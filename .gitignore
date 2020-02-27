@@ -2,3 +2,5 @@
 
 # Ignore the Snakefile
 Snakefile
+# Ignore any created html files
+*.html
