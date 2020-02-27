@@ -1,0 +1,267 @@
+---
+title: "DGE_Experimental_vs_Control"
+subtitle: 'DH25  vs DH25_control'
+author: "Asli Munzur"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+
+params:
+  ids: 'DH25-DH25_control'
+  output_path: '../../data/paired_dge_basic/DH25-DH25_control/outputsTEST.rds'
+  
+  pathwayHmark: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/h.all.v6.2.symbols.gmt'
+  pathwayGO: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/c5.all.v6.2.symbols.gmt'
+  pathwayReact: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/c2.cp.reactome.v7.0.symbols.gmt'
+  
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{css, echo=FALSE}
+    body .main-container {
+      max-width: 90% !important;
+      width: 90% !important;
+    }
+
+    body {
+      max-width: 90% !important;
+    }
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Packages, Libraries, and Functions to import
+
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(SingleCellExperiment)
+  library(scater)
+  library(scran)
+  library(here)
+  library(glue)
+  library(ggplot2) 
+  library(cowplot)
+  library(ggrepel)
+  library(edgeR)
+  library(DT)
+  library(reshape2)
+  library(fgsea)
+})
+
+source(here('source_scripts', 'utility.R'))
+```
+
+```{r}
+# extract this from passed in parameters
+
+ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+names(ids) <- c('transduced_id', 'control_id')
+```
+
+## DGEs
+
+```{r}
+
+plot_markers <- function(ids, ntop = 50, negative_control){
+  
+  sce_list <- lapply(ids, function(id) readRDS(here('data', 'qc', id, 'sce_qc.rds')))
+  names(sce_list) <- ids
+  
+  sce_list2 <- scran_batch_norm(sce_list)
+  
+  # sce_list <- do.call(batchelor::multiBatchNorm, c(sce_list, assay.type="counts", min.mean = 0.1))
+  # 
+  # sce_list <- lapply(sce_list, function(sce){
+  #   
+  #   for(n in reducedDimNames(sce)){
+  #     
+  #       reducedDim(sce, n) <- NULL
+  #     
+  #   }
+  #   
+  #   return(sce)
+  #   
+  # })
+
+  sce <- combine_sces(sce_list = sce_list, prefix_col_name = 'id', prefix_cell_name = TRUE)
+  
+  # Run UMAP, TSNE, PCA for visualization downstream steps: clustering, cellassign, ect.
+  sce <- runPCA(sce, exprs_values = "logcounts", ncomponents = 200)
+  sce <- runTSNE(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3)
+  sce <- runUMAP(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3,
+                    min_dist = 0.01, n_neighbors = 15, metric = "euclidean")
+  
+  # p1 <- plotReducedDim(sce, dimred = 'denoisePCA')
+  # p2 <- plotReducedDim(sce, dimred = 'TotalPCA')
+  # p3 <- plotReducedDim(sce, dimred = 'BioPCA')
+  # TSNEplot <- plotReducedDim(sce, 'TSNE') + ggtitle('Batch Norm - TSNE')
+  # UMAPplot <- plotReducedDim(sce, 'UMAP') + ggtitle('Batch Norm - UMAP')
+  # PCAplot <- plotReducedDim(sce, 'PCA') + ggtitle('Batch Norm - PCA')
+  # 
+  # plot(TSNEplot)
+  # plot(UMAPplot)
+  # plot(PCAplot)
+  # 
+  # gridExtra::grid.arrange(TSNEplot, TSNE_noBatchNorm, nrow = 1)
+  # gridExtra::grid.arrange(UMAPplot, UMAP_noBatchNorm, nrow = 1)
+  # gridExtra::grid.arrange(PCAplot, PCA_noBatchNorm, nrow = 1)
+  
+  
+  
+  # remove genes whose total counts < 100 and detected in < 5% of cells, remove mito, ribo genes
+  sce <- gene_filter(sce, gene_min_counts = 100, gene_min_detection_rate = 5, reporters = NULL)
+  
+  if(negative_control){
+    markers <- findMarkers(sce[rowData(sce)$qc_pass, ], groups = sample(sce$id))
+  }
+  else{
+    markers <- findMarkers(sce[rowData(sce)$qc_pass, ], groups = sce$id)
+  }
+  
+  markers <- markers[[ids[1]]] # pos logFC = up-regulated in tranduced cells
+  markers_all <- as.data.frame(markers) %>% rownames_to_column('gene_symbol')
+  colnames(markers_all) <- c('gene_symbol', 'Top', 'p.value ', 'FDR', 'logFC')
+  markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(FDR <= 0.05)
+  colnames(markers_sig) <- c('gene_symbol', 'Top', 'p.value ', 'FDR', 'logFC')
+  markers_sig <- markers_sig %>% dplyr::arrange(desc(abs(logFC))) #%>% dplyr::arrange(desc(abs(logFC))) dplyr::arrange(desc(logFC))
+  #tt_top <- top_n(markers_sig, n = ntop, wt = abs(logFC))
+  tt_top <- head(markers_sig, ntop)
+  
+  p <- ggplot(markers_sig, aes(x = logFC, y = -log10(FDR))) +
+    geom_point(colour = 'gray') +
+    geom_text_repel(data = tt_top, aes(label = gene_symbol), colour = 'red', size = 5) + 
+    geom_point(data = tt_top, aes(x = logFC, y = -log10(FDR)), colour = "blue") +
+    labs(title = glue('{infected}  vs. {control} top {ntop} DEGs', infected = ids[[1]], control = ids[[2]], ntop = ntop), 
+         subtitle = 'positive logFC means up-regulated in transduced sample') + theme(plot.subtitle = element_text(hjust = 0.5))
+  
+  outputs <- list(markers_all = markers_all, markers_sig = markers_sig, tt_top = tt_top, plot = p)
+  
+}
+
+outputs <- plot_markers(ids, ntop = 50, negative_control = FALSE)
+saveRDS(outputs, params$output_path)
+```
+
+```{r fig.height= 10, fig.width= 10}
+outputs$plot
+```
+
+**positive logFC = upregulated in transduced sample, genes sorted by absolute logFC**
+
+```{r}
+outputs$markers_sig %>%
+  DT::datatable(
+    extensions = 'Buttons', 
+    options = list(dom = 'Bfrtip', 
+                   buttons = list("copy", "excel", "csv", "pdf")))
+```
+
+## Gene Enrichment 
+
+**Plots show top 10 significant pathways**
+
+```{r}
+
+run_gene_enrichment <- function(markers, pathways_input, nperm){
+  
+  pathways <- gmtPathways(pathways_input)
+  # IF NON-HUMAN GENE, NEED TO MAP TO HUMAN GENOME FISRT, WE USE HUMAN GENOME SO OK
+  marker <- markers$markers_all %>% dplyr::select(gene_symbol, logFC) %>% na.omit() %>% distinct()
+  ranks <- deframe(marker)
+  fgseaRes <- fgsea(pathways = pathways, stats = ranks, nperm = nperm) %>% as_tibble() %>% dplyr::arrange(desc(NES))
+  sig_pathways <- fgseaRes[fgseaRes$padj < 0.05 , c('pathway', 'pval', 'padj', 'NES')]
+  
+  results <- list(fgseaRes = fgseaRes, sig_pathways = sig_pathways)
+  
+  return(results)
+  
+}
+
+make_ge_plots <- function(fgseaRes, pathway_name, pthresh = 0.05, ntop = 10, y_text_size = 10){
+  
+  fgseaRes <- fgseaRes[fgseaRes$padj < pthresh , ]
+  fgseaRes <- top_n(fgseaRes, n = ntop, wt = abs(NES))
+  fgseaRes$pathway <- as.character(lapply(fgseaRes$pathway, function(pw) str_replace(pw, pattern = glue(pathway_name, "_"), "")))
+  
+  if(dim(fgseaRes)[1] > 0){
+    
+      plot <- ggplot(fgseaRes, aes(reorder(pathway, NES), NES)) +
+              geom_col(aes(fill=padj < pthresh)) +
+              coord_flip() +
+              labs(x="Pathway", y="Normalized Enrichment Score",
+              title= glue(pathway_name, " pathways")) +
+              theme(text = element_text(size = 15),
+              axis.text.y = element_text(size = y_text_size))
+    
+      return(plot)
+    
+    } else{
+    
+      return(NULL)
+    
+    }
+}
+
+```
+
+```{r fig.height=5, fig.width=20, message=FALSE, warning=FALSE}
+set.seed(123458)
+fgseaReslist <- run_gene_enrichment(markers = outputs, pathways_input = params$pathwayHmark, nperm = 10000)
+make_ge_plots(fgseaRes = fgseaReslist$fgseaRes, pathway_name = "HALLMARK", pthresh = 0.05, ntop = 10)
+```
+
+```{r}
+fgseaReslist$sig_pathways %>%
+  DT::datatable(
+    extensions = 'Buttons', 
+    options = list(dom = 'Bfrtip', 
+                   buttons = list("copy", "excel", "csv", "pdf")))
+```
+
+```{r fig.height=5, fig.width=20, message=FALSE, warning=FALSE}
+set.seed(123458)
+fgseaReslist <- run_gene_enrichment(markers = outputs, pathways_input = params$pathwayGO, nperm = 10000)
+make_ge_plots(fgseaRes = fgseaReslist$fgseaRes, pathway_name = "GO", pthresh = 0.05, ntop = 10)
+```
+
+```{r}
+fgseaReslist$sig_pathways %>%
+  DT::datatable(
+    extensions = 'Buttons', 
+    options = list(dom = 'Bfrtip', 
+                   buttons = list("copy", "excel", "csv", "pdf")))
+```
+
+```{r fig.height=5, fig.width=20, message=FALSE, warning=FALSE}
+set.seed(123458)
+fgseaReslist <- run_gene_enrichment(markers = outputs, pathways_input = params$pathwayReact, nperm = 10000)
+make_ge_plots(fgseaRes = fgseaReslist$fgseaRes, pathway_name = "REACTOME", pthresh = 0.05, ntop = 10)
+```
+
+```{r}
+fgseaReslist$sig_pathways %>%
+  DT::datatable(
+    extensions = 'Buttons', 
+    options = list(dom = 'Bfrtip', 
+                   buttons = list("copy", "excel", "csv", "pdf")))
+```
+
+## Negative Control
+
+**Should return no DEG or very few DEGs**
+
+```{r}
+outputs <- plot_markers(ids, ntop = 50, negative_control = TRUE)
+```
+
+```{r}
+outputs$markers_sig %>%
+  DT::datatable(
+    extensions = 'Buttons', 
+    options = list(dom = 'Bfrtip', 
+                   buttons = list("copy", "excel", "csv", "pdf")))
+```
+

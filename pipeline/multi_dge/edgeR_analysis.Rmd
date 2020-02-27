@@ -1,0 +1,139 @@
+---
+title: "DE analysis"
+author: "asli"
+date: "2/25/2020"
+output: html_document
+
+params:
+  ids: 'DH25-DH25_control-DH22'
+---
+
+```{r}
+# source some files 
+source('')
+source('')
+
+```
+
+```{r include = FALSE}
+# load the sces
+ids <- strsplit(params$ids, "-")[[1]]
+dh_organoid_ids <- list('DH25_control','DH25')
+
+# make a list of the sces 
+sces <- lapply(dh_organoid_ids, function(dh_organoid_ids) readRDS(here('data', 'normalized', dh_organoid_ids, 'sce_norm.rds')))
+
+# rename the elements in the list based on the ids
+names(sces) <- paste(dh_organoid_ids)
+
+# find the common genes in our sces 
+universal <- Reduce(intersect, list(rownames(sces[[1]]), rownames( sces[[2]])))
+
+# only keep the common genes in all sces 
+sces <- lapply(sces, function(sce) sce <- sce[universal, ])
+
+# now sum across cells for each cell to make pseudo bulk samples
+# sces_countsList <- lapply(sces, function(sce) rowSums(counts(sce)))
+
+# turn each sce into a dge list object and combine them into one. we will be able to tell them apart using the id column 
+
+# dge_object_list <- lapply(sces_countsList, function(counts) DGEList(counts = counts))
+
+dge1 <- DGEList(counts = logcounts(sces[[1]]), group = sces[[1]]$id)
+dge2 <- DGEList(counts = logcounts(sces[[2]]), group = sces[[2]]$id)
+
+dge_object_list <- list(dge1, dge2)
+
+dgeObject <- do.call(cbind, dge_object_list) # combining 
+
+# plotMDS(dgeObject)
+
+# make a group of the ids, we will use this to make the linear model 
+group <- dgeObject$samples$group
+
+# normalize 
+# dgeObject <- calcNormFactors(dgeObject)
+
+# make a dataframe showing the experiment set up 
+# samples <- paste(ids)
+# treatment <- c('transduced', 'control', 'transduced')
+# setup <- data.frame(samples, treatment)
+# 
+# group <- factor(setup$samples, levels = c('DH25', 'DH25_control', 'DH22'))
+
+# make the model, we pick one with the intercept 
+designMatrix <- model.matrix(~group)
+
+# estimate the dispersion of genes to prepare for fitting the linear model, note that this takes some time, up to a few minutes 
+dgeObject <- estimateDisp(dgeObject, designMatrix)
+
+```
+
+
+```{r}
+# now that we have the dispersion estimates and the linear model, we will work on DE using quasi-likelihood (QL) F-test. 
+# this is better than a regular linear model because it accounts for the uncertainity in the dispersion estimates. 
+
+# first fit a negative binomial model to the data 
+fit <- glmQLFit(dgeObject, designMatrix)
+
+# the baseline is group one. here, we compare group 2 to group 1. if we had 3 groups and said coef = 3, this would mean comparing group 3 to group1. 
+# in other words, here we test the null hypothesis that coef1 - coef2 is equal to zero. 
+qlf <- glmQLFTest(fit, coef = 2)
+topTags(qlf)
+
+# a closer look at top genes: 
+summary(decideTests(qlf))
+
+plotMD(qlf)
+abline(h=c(-1,1), col="blue")
+
+# to find genes DE in all the groups: 
+# qlf <- glmQLFTest(fit, coef = 2:3)
+
+# DE GENE EXPRESSION ABOVE A THRESHOLD
+# Note that the fold-change threshold here is not the minimum value of the fold-change. Genes will need to exceed this threshold
+# before being declared statistically significant. we will use the same negative binomial fit. 
+qlf_threshold <- glmTreat(fit, coef = 2, lfc = 1)
+topTags(qlf_threshold)
+
+# Map gene names to entrez ids for goana and kegga
+geneIDs <- ensembldb::select(EnsDb.Hsapiens.v75, keys= my_genes, keytype = "SYMBOL", columns = c("SYMBOL","GENEID","ENTREZID"))
+
+# lets make sure we have the same genes in both 
+idx <- is.na(geneIDs$ENTREZID)
+idx_keep <- which(idx == FALSE)
+qlf_modified <- qlf[idx_keep, ]
+
+# drop the NAs, these are the genes we couldn't find an entrez id for 
+geneIDs <- na.omit(geneIDs)
+
+# do some gene enrichment 
+go <- goana(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs") # entrez gene ids are in mapping 
+topGO(go, sort="up")
+
+keg <- kegga(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs")
+topKEGG(keg, sort="up")
+
+```
+
+plot biological coefficient of variation against gene abundance, in ln counts per million   
+```{r, fig.height = 5, fig.width = 7}
+# plot biological coefficient of variation against gene abundance, in ln counts per million 
+plotBCV(dgeObject)
+```
+
+Plot the genewise quasi-likelihood dispersion against the gene abundance (in ln counts per million)  
+```{r, fig.height = 5, fig.width = 7}
+# Plot the genewise quasi-likelihood dispersion against the gene abundance (in ln counts per million).
+plotQLDisp(fit)
+```
+
+Plot the differentially expressed genes  
+The blue lines indicate 2-fold up or down. 
+```{r, fig.height = 10, fig.width = 10}
+# plot the differentially expressed genes 
+plotMD(qlf, main = paste('differentially expressed genes in', dh_organoid_ids[[2]], 'compared to', dh_organoid_ids[[1]]), ylab = 'log2 fold change')
+abline(h=c(-1,1), col="blue")
+```
+

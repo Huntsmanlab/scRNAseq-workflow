@@ -1,0 +1,34 @@
+---
+title: "DGE analysis between clusters within one sample"
+author: "asli"
+date: "2/25/2020"
+output: html_document
+
+params:
+  ids: 'DH25'
+---
+
+```{r include = FALSE}
+# source some files 
+
+```
+
+```{r include = FALSE}
+# load the data, the sce objects 
+id <- params$ids
+sce <- readRDS(here('data', 'clustered', 'sce', id, 'sce_clus.rds')) # load the sce with the clustered data 
+```
+
+```{r include = FALSE}
+# for DE analysis, we will use pseudo-bulk samples. here we sum the counts across cells in clusters 
+combos <- with(colData(sce), cluster)
+summed <- sumCountsAcrossCells(counts(sce), combos)
+
+# convert this matrix into a DGE list object 
+y <- DGEList(summed)
+group <- y$samples$group
+designMatrix <- model.matrix(~group)
+
+```
+
+

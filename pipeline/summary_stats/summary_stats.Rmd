@@ -1,0 +1,634 @@
+---
+title: " `r params$ids` Summary stats and quality control results"
+author: "asli munzur"
+date: "11/5/2020"
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  id: 'id'
+  ids: 'pair_ids'
+---
+
+```{r include = FALSE}
+# how do i run this script? 
+# you can run your samples through my entire pipeline using snakemake all the way from making an sce.
+# or you can also save your data to my folders, and just run it - make sure to start my DH_organoid Rproj. 
+# if you choose this methods, here is what you need to do: 
+# make a directory with your sample ids in the following folders: data/processed, data/qc, data/normalized
+# naming should be like this for the respective folders: 'sce.rds' 'sce_qc.rds' 'sce_norm.rds'
+```
+
+
+```{r include = FALSE}
+
+#extract the name_list from the parameters. we use the name list later on while making graphs. 
+ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+dh_organoid_ids <- list(ids[[1]], ids[[2]])
+
+# load the packages we need 
+suppressPackageStartupMessages({
+  
+  library(SingleCellExperiment)
+  library(scater)
+  library(scran)
+  library(tidyverse)
+  library(assertthat)
+  library(BiocSingular)
+  library(Matrix)
+  library(argparse)
+  library(data.table)
+  library(cowplot)
+  library(DropletUtils)
+  library(ggplot2)
+  library(gridExtra)
+  library(styler)
+  library(devtools)
+  library(edgeR)
+  library(Seurat)
+  library(here)
+  
+})
+
+```
+
+```{r include = FALSE}
+# here we do a bit or renaming and preparation for what is to come. 
+# find the directories where the sces are and load them
+sce_raws <- lapply(dh_organoid_ids, function(id) readRDS(here('data', 'processed', id, 'sce.rds')))
+sce_qcs <- lapply(dh_organoid_ids, function(id) readRDS(here('data', 'qc', id, 'sce_qc.rds')))
+
+# rename the sces
+names(sce_raws) <- dh_organoid_ids
+names(sce_qcs) <- dh_organoid_ids
+
+# the QC metrics are saved in sces. now extract them from sces and load them into objects 
+df_raws <- lapply(sce_raws, function(sce) colData(sce)) # this one has metrics before removing low quality cells 
+df_qcs <- lapply(sce_qcs, function(sce) colData(sce)) # this one has metrics after removing loq quality cells 
+
+#rename the dfs 
+names(df_raws) <- dh_organoid_ids
+names(df_qcs) <- dh_organoid_ids
+
+```
+
+```{r include = FALSE}
+# source the files for the functions we need 
+source('//huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R')
+source('//huntsman/mdouglas/dh_organoid/source_scripts/utility.R')
+source('//huntsman/amunzur/DH_organoid/pipeline/summary_stats/qcPlots.R')
+
+```
+
+
+```{r include = FALSE}
+# here we define a function to make plots. super simple function 
+# data is the data we want to make graph of 
+# what is what you are plotting on the y axis, the metric we are mainly interested in 
+# whichcolor allows you to pick a color since each metric has its own color 
+# name_list is the names of the datasets you use, we use it to name our plots. it must be list obviously 
+# theme is the theme. i like using theme_amunzur
+# yName is how you wanna name your y axis. we also use it to name our plots 
+# ymax is the the limit on the y axis. 
+
+makeQCplot <- function(data, what, whichcolor, name_list, theme, yName, yMax) {
+  
+  plot <- ggplot(data, aes(x = dataset, y = what)) +
+    geom_bar(stat = 'identity', fill = whichcolor, color = "black") +
+    ylab(yName) +
+    xlab("dataset") +
+    ylim(0, yMax) +
+    ggtitle(yName) + 
+    theme
+  
+  return(plot)
+}
+```
+
+```{r include = FALSE}
+# here we write a function to help us make dataframes that good for making plots later on 
+
+makeTable <- function(df, index) {
+  
+  # first we must go from S4 to data frame to be able to use dplyr
+  df <- as.data.frame(df) %>% 
+    
+    # get the mean for each column we are interested in 
+    summarize(sum = as.integer(mean(sum)), detected = as.integer(mean(detected)), subsets_mito_sum = as.integer(mean(subsets_mito_sum)), 
+              subsets_mito_percent =  as.integer(mean(subsets_mito_percent))) %>% 
+
+    mutate(id = dh_organoid_ids[[index]]) %>% 
+
+    # add a new column with the number of cells 
+    mutate(cell_number = nrow(df)) %>% 
+    
+    # here we take advantage of the select function to reorder the columns 
+    select(id, cell_number, sum, detected, subsets_mito_sum, subsets_mito_percent) %>% 
+    
+    # and here we just rename them for clarity 
+    rename(RNA_reds = sum, detected_genes = detected, mito_reads = subsets_mito_sum, mito_percent = subsets_mito_percent)
+  
+  return(df)
+  
+} # end of function 
+```
+
+```{r echo = FALSE, warning = FALSE}
+# we gotta add some tables here before we jump into graphs. 
+# we first make a very very basic table, then make it look better. 
+
+BEFOREcontrolTable <- makeTable(df_raws[[1]], 1)
+BEFOREexpTable <- makeTable(df_raws[[2]], 2)
+
+# combine data from control and treatment in one table 
+BEFOREtable <- rbind(BEFOREcontrolTable, BEFOREexpTable)
+
+AFTERcontrolTable <- makeTable(df_qcs[[1]], 1)
+AFTERexpTable <- makeTable(df_qcs[[2]], 2)
+
+# combine data from control and treatment in one table 
+AFTERtable <- rbind(AFTERcontrolTable, AFTERexpTable)
+
+```
+
+```{r echo = FALSE, warning = FALSE, results = 'asis'}
+# here we just make the tables look nice and add a caption as well. 
+BEFOREtable %>% 
+  knitr::kable(caption = 'Table 1: Summary statistics showing cell number and mean values per cell- BEFORE quality control')
+```
+
+
+```{r echo = FALSE, warning = FALSE, results = 'asis'}
+AFTERtable %>% 
+  knitr::kable(caption = 'Table 2: Summary statistics showing cell number and mean values per cell- AFTER quality control')
+```
+
+## BASIC QC METRICS  
+**These plots show these metrics:**  
+- Mean number of RNA reads per cell  
+- Mean number of detected genes per cell  
+- Mean percentage of mitochondrial genes per cell  
+
+```{r echo = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
+
+# the following plots plot the MEAN values per cell 
+# all 6 plots follow the same convention, easy to comprehend! 
+
+# but before we do these plots, we will find the best number ymax value for each type of graph. 
+# this value must stay the same before and after qc so that the basis of comparison stays the same. 
+# for each graph we make, we will pick the higher value of the 4 values we have. 2 for each: before and 
+# after qc. 
+
+ymax_library <- max(mean(df_raws[[1]]$sum), 
+                    mean(df_qcs[[1]]$sum), 
+                    mean(df_raws[[2]]$sum), 
+                    mean(df_qcs[[2]]$sum))
+
+ymax_detected <- max(mean(df_raws[[1]]$detected), 
+                    mean(df_qcs[[1]]$detected), 
+                    mean(df_raws[[2]]$detected), 
+                    mean(df_qcs[[2]]$detected))
+
+ymax_mito <- max(mean(df_raws[[1]]$subsets_mito_percent), 
+                    mean(df_qcs[[1]]$subsets_mito_percent), 
+                    mean(df_raws[[2]]$subsets_mito_percent), 
+                    mean(df_qcs[[2]]$subsets_mito_percent))
+
+
+# the problem is these values are ugly af, lets make them look nicer in a rounding function: 
+# actually this function doesnt work, so we will just use the ceiling function to round numbers. 
+roundUpNice <- function(x, nice=c(1,2,4,5,6,8,10)) {
+    if(length(x) != 1) stop("'x' must be of length 1")
+    10^floor(log10(x)) * nice[[which(x <= 10^floor(log10(x)) * nice)[[1]]]]
+}
+
+# now update our y limits:
+ymax_library <- ceiling(ymax_library)
+ymax_detected <- ceiling(ymax_detected)
+ymax_mito <- ceiling(ymax_mito)
+
+# MAKE PER CELL PLOTS - BEFORE QC ####
+# we will use the plots here for our before and after plotting & comparison
+
+# compare LIBRARY SIZES - before 
+dataset1 <- list(mean(df_raws[[1]]$sum), mean(df_raws[[2]]$sum))
+
+data1 <- data.frame(dataset = unlist(dh_organoid_ids), 
+           meanLibsize = unlist(dataset1))
+
+plot1 <- makeQCplot(data1, data1$meanLibsize, 'chartreuse3', dh_organoid_ids, theme_amunzur, 'mean RNA reads', ymax_library)
+
+
+# compare number of DETECTED - before 
+dataset2 <- list(mean(df_raws[[1]]$detected ), mean(df_raws[[2]]$detected))
+
+data2 <- data.frame(dataset = unlist(dh_organoid_ids), 
+                   meandetected = unlist(dataset2))
+
+plot2 <- makeQCplot(data2, data2$meandetected, 'brown3', dh_organoid_ids, theme_amunzur, 'mean detected genes', ymax_detected)
+
+
+
+# compare MITO PERCENTAGE - before 
+dataset3 <- list(mean(df_raws[[1]]$subsets_mito_percent ), mean(df_raws[[2]]$subsets_mito_percent))
+
+data3 <- data.frame(dataset = unlist(dh_organoid_ids), 
+                   meanmitoPercent = unlist(dataset3))
+
+plot3 <- makeQCplot(data3, data3$meanmitoPercent, 'deeppink1', dh_organoid_ids, theme_amunzur, 'mean mito percent', ymax_mito)
+
+grid.arrange(plot1, plot2, plot3, nrow = 1)
+```
+
+### AFTER QUALITY CONTROL  
+```{r echo = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
+
+# MAKE PER CELL PLOTS - AFTER QC ####
+# we will use the plots here for our before and after plotting & comparison
+
+# compare LIBRARY SIZES - after 
+dataset4 <- list(mean(df_qcs[[1]]$sum), mean(df_qcs[[2]]$sum))
+
+data4 <- data.frame(dataset = unlist(dh_organoid_ids), 
+                   meanLibsize = unlist(dataset4))
+
+plot4 <- makeQCplot(data4, data4$meanLibsize, 'chartreuse3', dh_organoid_ids, theme_amunzur, 'mean RNA reads', ymax_library)
+
+
+# compare number of DETECTED - after 
+dataset5 <- list(mean(df_qcs[[1]]$detected ), mean(df_qcs[[2]]$detected))
+
+data5 <- data.frame(dataset = unlist(dh_organoid_ids), 
+                   meandetected = unlist(dataset5))
+
+plot5 <- makeQCplot(data5, data5$meandetected, 'brown3', dh_organoid_ids, theme_amunzur, 'mean detected genes', ymax_detected)
+
+
+
+# compare MITO PERCENTAGE - after  
+dataset6 <- list(mean(df_qcs[[1]]$subsets_mito_percent ), mean(df_qcs[[2]]$subsets_mito_percent))
+
+data6 <- data.frame(dataset = unlist(dh_organoid_ids), 
+                   meanmitoPercent = unlist(dataset6))
+
+plot6 <- makeQCplot(data6, data6$meanmitoPercent, 'deeppink1', dh_organoid_ids, theme_amunzur, 'mean mito percent', ymax_mito)
+
+
+# show all 6 plots in one panel 
+grid.arrange(plot4, plot5, plot6, nrow = 1)
+```
+
+### Let's look at after QC results a little more closely: 
+```{r echo = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
+
+ymax_library <- ceiling(max(mean(df_qcs[[1]]$sum), 
+                    mean(df_qcs[[2]]$sum)))
+
+ymax_detected <- ceiling(max(mean(df_qcs[[1]]$detected), 
+                    mean(df_qcs[[2]]$detected)))
+
+ymax_mito <- ceiling(max(mean(df_qcs[[1]]$subsets_mito_percent), 
+                    mean(df_qcs[[2]]$subsets_mito_percent)))
+
+# MAKE PER CELL PLOTS - AFTER QC ####
+
+# compare LIBRARY SIZES - after 
+dataset4 <- list(mean(df_qcs[[1]]$sum), mean(df_qcs[[2]]$sum))
+
+data4 <- data.frame(dataset = unlist(dh_organoid_ids), 
+                   meanLibsize = unlist(dataset4))
+
+plot4 <- makeQCplot(data4, data4$meanLibsize, 'chartreuse3', dh_organoid_ids, theme_amunzur, 'mean RNA reads', ymax_library)
+
+
+# compare number of DETECTED - after 
+dataset5 <- list(mean(df_qcs[[1]]$detected ), mean(df_qcs[[2]]$sum))
+
+data5 <- data.frame(dataset = unlist(dh_organoid_ids), 
+                   meandetected = unlist(dataset5))
+
+plot5 <- makeQCplot(data5, data5$meandetected, 'brown3', dh_organoid_ids, theme_amunzur, 'mean detected genes', ymax_detected)
+
+
+
+# compare MITO PERCENTAGE - after  
+dataset6 <- list(mean(df_qcs[[1]]$subsets_mito_percent ), mean(df_qcs[[2]]$subsets_mito_percent))
+
+data6 <- data.frame(dataset = unlist(dh_organoid_ids), 
+                   meanmitoPercent = unlist(dataset6))
+
+plot6 <- makeQCplot(data6, data6$meanmitoPercent, 'deeppink1', dh_organoid_ids, theme_amunzur, 'mean mito percent', ymax_mito)
+
+
+# show all plots in one panel 
+grid.arrange(plot4, plot5, plot6, nrow = 1)
+```
+
+
+
+```{r include = FALSE}
+# MAKE TOTAL GRAPHS - not per cell - BEFORE ####
+
+# lib size 
+before1 <-  totalCountsPlot(as.data.frame(df_raws[[1]]), ymax_library) + ggtitle(dh_organoid_ids[[1]])
+before2 <- totalCountsPlot(as.data.frame(df_raws[[2]]), ymax_library) + ggtitle(dh_organoid_ids[[2]])
+
+# detected genes 
+before3 <- geneNumberPlot(as.data.frame(df_raws[[1]]), ymax_detected) + ggtitle(dh_organoid_ids[[1]])
+before4 <- geneNumberPlot(as.data.frame(df_raws[[2]]), ymax_detected) + ggtitle(dh_organoid_ids[[2]])
+
+# mito percent 
+before5 <- MitoPercentPlot(as.data.frame(df_raws[[1]]), ymax_mito) + ggtitle(dh_organoid_ids[[1]])
+before6 <- MitoPercentPlot(as.data.frame(df_raws[[2]]), ymax_mito) + ggtitle(dh_organoid_ids[[2]])
+
+# UMI and genes 
+before7 <- UMIandGenesPlot(as.data.frame(df_raws[[1]])) + ggtitle(dh_organoid_ids[[1]])
+before8 <- UMIandGenesPlot(as.data.frame(df_raws[[2]])) + ggtitle(dh_organoid_ids[[2]])
+
+# MAKE TOTAL GRAPHS - not per cell - AFTER ####
+
+before9 <-  totalCountsPlot(as.data.frame(df_qcs[[1]]), ymax_library) + ggtitle(dh_organoid_ids[[1]])
+before10 <- totalCountsPlot(as.data.frame(df_qcs[[2]]), ymax_library) + ggtitle(dh_organoid_ids[[2]])
+
+# detected genes 
+before11 <- geneNumberPlot(as.data.frame(df_qcs[[1]]), ymax_detected) + ggtitle(dh_organoid_ids[[1]])
+before12 <- geneNumberPlot(as.data.frame(df_qcs[[2]]), ymax_detected) + ggtitle(dh_organoid_ids[[2]])
+
+# mito percent 
+before13 <- MitoPercentPlot(as.data.frame(df_qcs[[1]]), ymax_mito) + ggtitle(dh_organoid_ids[[1]])
+before14 <- MitoPercentPlot(as.data.frame(df_qcs[[2]]), ymax_mito) + ggtitle(dh_organoid_ids[[2]])
+
+# UMI and genes 
+before15 <- UMIandGenesPlot(as.data.frame(df_qcs[[1]])) + ggtitle(dh_organoid_ids[[1]])
+before16 <- UMIandGenesPlot(as.data.frame(df_qcs[[2]])) + ggtitle(dh_organoid_ids[[2]])
+```
+
+
+
+```{r include = FALSE}
+
+# okay now lets do the same finding the y limit method for the histograms: 
+
+
+# find the max value from 4 sets and make that the y limit: 
+max1 <- max(ggplot_build(before1)$data[[1]]$count)
+max2 <- max(ggplot_build(before2)$data[[1]]$count)
+max3 <- max(ggplot_build(before9)$data[[1]]$count)
+max4 <- max(ggplot_build(before10)$data[[1]]$count)
+
+ymax_library <- max(max1, max2, max3, max4)
+
+max1 <- max(ggplot_build(before3)$data[[1]]$count)
+max2 <- max(ggplot_build(before4)$data[[1]]$count)
+max3 <- max(ggplot_build(before11)$data[[1]]$count)
+max4 <- max(ggplot_build(before12)$data[[1]]$count)
+
+ymax_detected <- max(max1, max2, max3, max4)
+
+max1 <- max(ggplot_build(before5)$data[[1]]$count)
+max2 <- max(ggplot_build(before6)$data[[1]]$count)
+max3 <- max(ggplot_build(before13)$data[[1]]$count)
+max4 <- max(ggplot_build(before14)$data[[1]]$count)
+
+ymax_mito <-max(max1, max2, max3, max4)
+```
+
+
+```{r include = FALSE}
+# MAKE TOTAL GRAPHS - not per cell - BEFORE ####
+
+# lib size 
+before1 <-  totalCountsPlot(as.data.frame(df_raws[[1]]), ymax_library) + ggtitle(dh_organoid_ids[[1]])
+before2 <- totalCountsPlot(as.data.frame(df_raws[[2]]), ymax_library) + ggtitle(dh_organoid_ids[[2]])
+
+# detected genes 
+before3 <- geneNumberPlot(as.data.frame(df_raws[[1]]), ymax_detected) + ggtitle(dh_organoid_ids[[1]])
+before4 <- geneNumberPlot(as.data.frame(df_raws[[2]]), ymax_detected) + ggtitle(dh_organoid_ids[[2]])
+
+# mito percent 
+before5 <- MitoPercentPlot(as.data.frame(df_raws[[1]]), ymax_mito) + ggtitle(dh_organoid_ids[[1]])
+before6 <- MitoPercentPlot(as.data.frame(df_raws[[2]]), ymax_mito) + ggtitle(dh_organoid_ids[[2]])
+
+# UMI and genes 
+before7 <- UMIandGenesPlot(as.data.frame(df_raws[[1]])) + ggtitle(dh_organoid_ids[[1]])
+before8 <- UMIandGenesPlot(as.data.frame(df_raws[[2]])) + ggtitle(dh_organoid_ids[[2]])
+
+# MAKE TOTAL GRAPHS - not per cell - AFTER ####
+
+before9 <-  totalCountsPlot(as.data.frame(df_qcs[[1]]), ymax_library) + ggtitle(dh_organoid_ids[[1]])
+before10 <- totalCountsPlot(as.data.frame(df_qcs[[2]]), ymax_library) + ggtitle(dh_organoid_ids[[2]])
+
+# detected genes 
+before11 <- geneNumberPlot(as.data.frame(df_qcs[[1]]), ymax_detected) + ggtitle(dh_organoid_ids[[1]])
+before12 <- geneNumberPlot(as.data.frame(df_qcs[[2]]), ymax_detected) + ggtitle(dh_organoid_ids[[2]])
+
+# mito percent 
+before13 <- MitoPercentPlot(as.data.frame(df_qcs[[1]]), ymax_mito) + ggtitle(dh_organoid_ids[[1]])
+before14 <- MitoPercentPlot(as.data.frame(df_qcs[[2]]), ymax_mito) + ggtitle(dh_organoid_ids[[2]])
+
+# UMI and genes 
+before15 <- UMIandGenesPlot(as.data.frame(df_qcs[[1]])) + ggtitle(dh_organoid_ids[[1]])
+before16 <- UMIandGenesPlot(as.data.frame(df_qcs[[2]])) + ggtitle(dh_organoid_ids[[2]])
+```
+
+
+```{r include = FALSE}
+# lets make some after graphs by zooming in a little bit: 
+# so now we need to find the ymax value among the df_qcs only.
+
+after1 <- totalCountsPlot(as.data.frame(df_qcs[[1]]),  ymax_library) + ggtitle(dh_organoid_ids[[1]])
+after2 <- totalCountsPlot(as.data.frame(df_qcs[[2]]),  ymax_library) + ggtitle(dh_organoid_ids[[2]])
+
+# detected genes 
+after3 <- geneNumberPlot(as.data.frame(df_qcs[[1]]), ymax_detected) + ggtitle(dh_organoid_ids[[1]])
+after4 <- geneNumberPlot(as.data.frame(df_qcs[[2]]), ymax_detected) + ggtitle(dh_organoid_ids[[2]])
+
+# mito percent 
+after5 <- MitoPercentPlot(as.data.frame(df_qcs[[1]]), ymax_mito) + ggtitle(dh_organoid_ids[[1]])
+after6 <- MitoPercentPlot(as.data.frame(df_qcs[[2]]), ymax_mito) + ggtitle(dh_organoid_ids[[2]])
+
+# updatde them with the correct ymax values: 
+ymax_library <- max(max(ggplot_build(after1)$data[[1]]$count), max(ggplot_build(after2)$data[[1]]$count))
+ymax_detected <- max(max(ggplot_build(after3)$data[[1]]$count), max(ggplot_build(after4)$data[[1]]$count))
+ymax_mito <- max(max(ggplot_build(after5)$data[[1]]$count), max(ggplot_build(after6)$data[[1]]$count))
+
+# make those graphs again: 
+after1 <-  totalCountsPlot(as.data.frame(df_qcs[[1]]), ymax_library) + ggtitle(dh_organoid_ids[[1]])
+after2 <- totalCountsPlot(as.data.frame(df_qcs[[2]]), ymax_library) + ggtitle(dh_organoid_ids[[2]])
+
+# detected genes 
+after3 <- geneNumberPlot(as.data.frame(df_qcs[[1]]), ymax_detected) + ggtitle(dh_organoid_ids[[1]])
+after4 <- geneNumberPlot(as.data.frame(df_qcs[[2]]), ymax_detected) + ggtitle(dh_organoid_ids[[2]])
+
+# mito percent 
+after5 <- MitoPercentPlot(as.data.frame(df_qcs[[1]]), ymax_mito) + ggtitle(dh_organoid_ids[[1]])
+after6 <- MitoPercentPlot(as.data.frame(df_qcs[[2]]), ymax_mito) + ggtitle(dh_organoid_ids[[2]])
+```
+
+These following graphs show the distribution of quality control metrics across all cells. 
+Red line shows the mean. 
+
+### Number of RNA reads  
+##### before QC 
+```{r echo = FALSE, warning = FALSE, fig.height = 4, fig.width = 7}
+# now we visualize these graphs 
+gridExtra::grid.arrange(before1, before2, nrow = 1)
+```
+
+##### after QC 
+```{r echo = FALSE, warning = FALSE, fig.height = 4, fig.width = 10}
+# now we visualize these graphs 
+gridExtra::grid.arrange(before9, before10, after1, after2, nrow = 1)
+```
+
+
+### Number of detected genes  
+##### before QC
+```{r echo = FALSE, warning = FALSE, fig.height = 4, fig.width = 7}
+# now we visualize these graphs 
+gridExtra::grid.arrange(before3, before4, nrow = 1)
+```
+
+##### after QC 
+```{r echo = FALSE, warning = FALSE, fig.height = 4, fig.width = 10}
+# now we visualize these graphs 
+gridExtra::grid.arrange(before11, before12, after3, after4, nrow = 1)
+```
+
+
+### Mitochondrial gene percentage  
+##### before QC
+Blue line shows 10% threshold.  
+```{r echo = FALSE, warning = FALSE, fig.height = 4, fig.width = 7}
+# now we visualize these graphs 
+gridExtra::grid.arrange(before5, before6, nrow = 1)
+```
+
+
+##### after QC
+```{r echo = FALSE, warning = FALSE, fig.height = 4, fig.width = 10}
+# now we visualize these graphs 
+gridExtra::grid.arrange(before13, before14, after5, after6, nrow = 1)
+```
+
+
+### Comparing number of RNA reads and number of detected genes 
+##### before QC
+
+```{r echo = FALSE, warning = FALSE, fig.height = 4, fig.width = 7}
+# now we visualize these graphs 
+gridExtra::grid.arrange(before7, before8, nrow = 1)
+```
+
+##### after QC
+
+```{r echo = FALSE, warning = FALSE, fig.height = 4, fig.width = 7}
+# now we visualize these graphs 
+gridExtra::grid.arrange(before15, before16, nrow = 1)
+```
+
+
+```{r include = FALSE}
+# some cool plots with scater:
+# CONTROL - DH25_control
+control_raw_withMetrics <- calculateQCMetrics(sce_raws[[1]])
+control_coolplot1 <- plotExprsFreqVsMean(control_raw_withMetrics) + ggtitle(paste(dh_organoid_ids[[1]], 'before QC', sep = '-'))
+
+control_qc_withMetrics <- calculateQCMetrics(sce_qcs[[1]])
+control_coolplot2 <- plotExprsFreqVsMean(control_qc_withMetrics) + ggtitle(paste(dh_organoid_ids[[1]], 'after QC', sep = '-'))
+
+# EXPERIMENTAL - DH25
+exp_raw_withMetrics <- calculateQCMetrics(sce_raws[[2]])
+exp_coolplot1 <- plotExprsFreqVsMean(exp_raw_withMetrics) + ggtitle(paste(dh_organoid_ids[[2]], 'before QC', sep = '-'))
+
+exp_qc_withMetrics <- calculateQCMetrics(sce_qcs[[2]])
+exp_coolplot2 <- plotExprsFreqVsMean(exp_qc_withMetrics) + ggtitle(paste(dh_organoid_ids[[2]], 'after QC', sep = '-'))
+
+```
+
+Frequency of expression (i.e., number of cells with non-zero expression) plotted against the mean.  
+These two metrics should be positively correlated with each other for most genes.
+
+BEFORE QC
+```{r echo = FALSE, warning = FALSE, fig.height = 10, fig.width = 10}
+gridExtra::grid.arrange(control_coolplot1, exp_coolplot1, nrow = 1)
+```
+
+AFTER QC
+```{r echo = FALSE, warning = FALSE, fig.height = 10, fig.width = 10}
+gridExtra::grid.arrange(control_coolplot2, exp_coolplot2)
+```
+
+
+### REDUCED DIMENSIONALITY PLOTS 
+Here we include the reduced dimensionality plots before and after batch normalization.  
+Note that these plots are only for the cells that underwent quality control.  
+
+```{r include = FALSE}
+# BEFORE BATCH NORM 
+
+# here, we need to use the normalized sces to run dim reduction. so lets load them and make a list. 
+sce_norms <- lapply(dh_organoid_ids, function(id) readRDS(here('data', 'normalized', id, 'sce_norm.rds')))
+
+# remove the reduced dimensions 
+sce_norms <- lapply(sce_norms, function(sce){
+      for(n in reducedDimNames(sce)){
+        reducedDim(sce, n) <- NULL
+      }
+      return(sce)
+    })
+
+# combine sces
+sce <- combine_sces(sce_list = sce_norms, prefix_col_name = 'id', prefix_cell_name = TRUE)
+  
+# Run UMAP, TSNE, PCA for visualization downstream steps: clustering, cellassign, ect.
+sce <- runPCA(sce, exprs_values = "logcounts", ncomponents = 200)
+sce <- runTSNE(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3)
+sce <- runUMAP(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3,
+                    min_dist = 0.01, n_neighbors = 15, metric = "euclidean")
+
+# make the reduced dims plots 
+PCA_noBatchNorm <- plotReducedDim(sce, dimred = 'PCA') + ggtitle('before batch norm - PCA')
+TSNE_noBatchNorm <- plotReducedDim(sce, dimred = 'TSNE') + ggtitle('before batch norm - TSNE')
+UMAP_noBatchNorm <- plotReducedDim(sce, dimred = 'UMAP') + ggtitle('before batch norm - UMAP')
+
+```
+
+
+```{r include = FALSE}
+# AFTER BATCH NORM
+
+# here, we need to use the normalized sces to run dim reduction. so lets load them and make a list. 
+sce_norms <- lapply(dh_organoid_ids, function(id) readRDS(here('data', 'normalized', id, 'sce_norm.rds')))
+
+# batch normalization 
+sce_norms <- scran_batch_norm(sce_norms)
+
+# combine sces
+sce <- combine_sces(sce_list = sce_norms, prefix_col_name = 'id', prefix_cell_name = TRUE)
+  
+# Run UMAP, TSNE, PCA for visualization downstream steps: clustering, cellassign, ect.
+sce <- runPCA(sce, exprs_values = "logcounts", ncomponents = 200)
+sce <- runTSNE(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3)
+sce <- runUMAP(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3,
+                    min_dist = 0.01, n_neighbors = 15, metric = "euclidean")
+
+# make the reduced dims plots
+TSNEplot <- plotReducedDim(sce, 'TSNE') + ggtitle('after batch Norm - TSNE')
+UMAPplot <- plotReducedDim(sce, 'UMAP') + ggtitle('after batch Norm - UMAP')
+PCAplot <- plotReducedDim(sce, 'PCA') + ggtitle('after batch Norm - PCA')
+
+```
+
+TSNE
+```{r echo = FALSE, warning = FALSE, fig.height = 4, fig.width = 7}
+# now we visualize
+gridExtra::grid.arrange(TSNE_noBatchNorm, TSNEplot, nrow = 1)
+```
+
+UMAP
+```{r echo = FALSE, warning = FALSE, fig.height = 4, fig.width = 7}
+# now we visualize
+gridExtra::grid.arrange(UMAP_noBatchNorm, UMAPplot, nrow = 1)
+```

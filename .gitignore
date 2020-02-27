@@ -1,0 +1,4 @@
+# The gitignore!
+
+# Ignore the Snakefile
+Snakefile

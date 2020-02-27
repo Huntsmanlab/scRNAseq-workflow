@@ -1,0 +1,277 @@
+---
+title: "`r params$ids` Clustering analysis on combined samples"
+author: "asli"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  id: 'id'
+  ids: 'pair_ids'
+---
+This report shows the results of clustering after we combine the samples.  
+We first show the results of clustering within each sample, then we compare those  
+results to clustering in a combined sample. For clustering in a combined sample,  
+we first do clustering analysis on individual samples by finding neighbors.  
+Based on our findings, we then define clusters. Seurat package picks the best number  
+of clusters for us. The algorithm we use is **nearest neighbors**.  
+When we have this data for both samples, we follow these steps:  
+
+1. find integration anchors, these are cells that have similar biological state  
+across samples  
+2. integrate the the samples into one larger sample  
+3. run dimension reduction analyses on the larger sample as well as a new clustering analysis  
+(best number of clusters is again decided by seurat)
+
+
+```{r include = FALSE}
+# source the files we need. this file also contains the packages we need. 
+source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R')
+```
+
+
+```{r include = FALSE}
+# extract our data from the ids 
+ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+dh_organoid_ids <- list(ids[[1]], ids[[2]])
+```
+
+```{r include = FALSE}
+# load the sce objects we will be working on 
+sce_list <- lapply(dh_organoid_ids, function(id) readRDS(here('data', 'clustered', 'sce', id, 'sce_clus.rds')))
+
+#name them nicely 
+names(sce_list) <- dh_organoid_ids
+```
+
+### Visualizing the reduced dims plots separately  
+#### First data set 
+
+```{r echo = FALSE, message = FALSE}
+
+plotTSNE(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', dh_organoid_ids[[1]], sep = '_'))
+plotUMAP(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', dh_organoid_ids[[1]], sep = '_'))
+plotPCA(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', dh_organoid_ids[[1]], sep = '_'))
+```
+
+#### Second data set  
+```{r echo = FALSE, message = FALSE}
+
+plotTSNE(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', dh_organoid_ids[[2]], sep = '_'))
+plotUMAP(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', dh_organoid_ids[[2]], sep = '_'))
+plotPCA(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', dh_organoid_ids[[2]], sep = '_'))
+```
+
+
+```{r include = FALSE}
+# we will be running similar analyses on two datasets, so we have this function instead: 
+# this function converts sce into a seurat object and perform clustering. 
+seuratClustering  <- function(sce, id) {
+  
+  # convert the sce into a seurat object 
+  sobject <- as.Seurat(sce)
+  
+  # find variable features to reduce run time
+  sobject <- FindVariableFeatures(sobject)
+  
+  # add to metadata so that we can keep track of the samples 
+  sobject@meta.data[, "protocol"] <- paste(id)
+  
+  # we need to do this annoying thing where we do a bunch of renaming because seurat doesnt like capital letters 
+  sobject@reductions$pca <- sobject@reductions$PCA
+  sobject@reductions$tsne <- sobject@reductions$TSNE
+  sobject@reductions$umap <- sobject@reductions$UMAP
+  
+  # compute the nearest neighbor graph
+  sobject <-FindNeighbors(sobject)
+  
+  # lets find some clusters 
+  sobject <- FindClusters(sobject, resolution = 0.15)
+  
+  return(sobject)
+}
+
+```
+
+frequency table: 
+```{r include = FALSE}
+# we run this function on our sces here. we just convert them into seurat objects and do a bit of a clean up 
+sobject1 <- seuratClustering(sce_list[[1]], paste(dh_organoid_ids[[1]]))
+sobject2 <- seuratClustering(sce_list[[2]], paste(dh_organoid_ids[[2]]))
+
+# LETS START OUR INTEGRATION:
+# first combine the objects and add cell ids as well so that we know where each cell came from 
+DH.combined = merge(sobject1, y = sobject2, add.cell.ids = c(dh_organoid_ids[[1]], dh_organoid_ids[[2]]), project = "protocol")
+
+# lets split by protocol 
+data.list <- SplitObject(DH.combined, split.by = "protocol")
+
+# make a reference list for our samples, we'll use it in the next step 
+reference.list <- data.list[c(paste(dh_organoid_ids[[1]]), dh_organoid_ids[[2]])]
+
+# this is where things get messy! we will follow a different path depending on how many cells we have in each sample. 
+# FindIntegrationAnchors will be used only if we have at least 200 cells in each sample 
+
+# condition based on cell number: 
+if (dim(DH.combined)[[2]] > 200) {
+  
+  # find anchoring points between two samples and put them in the refence list, use first 30 dimensions. 
+  # these anchors represent cells with similar states between two samples 
+  # seurat uses those samples to normalize the data. 
+  # when we have less than 200 cells, we will use other normalization methods for batch normalization 
+  samples.anchors <- FindIntegrationAnchors(object.list = reference.list, dims = 1:30, k.filter = NA)
+  
+  # integrate the two data sets 
+  samples.integrated <- IntegrateData(anchorset = samples.anchors, dims = 1:30)
+  
+  # set the default combined assay we will be using. we will be using the 'integrated', aka batch corrected assay, not the previous ones 
+  DefaultAssay(samples.integrated) <- "integrated"
+  
+  # do some gene level scaling. we scale so that each gene will be centered to have a mean of 0 and and scaled by SD of the gene
+  samples.integrated <- ScaleData(samples.integrated, verbose = FALSE)
+  
+  # run some dim reduction 
+  samples.integrated <- RunPCA(samples.integrated, npcs = 30, verbose = FALSE)
+  samples.integrated <- RunTSNE(samples.integrated, dims = 1:30)
+  samples.integrated <- RunUMAP(samples.integrated, dims = 1:30)
+  
+  # make the plots here 
+  # this is how our data basically looks like when we combine: 
+  # the group.by command shows the differences between groups based on protocol
+  p1 <- DimPlot(samples.integrated, reduction = "tsne", group.by = "protocol")
+   
+  # this command shows the same integrated object, but it separates it based on clusters 
+  p2 <- DimPlot(samples.integrated, reduction = "tsne", group.by = "seurat_clusters", label = TRUE, repel = TRUE) + NoLegend() + ggtitle('TSNE')
+  
+  p3 <- DimPlot(samples.integrated, reduction = "umap", group.by = "protocol")
+  p4 <- DimPlot(samples.integrated, reduction = "umap", group.by = "seurat_clusters", label = TRUE, repel = TRUE) + NoLegend() + ggtitle('UMAP')
+  
+  p5 <- DimPlot(samples.integrated, reduction = "pca", group.by = "protocol")
+  p6 <- DimPlot(samples.integrated, reduction = "pca", group.by = "seurat_clusters", label = TRUE, repel = TRUE) + NoLegend() + ggtitle('PCA')
+  
+  # this piece of code will show you the frequency of cell id types in each sample.
+  freq_table <- prop.table(x = table(samples.integrated@active.ident, samples.integrated@meta.data[, "protocol"]), margin = 2)
+  
+  freq_table %>% 
+    knitr::kable(caption = 'Table 1: frequency of each cell type (cluster) in each sample') %>% 
+    kable_styling(full_width = F)
+
+  
+} else {
+  
+  # subset to the common genes: 
+  universal <- intersect(rownames(sce_list[[1]]), rownames( sce_list[[2]]))
+  sce_list[[1]] <- sce1[universal,]
+  sce_list[[2]] <- sce2[universal,]
+  
+  # remove differences in sequencing depth between batches  
+  rescaled <- multiBatchNorm(sce_list[[1]], sce_list[[2]]) 
+  
+  # update our sces 
+  sce_list[[1]] <- rescaled[[1]]
+   sce_list[[2]] <- rescaled[[2]]
+  
+  # integration using nearest neighbors
+  corrected <- fastMNN(one = sce_list[[1]], two =  sce_list[[2]], subset.row=chosen.hvgs)
+  
+  # combine counts and log counts to make a combined sce 
+  overall_counts <- cbind(counts(sce_list[[1]]), counts( sce_list[[2]]))
+  overall_logcounts <- cbind(logcounts(sce_list[[1]]), logcounts( sce_list[[2]]))
+  
+  # do the combining here
+  sce <- SingleCellExperiment( 
+    
+    assays = list(counts = overall_counts, logcounts = overall_logcounts),  
+    rowData = rowData(sce_list[[1]]), # same as rowData(pbmc4k) 
+    colData = rbind(colData(sce_list[[1]]), colData( sce_list[[2]])))
+
+  # run reduced dim analysis 
+  # set the seed for reproducibility
+  set.seed(seed)
+  
+  sce <- runPCA(sce, exprs_values = "logcounts", ncomponents = 200)
+  sce <- runTSNE(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3)
+  sce <- runUMAP(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3,
+                    min_dist = 0.01, n_neighbors = 15, metric = "euclidean")
+
+  # convert to seurat object 
+  combined_seurat <- as.seurat(sce)
+  
+  # build a snn graph 
+  sobject <-FindNeighbors(sobject)
+  
+  # lets find some clusters 
+  sobject <- FindClusters(sobject, resolution = 0.15)
+  
+  # run reduced dim analysis 
+  sce <- RunPCA(sce, npcs = 30, verbose = FALSE)
+  sce <- RunTSNE(sce, dims = 1:30)
+  sce <- RunUMAP(sce, dims = 1:30)
+  
+  # do some gene level scaling. we scale so that each gene will be centered to have a mean of 0 and and scaled by SD of the gene
+  samples.integrated <- ScaleData(samples.integrated, verbose = FALSE)
+  
+  # make some reduced dim plots 
+  
+  # the group.by command shows the differences between groups based on id
+  p1 <- DimPlot(samples.integrated, reduction = "tsne", group.by = "id")
+   
+  # this command shows the same integrated object, but it separates it based on clusters 
+  p2 <- DimPlot(samples.integrated, reduction = "tsne", group.by = "seurat_clusters", label = TRUE, repel = TRUE) + NoLegend() + ggtitle('TSNE')
+  
+  p3 <- DimPlot(samples.integrated, reduction = "umap", group.by = "id")
+  p4 <- DimPlot(samples.integrated, reduction = "umap", group.by = "seurat_clusters", label = TRUE, repel = TRUE) + NoLegend() + ggtitle('UMAP')
+  
+  p5 <- DimPlot(samples.integrated, reduction = "pca", group.by = "id")
+  p6 <- DimPlot(samples.integrated, reduction = "pca", group.by = "seurat_clusters", label = TRUE, repel = TRUE) + NoLegend() + ggtitle('PCA')
+  
+  ##################################################################################################################
+  ##################################################################################################################
+  
+} # end of else 
+
+```
+
+
+Now, we run a clustering analysis on the combined data and visualize our findings in dimension reduction plots.  
+Each cluster is shown with a different color.  
+
+#### TSNE PLOTS
+```{r echo = FALSE, message = FALSE, fig.height = 10, fig.width = 10}
+grid.arrange(p1, p2, nrow = 2)
+```
+
+#### UMAP PLOTS
+```{r echo = FALSE, message = FALSE, fig.height = 10, fig.width = 10}
+grid.arrange(p3, p4, nrow = 2)
+
+```
+
+#### PCA PLOTS
+```{r echo = FALSE, message = FALSE, fig.height = 10, fig.width = 10}
+grid.arrange(p5, p6, nrow = 2)
+
+```
+
+Now we look at the cell id types in each sample. This bar plot shows the proportion of each type (cluster) in each sample.  
+```{r echo = FALSE, message = FALSE}
+barplot(height = freq_table)
+```
+
+
+
+```{r include = FALSE}
+# MOVE THIS TO DIM REDUCTION 
+# cluster.averages <- AverageExpression(samples.integrated, return.seurat = TRUE)
+# 
+# head(AverageExpression(samples.integrated))
+# 
+# 
+# DoHeatmap(cluster.averages, features = unlist(TopFeatures(samples.integrated[["pca"]], balanced = TRUE)), size = 3, 
+#     draw.lines = FALSE)
+# 
+# 
+# 
+# head(cluster.averages[["integrated"]])
+```
