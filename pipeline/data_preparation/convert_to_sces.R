@@ -1,13 +1,7 @@
 # this script has a function that makes a sce from cell ranger output. 
 
-suppressPackageStartupMessages({
-  library(SingleCellExperiment)
-  library(DropletUtils)
-  library(scater)
-  library(here)
-  library(glue)
-  library(argparse)
-})
+library(here)
+source(here('..', 'sourceFiles', 'utilities.R'))
 
 ##################################
 

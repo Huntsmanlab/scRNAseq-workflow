@@ -27,7 +27,9 @@ across samples
 
 ```{r include = FALSE}
 # source the files we need. this file also contains the packages we need. 
-source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R')
+library(here)
+source(here('..', 'sourceFiles', 'utilities.R'))
+
 ```
 
 

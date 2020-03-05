@@ -2,15 +2,8 @@
 
 # as inputs, it needs a list of filepaths that contains all the data we need. 
 
-suppressPackageStartupMessages({
-  library(SingleCellExperiment)
-  library(DropletUtils)
-  library(scater)
-  library(here)
-  library(glue)
-  library(argparse)
-})
-
+library(here)
+source(here('..', 'sourceFiles', 'utilities.R'))
 
 convert_to_sces <- function(path_to_10X, ids) {
 
@@ -39,4 +32,3 @@ convert_to_sces <- function(path_to_10X, ids) {
   return(results_sce) #return the list that contains all the sce objects we made in this function 
   
 } # end of function 
-
