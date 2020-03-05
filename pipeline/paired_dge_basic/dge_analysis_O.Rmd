@@ -13,8 +13,11 @@ params:
 
 ```{r include = FALSE}
 # source some files 
+# library(here)
+# source(here('sourceFiles', 'utilities.R'))
+# 
 source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R') 
-source('/huntsman/mdouglas/dh_organoid/source_scripts/utility.R')
+# source('/huntsman/mdouglas/dh_organoid/source_scripts/utility.R')
 
 ```
 
@@ -186,26 +189,31 @@ keg <- kegga(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs")
 
 ```
 
-### Diagnostic Plots  
+### Diagnostic Plots 
+These plots are intended to give an idea about the model and whether it is a good fit to represent the data we are interested in analyzing. 
 
 Plot samples (replicates, in this case clusters) on a two-dimensional scatterplot so that distances on the plot approximate the expression differences between the samples.  
-Clusters far apart mean they that are different in terms of gene expression. Closer means more similar. 
+Clusters shown far apart mean they that are different in terms of gene expression. Cluster shown together are more similar in terms of gene expression.  
 ```{r echo = FALSE, message = FALSE, fig.width = 8, fig.height = 6}
 plotMDS(dgeObject)
 ```
 
-
 #### Plot biological coefficient of variation against gene abundance, in log2 counts per million.  
-Biological coefficient of variation is the true variation between genes. 
+Biological coefficient of variation is the true variation between genes, and it corresponds to the dispersion parameter of the negative binomial model. To learn more about dispersion, variation and how they relate to one another, read more about the negative binomial model and its implementation in scRNA sequencing data.  
+Look for these to make sure your the model is a good fit:  
+**1.** High dispersion (variance) for low counts is expected. Dispersion is expected to decrease smoothly as the abundance increases.  
+**2.** For humans, common dispersion (the red line) should be around 0.3 - 0.4, meaning replicates can differ by 30% or more. If the common dispersion is more,  
+YOU SHOULD NOT BE USING THIS SCRIPT. High dispersion values will influence the differential expression analysis.  
+
+**This plot will give you a measure of how varies the samples are. **
 ```{r, echo = FALSE, message = FALSE, fig.height = 5, fig.width = 7}
 # plot biological coefficient of variation against gene abundance, in ln counts per million 
 plotBCV(dgeObject)
 ```
 
-
 #### Plot the genewise quasi-likelihood dispersion against the gene abundance (in log2 counts per million).
-In this script, we squeeze the dispersion values from raw counts towards the trended dispersion. (This just means we transform the data in certain ways.)
-The plots gives an idea about how much the data was squeezed.  
+In this script, we squeeze the dispersion values from raw counts towards the trended dispersion. (This just means we transform the data in certain ways to make the model fit.)
+The plots gives an idea about how much the data was squeezed. The expected is too see squeezed dispersion values (shown in red) closer to the trended (blue) line
 ```{r,echo = FALSE, message = FALSE, fig.height = 7, fig.width = 7}
 # Plot the genewise quasi-likelihood dispersion against the gene abundance (in ln counts per million).
 plotQLDisp(fit)
@@ -213,13 +221,12 @@ plotQLDisp(fit)
 
 
 #### Plot the differentially expressed genes  
-The blue lines indicate 2-fold up or down. The number of genes that are significantly up or down regulated are shown in the table, according to the plot.  
+The blue lines indicate 1-fold up or down. The number of genes that are significantly up or down regulated are shown in the table, according to the plot.  
 ```{r, echo = FALSE, message = FALSE, fig.height = 10, fig.width = 7}
 # plot the differentially expressed genes 
 plotMD(qlf, main = paste('differentially expressed genes in', dh_organoid_ids[[2]], 'compared to', dh_organoid_ids[[1]]), ylab = 'log2 fold change')
 abline(h=c(-1,1), col="blue")
 ```
-
 
 
 Take a closer look at the genes visualized above: 
@@ -290,11 +297,6 @@ DT::datatable(downregulated_genes_table,
   options = list(dom = 'Bfrtip', 
                  buttons = list("copy", "excel", "csv", "pdf")))
 
-
-# downregulated_genes_table %>% 
-#     knitr::kable(caption = paste('comparing', dh_organoid_ids[[2]], 'to', dh_organoid_ids[[1]])) %>% 
-#     kable_styling(full_width = T)
-
 ```
 
 
@@ -336,10 +338,6 @@ DT::datatable(gotable,
   extensions = 'Buttons', 
   options = list(dom = 'Bfrtip', 
                  buttons = list("copy", "excel", "csv", "pdf")))
-# 
-# gotable %>% 
-#   knitr::kable(caption = 'GO pathways') %>% 
-#   kable_styling(full_width = F)
   
 ```
 
@@ -355,10 +353,6 @@ DT::datatable(keggtable,
   options = list(dom = 'Bfrtip', 
                  buttons = list("copy", "excel", "csv", "pdf")))
 
-# keggtable %>% 
-#   knitr::kable(caption = 'KEGG pathways') %>% 
-#   kable_styling(full_width = F)
-#   
 ```
 
 ```{r include = FALSE}
