@@ -48,7 +48,8 @@ args <- parser$parse_args()
 # this function will give you two outputs: sce and qc metrics dataframe. you need to specify two separate paths to save them.
 # this function will also name things generically, so we dont need to specify the file names. 
 
-source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R')
+# source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R')
+source(here('sourceFiles', 'utilities.R'))
 
 make_sce_qc <- function(whichMethod, path_to_sce, output_file_name, mito_thresh_max, mito_thresh_min, nmads, seed, min_features){
   
