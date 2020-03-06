@@ -7,7 +7,7 @@ output:
     code_folding: hide
 
 params:
-  ids: 'DH21_P5-DH21_P5_control-DH21_control'
+  ids: 'DH21-DH21_control'
 ---
 
 ```{r include = FALSE}
@@ -31,11 +31,11 @@ if (length(ids) == 2) {dh_organoid_ids <- list(ids[[1]], ids[[2]])
 
 } else if (length(ids) == 5) {dh_organoid_ids <- list(ids[[1]], ids[[2]], ids[[3]], ids[[4]], ids[[5]])
 
-} else if (length(ids) == 6) {dh_organoid_ids <- list(ids[[1]], ids[[2]], ids[[3]], ids[[4]], ids[[5]], ids[[6]])}
+} else if (length(ids) == 6) {dh_organoid_ids <- list(ids[[1]], ids[[2]], ids[[3]], ids[[4]], ids[[5]], ids[[6]]) }
 ```
 
 
 ```{r include = FALSE}
 # load the data, volcano plots etc from max's folder. this one has the outputs: 
-readRDS(here('..', '..', 'mdouglas', 'dh_organoid', 'data', 'dge', params$ids))
+paired_output <- readRDS(here('..', '..', 'mdouglas', 'dh_organoid', 'data', 'dge', params$ids, 'outputs.rds'))
 ```
