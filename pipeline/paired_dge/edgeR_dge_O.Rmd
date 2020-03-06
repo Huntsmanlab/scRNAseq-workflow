@@ -342,19 +342,15 @@ Genes with smaller summed_ranks have high fold changes and low p values.
 ```{r include = FALSE}
 
 # here we do some manipulation to show the upregulated genes in a meaningful way 
-upregulated_genes_table <- make_upreg_table(qlf) %>% 
-  mutate_at(vars(logFC), funs(round(., 3)))
-
-datatable(upregulated_genes_table) 
-
-```
-
-```{r echo = FALSE, message = FALSE}
+upregulated_genes_table <- make_upreg_table(qlf)
 
 DT::datatable(upregulated_genes_table, 
   extensions = 'Buttons', 
   options = list(dom = 'Bfrtip', 
                  buttons = list("copy", "excel", "csv", "pdf")))
+
+# save the table to be loaded later 
+write.csv(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR_up', paste(params$ids)))
 
 ```
 
@@ -371,6 +367,9 @@ DT::datatable(downregulated_genes_table,
   extensions = 'Buttons', 
   options = list(dom = 'Bfrtip', 
                  buttons = list("copy", "excel", "csv", "pdf")))
+
+# save the table to be loaded later 
+write.csv(downregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR_down', paste(params$ids)))
 
 ```
 
@@ -443,3 +442,4 @@ This should return to no / few DE genes.
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 7}
 neg_control_plot
 ```
+
