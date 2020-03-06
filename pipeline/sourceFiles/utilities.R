@@ -63,17 +63,17 @@ theme_amunzur <- theme(
 ####################################################################################################
 # list of functions
 ####################################################################################################
-seuratClustering()
-combine_sces2()
-make_upreg_table()
-make_downreg_table()
-make_pseudo_counts()
+# seuratClustering()
+# combine_sces2()
+# make_upreg_table()
+# make_downreg_table()
+# make_pseudo_counts()
 
 # from max's utilities folder: 
-combine_sces()
-gene_filter()
-plotDEG_scran()
-scran_batch_norm()
+# combine_sces()
+# gene_filter()
+# plotDEG_scran()
+# scran_batch_norm()
 ####################################################################################################
 
 # before using the combine funtion, run this function first to turn our sces into seurat object. 
