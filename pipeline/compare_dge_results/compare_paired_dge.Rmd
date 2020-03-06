@@ -1,0 +1,41 @@
+---
+title: '`r params$ids` compare results of various DE analysis results'
+author: "aslı"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  ids: 'DH21_P5-DH21_P5_control-DH21_control'
+---
+
+```{r include = FALSE}
+
+# source some files 
+library(here)
+source(here('..', 'sourceFiles', 'utilities.R'))
+
+```
+
+```{r include = FALSE}
+# load ids
+ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+
+# make a list from the ids 
+if (length(ids) == 2) {dh_organoid_ids <- list(ids[[1]], ids[[2]])
+
+} else if (length(ids) == 3) {dh_organoid_ids <- list(ids[[1]], ids[[2]], ids[[3]]) 
+
+} else if (length(ids) == 4) {dh_organoid_ids <- list(ids[[1]], ids[[2]], ids[[3]], ids[[4]])
+
+} else if (length(ids) == 5) {dh_organoid_ids <- list(ids[[1]], ids[[2]], ids[[3]], ids[[4]], ids[[5]])
+
+} else if (length(ids) == 6) {dh_organoid_ids <- list(ids[[1]], ids[[2]], ids[[3]], ids[[4]], ids[[5]], ids[[6]])}
+```
+
+
+```{r include = FALSE}
+# load the data, volcano plots etc from max's folder. this one has the outputs: 
+readRDS(here('..', '..', 'mdouglas', 'dh_organoid', 'data', 'dge', params$ids))
+```
