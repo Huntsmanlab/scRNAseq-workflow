@@ -20,7 +20,6 @@ suppressPackageStartupMessages({
   library(gridExtra)
   library(styler)
   library(devtools)
-  library(SC3)
   library(pheatmap)
   library(here)
   library(knitr)
@@ -28,13 +27,11 @@ suppressPackageStartupMessages({
   library(Seurat)
   library(batchelor)
   library(edgeR)
-  library(limma)
   library(annotables)
   library(org.Hs.eg.db)
   library(EnsDb.Hsapiens.v75)
   library(AnnotationDbi)
   library(gtools)
-  library(formattable)
   library(DT)
   
 })
@@ -232,10 +229,12 @@ make_downreg_table <- function(qlf)  {
 ####################################################################################################
 
 # make pseudo counts 
-make_pseudo_counts <- function(sce_list) {
+make_pseudo_counts <- function(sce_list, combos) {
   
   i <-  1 
   pseudoCountsList <-  list() # make an empty list to append the results of the while loop 
+  
+  # sum across clusters to generate pseudo bulk counts. this allows us to treat each cluster as a replicate of the sample
   
   # make the pseudo bulk counts: 
   while (i <= length(sces)){
