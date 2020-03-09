@@ -7,14 +7,13 @@ output:
     code_folding: hide
 
 params:
-  ids: 'DH22-DH25_control' 
+  ids: 'id'
 ---
-
 
 ```{r include = FALSE}
 # source some files 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 # source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R') 
 # source('/huntsman/mdouglas/dh_organoid/source_scripts/utility.R')
@@ -28,7 +27,7 @@ dh_organoid_ids <- list(ids[[1]], ids[[2]])
 
 # make a list of the sces 
 # we are loading the clustered sces, since we will be using the clusters as replicates  
-sces <- lapply(dh_organoid_ids, function(dh_organoid_ids) readRDS(here('..', 'DH_organoid', 'data', 'clustered', 'sce', dh_organoid_ids, 'sce_clus.rds')))
+sces <- lapply(dh_organoid_ids, function(dh_organoid_ids) readRDS(here('..', 'data', 'clustered', 'sce', dh_organoid_ids, 'sce_clus.rds')))
 
 # rename the elements in the list based on the ids
 names(sces) <- paste(dh_organoid_ids)
@@ -43,7 +42,7 @@ sces <- lapply(sces, function(sce) sce <- sce[universal, ])
 combos <- lapply(sces, function(sce) with(colData(sce), paste(cluster)))
 
 # make the pseudo counts 
-pseudoCountsList <- make_pseudo_counts(sces)
+pseudoCountsList <- make_pseudo_counts(sces, combos)
 
   # this is just a quick guide for myself later on. 
   # a <- pseudoCountsList[[1]]
@@ -171,34 +170,33 @@ keg <- kegga(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs")
 ```{r include = FALSE}
 # negative control - here we mix shuffle the cells and then divide them into the same separate clusters. since they are randomly distributed, this analysis shouldnt return any DE genes. 
 
-# shuffle the cluster each cell belongs to for each sce 
-sces_1 <- sces[[1]]
-sces_2 <- sces[[2]]
+# add the id besides the name of the clusters in the sces 
+sces_neg <- sces
 
-sces_1$cluster <- sample(sces_1$cluster)
-sces_2$cluster <- sample(sces_2$cluster)
+sces_neg[[1]]$cluster <- paste(dh_organoid_ids[[1]], sces_neg[[1]]$cluster, sep = '_')
+sces_neg[[2]]$cluster <- paste(dh_organoid_ids[[2]], sces_neg[[2]]$cluster, sep = '_')
 
-# update the list 
-sces <- list(sces_1, sces_2)
+# combine sces 
+combined_sces <- combine_sces(sces_neg[[1]], sces_neg[[2]])
 
-# find the common genes in our sces 
-universal <- Reduce(intersect, list(rownames(sces[[1]]), rownames( sces[[2]])))
+# shuffle the clusters 
+combined_sces$cluster <- sample(combined_sces$cluster)
 
-# only keep the common genes in all sces 
-sces <- lapply(sces, function(sce) sce <- sce[universal, ])
-
-# sum across clusters to generate pseudo bulk counts. this allows us to treat each cluster as a replicate of the sample
-combos <- lapply(sces, function(sce) with(colData(sce), paste(cluster)))
+# make the combos, this will help us sum the cells in each cluster 
+combo <- with(colData(combined_sces), paste(cluster))
 
 # make the pseudo counts 
-pseudoCountsList <- make_pseudo_counts(sces)
+pseudoCounts <- sumCountsAcrossCells(counts(combined_sces), combo) # sum across cluster. this means add all the expression values for each gene for all cells in the cluster 
+    
+colnames(pseudoCounts) <- as.numeric(colnames(pseudoCounts)) # convert the column names to integers
+    
+pseudoCounts <- as.data.frame(pseudoCounts) # now convert it from double to data frame. 
+    
+# colnames(pseudoCounts) <- paste(colnames(pseudoCounts), paste(dh_organoid_ids[[i]]), sep = '_') # add the id of the sample next to the cluster number
 
 # make the dge object
 # now we have pseudo bulk counts for our sces. we will use these pseudo counts to make the dge list objects. do lapply to make dgelist objects of all our pseudo counts 
-dge_object_list <- lapply(pseudoCountsList, function(pseudoCounts) DGEList(counts = pseudoCounts, genes = rownames(pseudoCounts)))
-
-# now we combine them into one dge object: 
-dgeObject_neg <- do.call(cbind, dge_object_list) 
+dgeObject_neg <- DGEList(counts = pseudoCounts, genes = rownames(pseudoCountsList))
 
 # filter the lowly expressed genes 
 keep <- filterByExpr(dgeObject_neg)
@@ -212,13 +210,16 @@ idsRepeated <- list()
 max_sce <- length(sces) 
   
 while (i <= length(sces)) {
+  
   # repeat the sample index as many times as the number of clusters. this is equivalent to repeating the treatment condition as many times as the replicates. 
   clustersRepeated <- append(clustersRepeated, unlist(rep(i, max(as.numeric(colData(sces[[i]])$cluster)))))  
+   
   id <- dh_organoid_ids[[i]]
   idsRepeated <- append(idsRepeated, rep(id, max(as.numeric(colData(sces[[i]])$cluster)))) # same thing, repeat the id as many times as the cluster number. we will append them together. 
-  i <- i + 1 # go to the next sce 
+  
+  i <- i + 1
     
-} # end of while loop 
+} 
 
 # lets repeat the cluster numbers as many times as the ids repeated 
 group <- mapply(paste, clustersRepeated, idsRepeated, SIMPLIFY = FALSE, sep = '_')
@@ -262,23 +263,11 @@ fit <- glmQLFit(dgeObject_neg, designMatrix, robust = TRUE)
 # in other words, here we test the null hypothesis that coef1 - coef2 is equal to zero. 
 qlf <- glmQLFTest(fit, coef = 2)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 # fit the neg binomial model and run the QL tests 
-fit_neg_control <- glmQLFit(dge_neg_control, designMatrix, robust = TRUE)
+fit_neg_control <- glmQLFit(dgeObject_neg, designMatrix, robust = TRUE)
 qlf_neg_control <- glmQLFTest(fit_neg_control, coef = 2)
-plotMD(qlf_neg_control)
+neg_control_plot <- plotMD(qlf_neg_control)
+
 ```
 
 ### Diagnostic Plots 
@@ -352,25 +341,15 @@ Genes with smaller summed_ranks have high fold changes and low p values.
 ```{r include = FALSE}
 
 # here we do some manipulation to show the upregulated genes in a meaningful way 
-upregulated_genes_table <- make_upreg_table(qlf) %>% 
-  mutate_at(vars(logFC), funs(round(., 3)))
-
-# formattable(upregulated_genes_table, align = c("l", rep("r", NCOL(upregulated_genes_table) - 1)))
-
-datatable(upregulated_genes_table)
-
-# upregulated_genes_table %>% 
-#     knitr::kable(caption = paste('comparing', dh_organoid_ids[[2]], 'to', dh_organoid_ids[[1]])) %>% 
-#     kable_styling(full_width = F)
-
-```
-
-```{r echo = FALSE, message = FALSE}
+upregulated_genes_table <- make_upreg_table(qlf)
 
 DT::datatable(upregulated_genes_table, 
   extensions = 'Buttons', 
   options = list(dom = 'Bfrtip', 
                  buttons = list("copy", "excel", "csv", "pdf")))
+
+# save the table to be loaded later 
+write.csv(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR_up', paste(params$ids)))
 
 ```
 
@@ -380,14 +359,15 @@ Filtering and ranking systems is the same as upregulated genes, as explained abo
 ```{r echo = FALSE, message = FALSE}
 
 # here we do some manipulation to show the upregulated genes in a meaningful way 
-
-downregulated_genes_table <- make_downreg_table(qlf) %>% 
-  mutate_at(vars(logFC), funs(round(., 3)))
+downregulated_genes_table <- make_downreg_table(qlf)
 
 DT::datatable(downregulated_genes_table, 
   extensions = 'Buttons', 
   options = list(dom = 'Bfrtip', 
                  buttons = list("copy", "excel", "csv", "pdf")))
+
+# save the table to be loaded later 
+write.csv(downregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR_down', paste(params$ids)))
 
 ```
 
@@ -453,4 +433,10 @@ DT::datatable(keggtable,
 logCPM <- cpm(dgeObject, prior.count=2, log=TRUE)
 rownames(logCPM) <- dgeObject$genes$Symbol 
 colnames(logCPM) <- paste(dgeObject$samples$group, 1:2, sep="-")
+```
+
+Negative Control
+This should return to no / few DE genes. 
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 7}
+neg_control_plot
 ```

@@ -22,7 +22,6 @@ parser$add_argument('--min_features', metavar='FILE', type='integer', help="Mini
 args <- parser$parse_args()
 
 
-
 # this is the default_qc function from max. the method is the same but we no longer use deprecated functions, and it is a little more flexible. 
 # whichMethods can have 2 values, both must be strings: 'default' or 'quantile'. 
 # default: what we do already at the moment, only difference is we dont use a deprecated function. 
@@ -30,6 +29,8 @@ args <- parser$parse_args()
 # be careful when using this one, if many cells have high mito content, this one may not work. check summary stats after qc for good practice. 
 # this function will give you two outputs: sce and qc metrics dataframe. you need to specify two separate paths to save them.
 # this function will also name things generically, so we dont need to specify the file names. 
+
+# source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R')
 
 make_sce_qc <- function(whichMethod, path_to_sce, output_file_name, mito_thresh_max, mito_thresh_min, nmads, seed, min_features){
   
