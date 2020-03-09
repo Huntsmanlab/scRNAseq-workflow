@@ -7,7 +7,7 @@ output:
     code_folding: hide
 
 params:
-  ids: 'DH22-DH25_control' 
+  ids: 'DH21-DH21_control' 
 ---
 
 
@@ -169,7 +169,7 @@ keg <- kegga(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs")
 ```
 
 ```{r include = FALSE}
-# negative control - here we mix shuffle the cells and then divide them into the same separate clusters. since they are randomly distributed, this analysis shouldnt return any DE genes. 
+# NEGATIVE CONTROL - here we mix shuffle the cells and then divide them into the same separate clusters. since they are randomly distributed, this analysis shouldnt return any DE genes. 
 
 # add the id besides the name of the clusters in the sces 
 sces_neg <- sces
@@ -277,7 +277,8 @@ These plots are intended to give an idea about the model and whether it is a goo
 Plot samples (replicates, in this case clusters) on a two-dimensional scatterplot so that distances on the plot approximate the expression differences between the samples.  
 Clusters shown far apart mean they that are different in terms of gene expression. Cluster shown together are more similar in terms of gene expression.  
 ```{r echo = FALSE, message = FALSE, fig.width = 8, fig.height = 6}
-plotMDS(dgeObject)
+MDSplot <- plotMDS(dgeObject)
+MDSplot
 ```
 
 #### Plot biological coefficient of variation against gene abundance, in log2 counts per million.  
@@ -290,7 +291,8 @@ YOU SHOULD NOT BE USING THIS SCRIPT. High dispersion values will influence the d
 **This plot will give you a measure of the variation between the samples. **
 ```{r, echo = FALSE, message = FALSE, fig.height = 5, fig.width = 7}
 # plot biological coefficient of variation against gene abundance, in ln counts per million 
-plotBCV(dgeObject)
+BCVplot <- plotBCV(dgeObject)
+BCVplot
 ```
 
 #### Plot the genewise quasi-likelihood dispersion against the gene abundance (in log2 counts per million).
@@ -298,7 +300,8 @@ In this script, we squeeze the dispersion values from raw counts towards the tre
 The plots gives an idea about how much the data was squeezed. The expected is too see squeezed dispersion values (shown in red) closer to the trended (blue) line
 ```{r,echo = FALSE, message = FALSE, fig.height = 7, fig.width = 7}
 # Plot the genewise quasi-likelihood dispersion against the gene abundance (in ln counts per million).
-plotQLDisp(fit)
+dispersion <- plotQLDisp(fit)
+dispersion
 ```
 
 
@@ -306,14 +309,14 @@ plotQLDisp(fit)
 The blue lines indicate 1-fold up or down. The number of genes that are significantly up or down regulated are shown in the table, according to the plot.  
 ```{r, echo = FALSE, message = FALSE, fig.height = 10, fig.width = 7}
 # plot the differentially expressed genes 
-plotMD(qlf, main = paste('differentially expressed genes in', dh_organoid_ids[[2]], 'compared to', dh_organoid_ids[[1]]), ylab = 'log2 fold change')
+MDplot <- plotMD(qlf, main = paste('differentially expressed genes in', dh_organoid_ids[[2]], 'compared to', dh_organoid_ids[[1]]), ylab = 'log2 fold change')
+MDplot
 abline(h=c(-1,1), col="blue")
 ```
 
 
 Take a closer look at the genes visualized above: 
 ```{r, echo = FALSE, message = FALSE}
-# a closer look at top genes: 
 summary <- summary(decideTests(qlf))
 
 summary %>% 
@@ -326,7 +329,8 @@ Now we narrow down the DE genes a little bit to visualize genes with a reasonabl
 We restrict the fold change to 0.5.  
 ```{r echo = FALSE, message = FALSE, fig.height = 10, fig.width = 7}
 
-plotMD(tr, main = paste('differentially expressed genes in', dh_organoid_ids[[2]], 'compared to', dh_organoid_ids[[1]]), ylab = 'log2 fold change')
+MDplot2 <- plotMD(tr, main = paste('differentially expressed genes in', dh_organoid_ids[[2]], 'compared to', dh_organoid_ids[[1]]), ylab = 'log2 fold change')
+MDplot2
 
 ```
 
@@ -342,14 +346,15 @@ Genes with smaller summed_ranks have high fold changes and low p values.
 ```{r include = FALSE}
 
 # here we do some manipulation to show the upregulated genes in a meaningful way 
-upregulated_genes_table <- make_upreg_table(qlf)
+upregulated_genes_table <- make_upreg_table(qlf)%>%
+  mutate_at(vars(logFC), funs(round(., 3)))
 
-DT::datatable(upregulated_genes_table, 
-  extensions = 'Buttons', 
-  options = list(dom = 'Bfrtip', 
+DT::datatable(upregulated_genes_table,
+  extensions = 'Buttons',
+  options = list(dom = 'Bfrtip',
                  buttons = list("copy", "excel", "csv", "pdf")))
 
-# save the table to be loaded later 
+# # save the table to be loaded later 
 write.csv(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR_up', paste(params$ids)))
 
 ```
