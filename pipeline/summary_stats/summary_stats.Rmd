@@ -38,8 +38,8 @@ dh_organoid_ids <- list(ids[[1]], ids[[2]])
 ```{r include = FALSE}
 # here we do a bit or renaming and preparation for what is to come. 
 # find the directories where the sces are and load them
-sce_raws <- lapply(dh_organoid_ids, function(id) readRDS(here('data', 'processed', id, 'sce.rds')))
-sce_qcs <- lapply(dh_organoid_ids, function(id) readRDS(here('data', 'qc', id, 'sce_qc.rds')))
+sce_raws <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'processed', id, 'sce.rds')))
+sce_qcs <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'qc', id, 'sce_qc.rds')))
 
 # rename the sces
 names(sce_raws) <- dh_organoid_ids
@@ -98,10 +98,10 @@ makeTable <- function(df, index) {
     mutate(cell_number = nrow(df)) %>% 
     
     # here we take advantage of the select function to reorder the columns 
-    select(id, cell_number, sum, detected, subsets_mito_sum, subsets_mito_percent) %>% 
+    dplyr::select(id, cell_number, sum, detected, subsets_mito_sum, subsets_mito_percent) %>% 
     
     # and here we just rename them for clarity 
-    rename(RNA_reds = sum, detected_genes = detected, mito_reads = subsets_mito_sum, mito_percent = subsets_mito_percent)
+    rename(RNA_reads = sum, detected_genes = detected, mito_reads = subsets_mito_sum, mito_percent = subsets_mito_percent)
   
   return(df)
   
@@ -574,7 +574,7 @@ UMAP_noBatchNorm <- plotReducedDim(sce, dimred = 'UMAP') + ggtitle('before batch
 # AFTER BATCH NORM
 
 # here, we need to use the normalized sces to run dim reduction. so lets load them and make a list. 
-sce_norms <- lapply(dh_organoid_ids, function(id) readRDS(here('data', 'normalized', id, 'sce_norm.rds')))
+sce_norms <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'normalized', id, 'sce_norm.rds')))
 
 # batch normalization 
 sce_norms <- scran_batch_norm(sce_norms)
