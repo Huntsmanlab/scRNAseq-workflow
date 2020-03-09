@@ -1,0 +1,114 @@
+---
+title: '`r params$ids` Comparing two DGE methods: edgeR and scran'
+author: "aslı"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  ids: 'DH21-DH21_control' 
+---
+
+```{r include = FALSE}
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+```
+
+```{r include = FALSE}
+# LOAD THE DATA FROM edgeR
+edgeR_output <- read.csv(here('..', 'data', 'dge', 'edgeR_up', paste(params$ids))) # DE expressed, up regulated genes 
+
+# do some cleaning up in edgeR data 
+edgeR_up <- edgeR_output[edgeR_output$logFC > 0 , ] # only keep genes with lfc more than 0.5 
+edgeR_down <- edgeR_output[edgeR_output$logFC < 0 , ] # only keep genes with lfc less than 0.5 
+
+
+# LOAD DATA FROM SCRAN 
+scran_output <- readRDS(here('..', '..', 'mdouglas', 'dh_organoid', 'data', 'dge', paste(params$ids), 'outputs.rds'))
+
+# do some cleaning up in the scran data 
+scran_up <- scran_output$markers_sig[scran_output$markers_sig$logFC > 0 , ] # only keep genes with lfc more than 0.5 
+scran_down <- scran_output$markers_sig[scran_output$markers_sig$logFC < 0 , ] # only keep genes with lfc less than 0.5 
+
+```
+
+```{r include = FALSE}
+# find the genes common in both and store the gene names 
+common_up <- intersect(scran_up$gene_symbol, edgeR_up$gene_names)
+common_up <- c(unlist(common_up))
+
+common_down <- intersect(scran_down$gene_symbol, edgeR_down$gene_names)
+common_down <- c(unlist(common_down))
+
+# extract the indices of common elements. we will use them to subset our tables 
+edgeR_up_indices <- which(edgeR_up$gene_names %in% common_up)
+edgeR_down_indices <- which(edgeR_down$gene_names %in% common_down)
+
+scran_up_indices <- which(scran_up$gene_symbol %in% common_up)
+scran_down_indices <- which(scran_down$gene_symbol %in% common_down)
+
+# now subset our tables
+edgeR_up_common <- edgeR_up[edgeR_up_indices , ]
+edgeR_down_common <- edgeR_down[edgeR_down_indices , ]
+  
+scran_up_common <- scran_up[scran_up_indices , ]
+scran_down_common <- scran_down[scran_down_indices , ]
+
+# alphabetize according to gene name, so that all the tables will have the genes in the same order 
+edgeR_up_common <- edgeR_up_common[order(edgeR_up_common$gene_names), ]
+edgeR_down_common <- edgeR_down_common[order(edgeR_down_common$gene_names), ]
+
+scran_up_common <- scran_up_common[order(scran_up_common$gene_symbol), ]
+scran_down_common <- scran_down_common[order(scran_down_common$gene_symbol), ]
+
+# now finally make our tables: 
+common_up_organized <- as.data.frame(cbind(
+  
+  as.character(edgeR_up_common$gene_names), 
+  as.numeric(as.character(edgeR_up_common$logFC)), 
+  edgeR_up_common$PValue, 
+  as.numeric(as.character(scran_up_common$logFC)),
+  scran_up_common$p.value
+  
+))
+
+common_down_organized <- as.data.frame(cbind(
+  
+  as.character(edgeR_down_common$gene_names), 
+  as.numeric(as.character(edgeR_down_common$logFC)), 
+  edgeR_down_common$PValue, 
+  as.numeric(as.character(scran_down_common$logFC)),
+  scran_down_common$p.value
+  
+))
+
+# rename columns 
+common_up_organized <- rename(common_up_organized, 
+                              gene_name = V1, 
+                              edgeR_logFC = V2, 
+                              edgeR_pValue = V3, 
+                              scran_logFC = V4, 
+                              scran_pValue = V5)
+
+common_down_organized <- rename(common_down_organized, 
+                              gene_name = V1, 
+                              edgeR_logFC = V2, 
+                              edgeR_pValue = V3, 
+                              scran_logFC = V4, 
+                              scran_pValue = V5)
+
+# some simple rounding for readilibility 
+# common_up_organized %>% mutate_at(vars(edgeR_logFC, scran_logFC), funs(round(., 3)))
+
+
+scran_down$gene_symbol[common_down, ]
+edgeR_up[which(apply(edgeR_up, 1, function(r) any(r %in% common_up))), ]
+
+
+edgeR_up_common[order(edgeR_up_common$gene_names), ]
+
+
+which(apply(edgeR_up, 1, function(r) any(r %in% common_up)))
+
+```
