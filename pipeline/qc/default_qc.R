@@ -22,7 +22,6 @@ parser$add_argument('--min_features', metavar='FILE', type='integer', help="Mini
 args <- parser$parse_args()
 
 
-
 # this is the default_qc function from max. the method is the same but we no longer use deprecated functions, and it is a little more flexible. 
 # whichMethods can have 2 values, both must be strings: 'default' or 'quantile'. 
 # default: what we do already at the moment, only difference is we dont use a deprecated function. 
