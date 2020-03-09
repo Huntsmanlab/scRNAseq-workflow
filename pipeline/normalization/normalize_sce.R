@@ -1,22 +1,5 @@
-suppressPackageStartupMessages({
-  
-  library(SingleCellExperiment)
-  library(scater)
-  library(scran)
-  library(tidyverse)
-  library(assertthat)
-  library(BiocSingular)
-  library(Matrix)
-  library(argparse)
-  library(data.table)
-  library(cowplot)
-  library(DropletUtils)
-  library(ggplot2)
-  library(gridExtra)
-  library(styler)
-  library(devtools)
-  
-})
+library(here)
+source(here('..', 'sourceFiles', 'utilities.R'))
 
 parser <- ArgumentParser(description = "normalize sce after QC")
 

@@ -1,0 +1,442 @@
+---
+title: '`r params$ids` DE analysis using edgeR'
+author: "aslı"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  ids: 'id'
+---
+
+```{r include = FALSE}
+# source some files 
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+
+# source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R') 
+# source('/huntsman/mdouglas/dh_organoid/source_scripts/utility.R')
+
+```
+
+```{r include = FALSE}
+# load the sces
+ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+dh_organoid_ids <- list(ids[[1]], ids[[2]])
+
+# make a list of the sces 
+# we are loading the clustered sces, since we will be using the clusters as replicates  
+sces <- lapply(dh_organoid_ids, function(dh_organoid_ids) readRDS(here('..', 'data', 'clustered', 'sce', dh_organoid_ids, 'sce_clus.rds')))
+
+# rename the elements in the list based on the ids
+names(sces) <- paste(dh_organoid_ids)
+
+# find the common genes in our sces 
+universal <- Reduce(intersect, list(rownames(sces[[1]]), rownames( sces[[2]])))
+
+# only keep the common genes in all sces 
+sces <- lapply(sces, function(sce) sce <- sce[universal, ])
+
+# sum across clusters to generate pseudo bulk counts. this allows us to treat each cluster as a replicate of the sample
+combos <- lapply(sces, function(sce) with(colData(sce), paste(cluster)))
+
+# make the pseudo counts 
+pseudoCountsList <- make_pseudo_counts(sces, combos)
+
+  # this is just a quick guide for myself later on. 
+  # a <- pseudoCountsList[[1]]
+  # b <- pseudoCountsList[[2]]
+  # 
+  # a <- a[1:300, ]
+  # b <- b[1:300, ]
+  # 
+  # b[1:20, 1:7] <- b[1:20, 1:7] + 400
+  # pseudoCountsList <- list(a, b)
+
+# now we have pseudo bulk counts for our sces. we will use these pseudo counts to make the dge list objects. do lapply to make dgelist objects of all our pseudo counts 
+dge_object_list <- lapply(pseudoCountsList, function(pseudoCounts) DGEList(counts = pseudoCounts, genes = rownames(pseudoCounts)))
+
+# now we combine them into one dge object: 
+dgeObject <- do.call(cbind, dge_object_list) 
+
+# filter the lowly expressed genes 
+keep <- filterByExpr(dgeObject)
+dgeObject <- dgeObject[keep, ]
+
+# make the group, do this by repeating the number of treatments as many times as the number of clusters, which represent the number of replicates. 
+# now we make a vector showing how many times each sample should be repeated.
+i <- 1
+clustersRepeated <- list()
+idsRepeated <- list()
+max_sce <- length(sces) 
+  
+while (i <= length(sces)) {
+  # repeat the sample index as many times as the number of clusters. this is equivalent to repeating the treatment condition as many times as the replicates. 
+  clustersRepeated <- append(clustersRepeated, unlist(rep(i, max(as.numeric(colData(sces[[i]])$cluster)))))  
+  id <- dh_organoid_ids[[i]]
+  idsRepeated <- append(idsRepeated, rep(id, max(as.numeric(colData(sces[[i]])$cluster)))) # same thing, repeat the id as many times as the cluster number. we will append them together. 
+  i <- i + 1 # go to the next sce 
+    
+} # end of while loop 
+
+# lets repeat the cluster numbers as many times as the ids repeated 
+group <- mapply(paste, clustersRepeated, idsRepeated, SIMPLIFY = FALSE, sep = '_')
+
+# now our group is a list, but we need to turn it into a vector to be able to use it in EdgeR
+group <- c(unlist(group))
+
+# normalize using edgeR's method 
+dgeObject <- calcNormFactors(dgeObject)
+
+# make a data frame explaning the set up. we are making the treatment column of our data frame 
+sample <- paste('sample', 1:length(group), sep = '_')
+treatment <- c(unlist(idsRepeated))
+
+setup <- as.data.frame(sample, treatment)
+setup <- cbind(sample, treatment)
+
+rownames(setup) <- setup[, 1]
+
+# make the model, we pick one with the intercept. 
+designMatrix <- model.matrix(~treatment)
+
+# estimate the dispersion of genes to prepare for fitting the linear model, note that this may take some time
+dgeObject <- estimateDisp(dgeObject, designMatrix)
+
+# do some filtering on the dge object to remove genes with low counts. we base the filtering on cpm (counts per million)
+# For the current analysis, we keep genes that have CPM values above 0.5 in at least two libraries
+keep <- rowSums(edgeR::cpm(dgeObject) > 0.5) >= 2
+table(keep)
+
+# The DGEList object is subsetted to retain only the non-filtered genes. we add keep.lib.sizes=FALSE because lib sizes are recalculated after drop some genes. 
+dgeObject <- dgeObject[keep, , keep.lib.sizes=FALSE]
+
+```
+
+
+```{r include = FALSE}
+# now that we have the dispersion estimates and the linear model, we will work on DE using quasi-likelihood (QL) F-test. 
+# this is better than a regular linear model because it accounts for the uncertainity in the dispersion estimates and gives us more flexibility. 
+
+# first fit a negative binomial model to the data 
+fit <- glmQLFit(dgeObject, designMatrix, robust = TRUE)
+
+# the baseline is group one. here, we compare group 2 to group 1. if we had 3 groups and said coef = 3, this would mean comparing group 3 to group1. 
+# in other words, here we test the null hypothesis that coef1 - coef2 is equal to zero. 
+qlf <- glmQLFTest(fit, coef = 2)
+# you can use this piece of code to see the top genes: 
+# topTags(qlf) 
+
+# only get the genes with fold changes more than 0.5 
+tr <- glmTreat(fit, coef = 2, lfc = 2)
+
+# to find genes DE in all the groups: 
+# qlf <- glmQLFTest(fit, coef = 2:3)
+
+# DE GENE EXPRESSION ABOVE A THRESHOLD
+# Note that the fold-change threshold here is not the minimum value of the fold-change. Genes will need to exceed this threshold
+# before being declared statistically significant. we will use the same negative binomial fit but just for this time, add a threshold. 
+qlf_threshold <- glmTreat(fit, coef = 2, lfc = 0.5)
+# topTags(qlf_threshold)
+
+# Map gene names to entrez ids for goana and kegga. we have to convert from ensembl ids to entrez ids. 
+geneIDs <- ensembldb::select(EnsDb.Hsapiens.v75, keys = rownames(qlf), keytype = "SYMBOL", columns = c("SYMBOL","ENTREZID"))
+
+# sometimes we get duplicates, remove those 
+geneIDs <- geneIDs[!duplicated(geneIDs$SYMBOL), ]
+
+# lets make sure we have the same genes in both 
+idx <- is.na(geneIDs$ENTREZID)
+idx_keep <- which(idx == FALSE)
+qlf_modified <- qlf[idx_keep, ]
+
+# drop the NAs, these are the genes we couldn't find an entrez id for 
+geneIDs <- na.omit(geneIDs)
+
+# do some gene enrichment 
+go <- goana(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs") # entrez gene ids are in mapping 
+
+# visualize goana results 
+# topGO(go, sort="up") 
+
+keg <- kegga(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs")
+
+# visualize kegga results
+# topKEGG(keg, sort="up")
+
+```
+
+```{r include = FALSE}
+# negative control - here we mix shuffle the cells and then divide them into the same separate clusters. since they are randomly distributed, this analysis shouldnt return any DE genes. 
+
+# add the id besides the name of the clusters in the sces 
+sces_neg <- sces
+
+sces_neg[[1]]$cluster <- paste(dh_organoid_ids[[1]], sces_neg[[1]]$cluster, sep = '_')
+sces_neg[[2]]$cluster <- paste(dh_organoid_ids[[2]], sces_neg[[2]]$cluster, sep = '_')
+
+# combine sces 
+combined_sces <- combine_sces(sces_neg[[1]], sces_neg[[2]])
+
+# shuffle the clusters 
+combined_sces$cluster <- sample(combined_sces$cluster)
+
+# make the combos, this will help us sum the cells in each cluster 
+combo <- with(colData(combined_sces), paste(cluster))
+
+# make the pseudo counts 
+pseudoCounts <- sumCountsAcrossCells(counts(combined_sces), combo) # sum across cluster. this means add all the expression values for each gene for all cells in the cluster 
+    
+colnames(pseudoCounts) <- as.numeric(colnames(pseudoCounts)) # convert the column names to integers
+    
+pseudoCounts <- as.data.frame(pseudoCounts) # now convert it from double to data frame. 
+    
+# colnames(pseudoCounts) <- paste(colnames(pseudoCounts), paste(dh_organoid_ids[[i]]), sep = '_') # add the id of the sample next to the cluster number
+
+# make the dge object
+# now we have pseudo bulk counts for our sces. we will use these pseudo counts to make the dge list objects. do lapply to make dgelist objects of all our pseudo counts 
+dgeObject_neg <- DGEList(counts = pseudoCounts, genes = rownames(pseudoCountsList))
+
+# filter the lowly expressed genes 
+keep <- filterByExpr(dgeObject_neg)
+dgeObject_neg <- dgeObject_neg[keep, ]
+
+# make the group, do this by repeating the number of treatments as many times as the number of clusters, which represent the number of replicates. 
+# now we make a vector showing how many times each sample should be repeated.
+i <- 1
+clustersRepeated <- list()
+idsRepeated <- list()
+max_sce <- length(sces) 
+  
+while (i <= length(sces)) {
+  
+  # repeat the sample index as many times as the number of clusters. this is equivalent to repeating the treatment condition as many times as the replicates. 
+  clustersRepeated <- append(clustersRepeated, unlist(rep(i, max(as.numeric(colData(sces[[i]])$cluster)))))  
+   
+  id <- dh_organoid_ids[[i]]
+  idsRepeated <- append(idsRepeated, rep(id, max(as.numeric(colData(sces[[i]])$cluster)))) # same thing, repeat the id as many times as the cluster number. we will append them together. 
+  
+  i <- i + 1
+    
+} 
+
+# lets repeat the cluster numbers as many times as the ids repeated 
+group <- mapply(paste, clustersRepeated, idsRepeated, SIMPLIFY = FALSE, sep = '_')
+
+# now our group is a list, but we need to turn it into a vector to be able to use it in EdgeR
+group <- c(unlist(group))
+
+# normalize using edgeR's method 
+dgeObject_neg <- calcNormFactors(dgeObject_neg)
+
+# make a data frame explaning the set up. we are making the treatment column of our data frame 
+sample <- paste('sample', 1:length(group), sep = '_')
+treatment <- c(unlist(idsRepeated))
+
+setup <- as.data.frame(sample, treatment)
+setup <- cbind(sample, treatment)
+
+rownames(setup) <- setup[, 1]
+
+# make the model, we pick one with the intercept. 
+designMatrix <- model.matrix(~treatment)
+
+# estimate the dispersion of genes to prepare for fitting the linear model, note that this may take some time
+dgeObject_neg <- estimateDisp(dgeObject_neg, designMatrix)
+
+# do some filtering on the dge object to remove genes with low counts. we base the filtering on cpm (counts per million)
+# For the current analysis, we keep genes that have CPM values above 0.5 in at least two libraries
+keep <- rowSums(edgeR::cpm(dgeObject) > 0.5) >= 2
+table(keep)
+
+# The DGEList object is subsetted to retain only the non-filtered genes. we add keep.lib.sizes=FALSE because lib sizes are recalculated after drop some genes. 
+dgeObject_neg <- dgeObject_neg[keep, , keep.lib.sizes=FALSE]
+
+# now that we have the dispersion estimates and the linear model, we will work on DE using quasi-likelihood (QL) F-test. 
+# this is better than a regular linear model because it accounts for the uncertainity in the dispersion estimates and gives us more flexibility. 
+
+# first fit a negative binomial model to the data 
+fit <- glmQLFit(dgeObject_neg, designMatrix, robust = TRUE)
+
+# the baseline is group one. here, we compare group 2 to group 1. if we had 3 groups and said coef = 3, this would mean comparing group 3 to group1. 
+# in other words, here we test the null hypothesis that coef1 - coef2 is equal to zero. 
+qlf <- glmQLFTest(fit, coef = 2)
+
+# fit the neg binomial model and run the QL tests 
+fit_neg_control <- glmQLFit(dgeObject_neg, designMatrix, robust = TRUE)
+qlf_neg_control <- glmQLFTest(fit_neg_control, coef = 2)
+neg_control_plot <- plotMD(qlf_neg_control)
+
+```
+
+### Diagnostic Plots 
+These plots are intended to give an idea about the model and whether it is a good fit to represent the data we are interested in analyzing. 
+
+Plot samples (replicates, in this case clusters) on a two-dimensional scatterplot so that distances on the plot approximate the expression differences between the samples.  
+Clusters shown far apart mean they that are different in terms of gene expression. Cluster shown together are more similar in terms of gene expression.  
+```{r echo = FALSE, message = FALSE, fig.width = 8, fig.height = 6}
+plotMDS(dgeObject)
+```
+
+#### Plot biological coefficient of variation against gene abundance, in log2 counts per million.  
+Biological coefficient of variation is the true variation between genes, and it corresponds to the dispersion parameter of the negative binomial model. To learn more about dispersion, variation and how they relate to one another, read more about the negative binomial model and its implementation in scRNA sequencing data.  
+Look for these to make sure your the model is a good fit:  
+**1.** High dispersion (variance) for low counts is expected. Dispersion is expected to decrease smoothly as the abundance increases.  
+**2.** For humans, common dispersion (the red line) should be around 0.3 - 0.4, meaning replicates can differ by 30% or more. If the common dispersion is more,  
+YOU SHOULD NOT BE USING THIS SCRIPT. High dispersion values will influence the differential expression analysis.  
+
+**This plot will give you a measure of the variation between the samples. **
+```{r, echo = FALSE, message = FALSE, fig.height = 5, fig.width = 7}
+# plot biological coefficient of variation against gene abundance, in ln counts per million 
+plotBCV(dgeObject)
+```
+
+#### Plot the genewise quasi-likelihood dispersion against the gene abundance (in log2 counts per million).
+In this script, we squeeze the dispersion values from raw counts towards the trended dispersion. (This just means we transform the data in certain ways to make the model fit.)
+The plots gives an idea about how much the data was squeezed. The expected is too see squeezed dispersion values (shown in red) closer to the trended (blue) line
+```{r,echo = FALSE, message = FALSE, fig.height = 7, fig.width = 7}
+# Plot the genewise quasi-likelihood dispersion against the gene abundance (in ln counts per million).
+plotQLDisp(fit)
+```
+
+
+#### Plot the differentially expressed genes  
+The blue lines indicate 1-fold up or down. The number of genes that are significantly up or down regulated are shown in the table, according to the plot.  
+```{r, echo = FALSE, message = FALSE, fig.height = 10, fig.width = 7}
+# plot the differentially expressed genes 
+plotMD(qlf, main = paste('differentially expressed genes in', dh_organoid_ids[[2]], 'compared to', dh_organoid_ids[[1]]), ylab = 'log2 fold change')
+abline(h=c(-1,1), col="blue")
+```
+
+
+Take a closer look at the genes visualized above: 
+```{r, echo = FALSE, message = FALSE}
+# a closer look at top genes: 
+summary <- summary(decideTests(qlf))
+
+summary %>% 
+    knitr::kable(caption = paste('comparing', dh_organoid_ids[[2]], 'to', dh_organoid_ids[[1]])) %>% 
+    kable_styling(full_width = F)
+```
+
+
+Now we narrow down the DE genes a little bit to visualize genes with a reasonably large expression changes. This is helpful to list the biologically more meaningful genes.  
+We restrict the fold change to 0.5.  
+```{r echo = FALSE, message = FALSE, fig.height = 10, fig.width = 7}
+
+plotMD(tr, main = paste('differentially expressed genes in', dh_organoid_ids[[2]], 'compared to', dh_organoid_ids[[1]]), ylab = 'log2 fold change')
+
+```
+
+#### Upregulated genes 
+Now we take a closer look at the **upregulated** genes. To look for interesting genes, we do the following filtering:  
+We don't show genes with log fold change (LogFC) less than 0.5. 
+We also eliminate genes with p values more than 0.05.  
+We resticted this table to first 50 genes. 
+  
+To help interpret, we use the follwing ranking system: 
+Genes are ranked separately for log fold change (high to low) and p values (low to high). We then add these ranks together to get **summed_ranks.**  
+Genes with smaller summed_ranks have high fold changes and low p values.  
+```{r include = FALSE}
+
+# here we do some manipulation to show the upregulated genes in a meaningful way 
+upregulated_genes_table <- make_upreg_table(qlf)
+
+DT::datatable(upregulated_genes_table, 
+  extensions = 'Buttons', 
+  options = list(dom = 'Bfrtip', 
+                 buttons = list("copy", "excel", "csv", "pdf")))
+
+# save the table to be loaded later 
+write.csv(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR_up', paste(params$ids)))
+
+```
+
+#### Downregulated genes 
+Filtering and ranking systems is the same as upregulated genes, as explained above. Genes with the highest fold changes and lowest p values have lower summed_ranks.
+  
+```{r echo = FALSE, message = FALSE}
+
+# here we do some manipulation to show the upregulated genes in a meaningful way 
+downregulated_genes_table <- make_downreg_table(qlf)
+
+DT::datatable(downregulated_genes_table, 
+  extensions = 'Buttons', 
+  options = list(dom = 'Bfrtip', 
+                 buttons = list("copy", "excel", "csv", "pdf")))
+
+# save the table to be loaded later 
+write.csv(downregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR_down', paste(params$ids)))
+
+```
+
+
+This table tells us how many genes up or down regulated in the analysis with the given log fold change:  
+```{r echo = FALSE, message = FALSE}
+
+summary <- summary(decideTests(tr))
+
+summary %>% 
+    knitr::kable(caption = paste('comparing', dh_organoid_ids[[2]], 'to', dh_organoid_ids[[1]])) %>% 
+    kable_styling(full_width = F)
+
+```
+
+### Gene enrichment  
+#### GO Pathway analysis  
+Understanding the table:  
+**Ont:**  
+Note that GO shows three complementary biological concepts including Biological Process (BP), Molecular Function (MF) and Cellular Component (CC).  
+You can find these in the 'Ont' column.  
+**N:**  
+number of genes in the GO term  
+**Up:**  
+number of up-regulated differentially expressed genes.  
+**Down:**
+number of down-regulated differentially expressed genes.
+**P.Up**  
+p-value for the representation of GO pathway in up-regulated genes  
+**P.Down**  
+p-value for the representation of GO pathway in down-regulated genes  
+The above is also true for the KEGG table below. 
+
+```{r echo = FALSE, message = FALSE}
+# here we show the results of the go pathways 
+gotable <- topGO(go, sort="up")
+
+# do some cleaning up
+DT::datatable(gotable, 
+  extensions = 'Buttons', 
+  options = list(dom = 'Bfrtip', 
+                 buttons = list("copy", "excel", "csv", "pdf")))
+  
+```
+
+#### KEGG analysis 
+
+```{r echo = FALSE, message = FALSE}
+# here we show the results of the KEGG analysis 
+keggtable <- topKEGG(keg, sort="up")
+
+# do some cleaning up
+DT::datatable(keggtable, 
+  extensions = 'Buttons', 
+  options = list(dom = 'Bfrtip', 
+                 buttons = list("copy", "excel", "csv", "pdf")))
+
+```
+
+```{r include = FALSE}
+# now we make a heatmap to visualize the DE genes 
+# convert the read counts into log2-counts-per-million (logCPM) values
+logCPM <- cpm(dgeObject, prior.count=2, log=TRUE)
+rownames(logCPM) <- dgeObject$genes$Symbol 
+colnames(logCPM) <- paste(dgeObject$samples$group, 1:2, sep="-")
+```
+
+Negative Control
+This should return to no / few DE genes. 
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 7}
+neg_control_plot
+```

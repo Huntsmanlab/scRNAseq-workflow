@@ -1,22 +1,5 @@
-suppressPackageStartupMessages({
-  
-  library(SingleCellExperiment)
-  library(scater)
-  library(scran)
-  library(tidyverse)
-  library(assertthat)
-  library(BiocSingular)
-  library(Matrix)
-  library(argparse)
-  library(data.table)
-  library(cowplot)
-  library(DropletUtils)
-  library(ggplot2)
-  library(gridExtra)
-  library(styler)
-  library(devtools)
-  
-})
+library(here)
+source(here('..', 'sourceFiles', 'utilities.R'))
 
 parser <- ArgumentParser(description = "perform qc on sce")
 
@@ -49,7 +32,6 @@ args <- parser$parse_args()
 # this function will also name things generically, so we dont need to specify the file names. 
 
 # source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R')
-source(here('sourceFiles', 'utilities.R'))
 
 make_sce_qc <- function(whichMethod, path_to_sce, output_file_name, mito_thresh_max, mito_thresh_min, nmads, seed, min_features){
   

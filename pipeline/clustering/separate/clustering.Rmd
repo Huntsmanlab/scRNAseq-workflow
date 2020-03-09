@@ -20,8 +20,8 @@ widely adopted. Scran picks the best number of clusters and uses graph based clu
 
 ```{r include = FALSE}
 # source some files 
-source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R') # this one has the packages / functions we need 
-
+library(here)
+source(here('..', 'sourceFiles', 'utilities.R'))
 ```
 
 ```{r include = FALSE}
