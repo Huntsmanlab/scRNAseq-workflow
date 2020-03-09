@@ -7,13 +7,14 @@ output:
     code_folding: hide
 
 params:
-  ids: 'pair_ids'
+  ids: 'DH21-DH21_control' 
 ---
 
 This script will compare the DE genes found by two DGE analysis scripts: scran and edgeR. 
 It will separate the genes found in these two scripts into two categories: up and down regulated genes. 
 Besides showing the common genes in both, it will also show the logFC and p values for both.  
 Genes are ordered alphabetically. 
+
 
 ```{r include = FALSE}
 library(here)
@@ -138,3 +139,9 @@ DT::datatable(common_down_organized,
   options = list(dom = 'Bfrtip', 
                  buttons = list("copy", "excel", "csv", "pdf")))
 ```
+
+
+
+
+
+
