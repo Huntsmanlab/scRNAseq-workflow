@@ -8,3 +8,6 @@ Snakefile
 
 # ignore the rproject 
 scRNAseq-workflow.Rproj
+
+# ignore all hidden files, including snakemake logs 
+.* 
