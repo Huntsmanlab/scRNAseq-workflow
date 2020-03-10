@@ -84,7 +84,7 @@ reference.list <- data.list[c(paste(dh_organoid_ids[[1]]), dh_organoid_ids[[2]])
 # this is where things get messy! we will follow a different path depending on how many cells we have in each sample. 
 # FindIntegrationAnchors will be used only if we have at least 200 cells in each sample 
 
-# condition based on cell number: 
+# condition based on cell number: do this first method if we have more than 200 cells 
 if (dim(DH.combined)[[2]] > 200) {
   
   # find anchoring points between two samples and put them in the refence list, use first 30 dimensions. 
@@ -141,7 +141,7 @@ if (dim(DH.combined)[[2]] > 200) {
   
   # update our sces 
   sce_list[[1]] <- rescaled[[1]]
-   sce_list[[2]] <- rescaled[[2]]
+  sce_list[[2]] <- rescaled[[2]]
   
   # integration using nearest neighbors
   corrected <- fastMNN(one = sce_list[[1]], two =  sce_list[[2]], subset.row=chosen.hvgs)
@@ -170,10 +170,10 @@ if (dim(DH.combined)[[2]] > 200) {
   combined_seurat <- as.seurat(sce)
   
   # build a snn graph 
-  sobject <-FindNeighbors(sobject)
+  combined_seurat <-FindNeighbors(combined_seurat)
   
   # lets find some clusters 
-  sobject <- FindClusters(sobject, resolution = 0.15)
+  combined_seurat <- FindClusters(combined_seurat, resolution = 0.15)
   
   # run reduced dim analysis / i probably dont need this? 
   # sce <- RunPCA(sce, npcs = 30, verbose = FALSE)
