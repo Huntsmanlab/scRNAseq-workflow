@@ -65,37 +65,6 @@ plotUMAP(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste(
 plotPCA(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', dh_organoid_ids[[2]], sep = '_'))
 ```
 
-
-```{r include = FALSE}
-# we will be running similar analyses on two datasets, so we have this function instead: 
-# this function converts sce into a seurat object and perform clustering. 
-seuratClustering  <- function(sce, id) {
-  
-  # convert the sce into a seurat object 
-  sobject <- as.Seurat(sce)
-  
-  # find variable features to reduce run time
-  sobject <- FindVariableFeatures(sobject)
-  
-  # add to metadata so that we can keep track of the samples 
-  sobject@meta.data[, "protocol"] <- paste(id)
-  
-  # we need to do this annoying thing where we do a bunch of renaming because seurat doesnt like capital letters 
-  sobject@reductions$pca <- sobject@reductions$PCA
-  sobject@reductions$tsne <- sobject@reductions$TSNE
-  sobject@reductions$umap <- sobject@reductions$UMAP
-  
-  # compute the nearest neighbor graph
-  sobject <-FindNeighbors(sobject)
-  
-  # lets find some clusters 
-  sobject <- FindClusters(sobject, resolution = 0.15)
-  
-  return(sobject)
-}
-
-```
-
 frequency table: 
 ```{r include = FALSE}
 # we run this function on our sces here. we just convert them into seurat objects and do a bit of a clean up 
@@ -172,7 +141,7 @@ if (dim(DH.combined)[[2]] > 200) {
   
   # update our sces 
   sce_list[[1]] <- rescaled[[1]]
-   sce_list[[2]] <- rescaled[[2]]
+  sce_list[[2]] <- rescaled[[2]]
   
   # integration using nearest neighbors
   corrected <- fastMNN(one = sce_list[[1]], two =  sce_list[[2]], subset.row=chosen.hvgs)
@@ -201,10 +170,10 @@ if (dim(DH.combined)[[2]] > 200) {
   combined_seurat <- as.seurat(sce)
   
   # build a snn graph 
-  sobject <-FindNeighbors(sobject)
+  combined_seurat <-FindNeighbors(combined_seurat)
   
   # lets find some clusters 
-  sobject <- FindClusters(sobject, resolution = 0.15)
+  combined_seurat <- FindClusters(combined_seurat, resolution = 0.15)
   
   # run reduced dim analysis / i probably dont need this? 
   # sce <- RunPCA(sce, npcs = 30, verbose = FALSE)
@@ -232,6 +201,8 @@ if (dim(DH.combined)[[2]] > 200) {
   ##################################################################################################################
   
 } # end of else 
+
+saveRDS(samples.integrated, file = here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids[[1]], dh_organoid_ids[[2]], sep = '-'), 'integrated_seurat_object'))
 
 ```
 

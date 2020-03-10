@@ -202,6 +202,8 @@ if (dim(DH.combined)[[2]] > 200) {
   
 } # end of else 
 
+saveRDS(samples.integrated, file = here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids[[1]], dh_organoid_ids[[2]], sep = '-'), 'integrated_seurat_object'))
+
 ```
 
 
