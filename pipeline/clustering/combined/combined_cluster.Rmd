@@ -206,11 +206,11 @@ if (dim(DH.combined)[[2]] > 200) {
   # lets find some clusters 
   sobject <- FindClusters(sobject, resolution = 0.15)
   
-  # run reduced dim analysis 
-  sce <- RunPCA(sce, npcs = 30, verbose = FALSE)
-  sce <- RunTSNE(sce, dims = 1:30)
-  sce <- RunUMAP(sce, dims = 1:30)
-  
+  # run reduced dim analysis / i probably dont need this? 
+  # sce <- RunPCA(sce, npcs = 30, verbose = FALSE)
+  # sce <- RunTSNE(sce, dims = 1:30)
+  # sce <- RunUMAP(sce, dims = 1:30)
+
   # do some gene level scaling. we scale so that each gene will be centered to have a mean of 0 and and scaled by SD of the gene
   samples.integrated <- ScaleData(samples.integrated, verbose = FALSE)
   
