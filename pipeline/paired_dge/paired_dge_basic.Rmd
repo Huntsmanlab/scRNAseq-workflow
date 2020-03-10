@@ -1,12 +1,13 @@
 ---
 title: "DGE_Experimental_vs_Control"
-subtitle: 'DH25  vs DH25_control'
-author: "Asli Munzur"
+subtitle: '`r params$ids` DE analysis using scran'
+author: "Aslı Munzur"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 
 params:
-  ids: 'DH25-DH25_control'
-  output_path: '../../data/paired_dge_basic/DH25-DH25_control/outputsTEST.rds'
+  ids: 'id'
+  pair_ids: 'pair_ids'
+  output_path: 'output_path'
   
   pathwayHmark: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/h.all.v6.2.symbols.gmt'
   pathwayGO: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/c5.all.v6.2.symbols.gmt'
@@ -16,6 +17,13 @@ output:
   html_document:
     code_folding: hide
 ---
+
+```{r}
+# Packages, Libraries, and Functions to import
+library(here)
+source(here('pipeline', 'sourceFiles', 'utility.R'))
+
+```
 
 ```{css, echo=FALSE}
     body .main-container {
@@ -32,27 +40,6 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
-# Packages, Libraries, and Functions to import
-
-suppressPackageStartupMessages({
-  library(tidyverse)
-  library(SingleCellExperiment)
-  library(scater)
-  library(scran)
-  library(here)
-  library(glue)
-  library(ggplot2) 
-  library(cowplot)
-  library(ggrepel)
-  library(edgeR)
-  library(DT)
-  library(reshape2)
-  library(fgsea)
-})
-
-source(here('source_scripts', 'utility.R'))
-```
 
 ```{r}
 # extract this from passed in parameters
