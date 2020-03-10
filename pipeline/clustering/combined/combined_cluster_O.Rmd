@@ -7,7 +7,7 @@ output:
     code_folding: hide
 
 params:
-  id: 'DH21-DH21_control'
+  ids: 'DH21-DH21_control'
 ---
 This report shows the results of clustering after we combine the samples.  
 We first show the results of clustering within each sample, then we compare those  
@@ -40,7 +40,7 @@ dh_organoid_ids <- list(ids[[1]], ids[[2]])
 
 ```{r include = FALSE}
 # load the sce objects we will be working on 
-sce_list <- lapply(dh_organoid_ids, function(id) readRDS(here('data', 'clustered', 'sce', id, 'sce_clus.rds')))
+sce_list <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'clustered', 'sce', id, 'sce_clus.rds')))
 
 #name them nicely 
 names(sce_list) <- dh_organoid_ids
