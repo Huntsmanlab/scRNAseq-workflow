@@ -44,7 +44,7 @@ names(counts)[1] <- "control" # rename the columns in the counts matrix
 names(counts)[2] <- "experimental"
 
 # make the DGE object 
-dgeObject <- DGEList(counts = counts, group = factor(c(1, 2)))
+dgeObject <- DGEList(counts = counts, genes = rownames(counts), group = factor(c(1, 2)))
 
 # filter the lowly expressed genes - have at least in 0.5 cpm in at least 2 samples 
 keep <- rowSums(cpm(dgeObject) > 0.5) >= 2 
@@ -271,11 +271,11 @@ gridExtra::grid.arrange(control_plot, experimental_plot, nrow = 1)
 group <- factor(c(1, 2))
 # designMatrix <- model.matrix(~group)
 
-designMatrix <- matrix(data = c(0, 0, 0, 1), ncol = 2, nrow = 2, dimnames = list(c('sample1', 'sample2'), c('control', 'treatment')))
+designMatrix <- matrix(data = c(0, 1, 0, 1), ncol = 2, nrow = 2, dimnames = list(c('sample1', 'sample2'), c('control', 'treatment')))
 
 designMatrix <- matrix(1, 2, 1)
 
-designMatrix <- model.matrix(~0+group)
+# designMatrix <- model.matrix(~0+group)
 
 
 BvsA <- makeContrasts(control - experimental - group1, levels=design)
@@ -288,7 +288,7 @@ dgeObject1 <- dgeObject # create a copy of the data object with only one treatme
 dgeObject1$samples$group <- 1 # assume it is all one big treatment 
 
 # Then estimate the common dispersion from the housekeeping genes and all the libraries as one group
-temporary <- estimateDisp(dgeObject1[housekeeping_indices, ], trend="none", tagwise=FALSE)
+temporary <- estimateDisp(dgeObject1[housekeeping_indices, ], design = designMatrix, trend="none", tagwise=FALSE, )
 
 # insert the dispersion estimate into our original object 
 dgeObject$common.dispersion <- temporary$common.dispersion
@@ -305,7 +305,7 @@ fit <- glmQLFit(dgeObject, designMatrix, robust = TRUE)
 
 # the baseline is group one. here, we compare group 2 to group 1. if we had 3 groups and said coef = 3, this would mean comparing group 3 to group1. 
 # in other words, here we test the null hypothesis that coef1 - coef2 is equal to zero. 
-qlf <- glmQLFTest(fit, coef = 1)
+qlf <- glmQLFTest(fit)
 
 # you can use this piece of code to see the top genes: 
 # topTags(qlf) 
