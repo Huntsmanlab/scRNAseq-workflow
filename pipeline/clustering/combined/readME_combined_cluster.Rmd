@@ -1,0 +1,21 @@
+---
+title: "ReadMe for the comhbined_cluster file"
+author: "aslı"
+date: "3/13/2020"
+output: html_document
+---
+
+#### This is the readME for the combined_clustering script. 
+
+#### What does this script do? 
+It is possible to run a clustering algorithm in various ways. For example, we can cluster samples within themselves, or we can combine more than one sample together and perform a cluster analysis on the combined sample. This script exactly does that. It integrates two sces and tries to find clusters across the combined sample. The results are shown in the dim reduction plots. 
+
+#### Any analyses that must be run before running this script? 
+This script uses sces with the clustering information, so we need to run the separate clustering script first for each sce. The only input we need to add is at the beginning of the script, shown below. MAke sure to separate the ids with '-'. 
+
+```{r eval = FALSE}
+params:
+  ids: 'DH21-DH21_control'
+```
+
+Script will first shows the dimensionality reduction plots for each sce, separately. We include all 3
