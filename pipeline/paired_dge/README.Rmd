@@ -1,0 +1,72 @@
+---
+title: "ReadME for edgeR scripts"
+author: "aslı"
+date: "3/16/2020"
+output: html_document
+---
+
+### General notes 
+
+This is the readME document for all the scripts we have in this directory doing paired DGE analysis. The reason for this readME is to help you choose which script fits best to your needs. 
+So far, these are 5 types of scripts in this directory. Three of them do DGE analysis using edgeR, one of them is using scran and one of them is the script that compares the output from scran and edgeR. Three edgeR scripts do DGe anlaysis similarly, but there are some crucial differences among them. Note that since this is the paired_dge folder, all the DGE  analysis done here is concerning only 2 samples and / or clusters. 
+
+As usual, some files end with "_O". This means the script is a one off script, and it won't work in the pipeline through Snakemake. The same file name without the extension is the version
+integrated into the Snakefile. If you need to run just one file and not the whole pipeline, just use the one off script. The html output will be saved into the same folder as the markdown script.
+
+#### scran script 
+- paired_dge_basic.Rmd
+
+#### edgeR scripts
+- edgeR_cluster.Rmd - compare clusters  
+- edgeR_HKG.Rmd - use house keeping genes to estimate variance and dispersion   
+- edgeR_pseudo.Rmd - use pseudo bulk counts within clusters  
+
+
+#### comparison script 
+- compare_paired_dge_methods.Rmd - output the common genes found by scran and edgeR
+
+### Scripts in detail 
+
+#### paired_dge_basic.Rmd and paired_dge_basic_O.Rmd
+Using scran package, this script will find the DE markers between the two samples, along with their fold changes and p values. It will also output the significant GO pathways. Inputs should be given like this when running the one off script: 
+
+```{r eval = FALSE}
+params:
+  ids: 'DH21-DH21_control' 
+
+```
+
+#### edgeR_cluster_O.Rmd and edgeR_cluster.Rmd
+This script looks into the DE expressed genes between two chosen clusters and it treats the cells in each cluster as a replicate. As an input, all the script needs is the sample id, followed by the cluster number. Like this: 
+
+```{r eval = FALSE}
+params:
+  ids: 'DH25_3-DH25_control_8'
+
+```
+
+This script is useful when you already identified two interesting clusters and you want to see if there are DE genes between the two. 
+
+#### edgeR_HKG_O.Rmd and edgeR_HKG.Rmd
+This script was an attempt to overcome the issue of not having enough replicates, so it was designed to be used when we have only 2 samples to work with. However, it has some unsolved issues, as of March 16th, 2020. The main goal was to use the house keeping genes (HKG) across samples to estimate the dispersion value, and use the value to compute the negative binomial fit. To run the one off script you only need the names of the samples as input, written here: 
+
+```{r eval = FALSE}
+params:
+  ids: 'DH21-DH21_control' 
+
+```
+
+#### edgeR_pseudo_O.Rmd and edgeR_pseudo.Rmd
+This script is another attempt to deal with lack of replicates. Thus, this script should not be used if we have more than 2 samples. Here, we pretend that the cells within the same cluster are  replicates and we add up the counts within the cluster to get pseudo bulk counts. This also improves edgeR analysis because edgeR isn't good at dealing with data with many zero counts. However, this script shouldn't be used with data from experiments where some sort of genetic manipulation was used. Not all the cells will be transformed, so assuming they are the same would be problematic. Experiments where samples were treated with a chemical etc. are better suited to be analyzed through this script. Inputs should be supplied like this, same as above: 
+
+```{r eval = FALSE}
+params:
+  ids: 'DH21-DH21_control' 
+
+```
+
+
+
+
+
+
