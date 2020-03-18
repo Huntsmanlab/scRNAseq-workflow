@@ -33,6 +33,7 @@ suppressPackageStartupMessages({
   library(AnnotationDbi)
   library(gtools)
   library(DT)
+  library(xlsx)
   
 })
 

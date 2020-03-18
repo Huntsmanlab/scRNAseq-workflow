@@ -7,7 +7,7 @@ output:
     code_folding: hide
 
 params:
-  ids: 'DH21-DH21_control'
+  ids: 'DH8-DH24'
 ---
 This report shows the results of clustering after we combine the samples.  
 We first show the results of clustering within each sample, then we compare those  
@@ -22,6 +22,8 @@ across samples
 2. integrate the the samples into one larger sample  
 3. run dimension reduction analyses on the larger sample as well as a new clustering analysis  
 (best number of clusters is again decided by seurat)
+
+Note that this script is also good for just integrating two samples and removing batch effects. 
 
 
 ```{r include = FALSE}
@@ -46,27 +48,33 @@ sce_list <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'clu
 names(sce_list) <- dh_organoid_ids
 ```
 
-### Visualizing the reduced dims plots separately  
+### We fist visualize the reduced dim plots (tsne and umap) separately for each sample.   
 #### First data set 
 
-```{r echo = FALSE, message = FALSE}
+```{r include = FALSE}
 
-plotTSNE(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', dh_organoid_ids[[1]], sep = '_'))
-plotUMAP(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', dh_organoid_ids[[1]], sep = '_'))
-plotPCA(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', dh_organoid_ids[[1]], sep = '_'))
+a <- plotTSNE(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', dh_organoid_ids[[1]], sep = '_'))
+b <- plotUMAP(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', dh_organoid_ids[[1]], sep = '_'))
+# plotPCA(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', dh_organoid_ids[[1]], sep = '_'))
 ```
 
 #### Second data set  
-```{r echo = FALSE, message = FALSE}
+```{r include = FALSE}
 
-plotTSNE(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', dh_organoid_ids[[2]], sep = '_'))
-plotUMAP(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', dh_organoid_ids[[2]], sep = '_'))
-plotPCA(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', dh_organoid_ids[[2]], sep = '_'))
+c <- plotTSNE(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', dh_organoid_ids[[2]], sep = '_'))
+d <- plotUMAP(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', dh_organoid_ids[[2]], sep = '_'))
+# plotPCA(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', dh_organoid_ids[[2]], sep = '_'))
 ```
 
+```{r echo = FALSE, message = FALSE}
 
-frequency table: 
-```{r include = FALSE}
+gridExtra::grid.arrange(a, b, c, d, nrow = 2)
+
+```
+
+Frequency table: 
+This table shows the frequency of cell id types in each sample.
+```{r echo = FALSE, message = FALSE}
 # we run this function on our sces here. we just convert them into seurat objects and do a bit of a clean up. function is defined in the utilities file. 
 sobject1 <- seuratClustering(sce_list[[1]], paste(dh_organoid_ids[[1]]))
 sobject2 <- seuratClustering(sce_list[[2]], paste(dh_organoid_ids[[2]]))
@@ -129,7 +137,7 @@ if (dim(DH.combined)[[2]] > 200) {
     kable_styling(full_width = F)
 
   
-} else {
+} else { # this is what to do if yo uhave less than 200 samples: 
   
   # subset to the common genes: 
   universal <- intersect(rownames(sce_list[[1]]), rownames( sce_list[[2]]))
@@ -194,8 +202,8 @@ if (dim(DH.combined)[[2]] > 200) {
   p3 <- DimPlot(samples.integrated, reduction = "umap", group.by = "id")
   p4 <- DimPlot(samples.integrated, reduction = "umap", group.by = "seurat_clusters", label = TRUE, repel = TRUE) + NoLegend() + ggtitle('UMAP')
   
-  p5 <- DimPlot(samples.integrated, reduction = "pca", group.by = "id")
-  p6 <- DimPlot(samples.integrated, reduction = "pca", group.by = "seurat_clusters", label = TRUE, repel = TRUE) + NoLegend() + ggtitle('PCA')
+  # p5 <- DimPlot(samples.integrated, reduction = "pca", group.by = "id")
+  # p6 <- DimPlot(samples.integrated, reduction = "pca", group.by = "seurat_clusters", label = TRUE, repel = TRUE) + NoLegend() + ggtitle('PCA')
   
   ##################################################################################################################
   ##################################################################################################################
@@ -207,23 +215,25 @@ saveRDS(samples.integrated, file = here('..', 'data', 'clustered', 'combined', p
 ```
 
 
+The following plots are generated after we integrate the two samples and run a clustering algorithm on the integrated sample. 
 Now, we run a clustering analysis on the combined data and visualize our findings in dimension reduction plots.  
 Each cluster is shown with a different color.  
 
 #### TSNE PLOTS
 ```{r echo = FALSE, message = FALSE, fig.height = 10, fig.width = 10}
-grid.arrange(p1, p2, nrow = 2)
+grid.arrange(p1, p2, nrow = 1)
 ```
 
 #### UMAP PLOTS
 ```{r echo = FALSE, message = FALSE, fig.height = 10, fig.width = 10}
-grid.arrange(p3, p4, nrow = 2)
+grid.arrange(p3, p4, nrow = 1)
 
 ```
 
-#### PCA PLOTS
+
 ```{r echo = FALSE, message = FALSE, fig.height = 10, fig.width = 10}
-grid.arrange(p5, p6, nrow = 2)
+# PCA PLOTS
+# grid.arrange(p5, p6, nrow = 2)
 
 ```
 

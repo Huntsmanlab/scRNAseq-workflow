@@ -44,6 +44,7 @@ make_sce_qc <- function(whichMethod, path_to_sce, output_file_name, mito_thresh_
   if ( grepl("^ENSMUS", sce@rowRanges@elementMetadata@listData[["ID"]][1]) ){               # For mouse
     mt_genes <- grepl("^mt", rowData(sce)$Symbol)
     ribo_genes <- grepl("^Rp[sl][[:digit:]]", rowData(sce)$Symbol)
+    
   } else {                                                                                  # For human
     mt_genes <- grepl("^MT-", rowData(sce)$Symbol)
     ribo_genes <- grepl("^RP[LS]", rowData(sce)$Symbol)
