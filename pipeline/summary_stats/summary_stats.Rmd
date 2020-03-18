@@ -606,3 +606,24 @@ UMAP
 # now we visualize
 gridExtra::grid.arrange(UMAP_noBatchNorm, UMAPplot, nrow = 1)
 ```
+
+### REPORTER GENE DETECTION 
+
+```{r include = FALSE}
+
+# find GFP 
+find_reporter_genes('gfp', sce)
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
