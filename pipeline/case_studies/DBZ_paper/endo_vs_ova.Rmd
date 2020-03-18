@@ -1,0 +1,196 @@
+---
+title: '`r params$ids` DE analysis using edgeR'
+author: "aslı"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  ids_1: 'DH8-DH24'
+  ids_2: 'DH4-DH17'
+  seed: 123
+---
+
+```{r include = FALSE}
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+
+```
+
+
+```{r include = FALSE}
+
+# FIRST PAIR
+# load the sces
+ids_1 <- strsplit(params$ids_1, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+
+# just a silly attempt to be flexible: 
+
+if (length(ids_1) == 2){ dh_organoid_ids_1 <- list(ids_1[[1]], ids_1[[2]])
+  
+} else if (length(ids_1) == 3) { dh_organoid_ids_1 <- list(ids_1[[1]], ids_1[[2]], ids_1[[3]])
+  
+} else if (length(ids_1) == 4) { dh_organoid_ids_1 <- list(ids_1[[1]], ids_1[[2]], ids_1[[3]], ids_1[[4]])
+  
+} else if (length(ids_1) == 5) { dh_organoid_ids_1 <- list(ids_1[[1]], ids_1[[2]], ids_1[[3]], ids_1[[4]], ids_1[[5]])
+  
+} else if (length(ids_1) == 6) { dh_organoid_ids_1 <- list(ids_1[[1]], ids_1[[2]], ids_1[[3]], ids_1[[4]], ids_1[[5]], ids_1[[6]])
+  
+} else if (length(ids_1) == 7) {dh_organoid_ids_1 <- list(ids_1[[1]], ids_1[[2]], ids_1[[3]], ids_1[[4]], ids_1[[5]], ids_1[[6]], ids_1[[7]])}
+
+
+# load the integrated seurat object 
+integrated_pair1 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_1[[1]], dh_organoid_ids_1[[2]], sep = '-'), 'integrated_seurat_object'))
+
+```
+
+
+```{r include = FALSE}
+
+# FIRST PAIR
+# load the sces
+ids_2 <- strsplit(params$ids_2, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+
+# just a silly attempt to be flexible: 
+
+if (length(ids_2) == 2){ dh_organoid_ids_2 <- list(ids_2[[1]], ids_2[[2]])
+  
+} else if (length(ids_2) == 3) { dh_organoid_ids_2 <- list(ids_2[[1]], ids_2[[2]], ids_2[[3]])
+  
+} else if (length(ids_2) == 4) { dh_organoid_ids_2 <- list(ids_2[[1]], ids_2[[2]], ids_2[[3]], ids_2[[4]])
+  
+} else if (length(ids_2) == 5) { dh_organoid_ids_2 <- list(ids_2[[1]], ids_2[[2]], ids_2[[3]], ids_2[[4]], ids_2[[5]])
+  
+} else if (length(ids_2) == 6) { dh_organoid_ids_2 <- list(ids_2[[1]], ids_2[[2]], ids_2[[3]], ids_2[[4]], ids_2[[5]], ids_2[[6]])
+  
+} else if (length(ids_2) == 7) {dh_organoid_ids_2 <- list(ids_2[[1]], ids_2[[2]], ids_2[[3]], ids_2[[4]], ids_2[[5]], ids_2[[6]], ids_2[[7]])}
+
+
+# load the integrated seurat object 
+integrated_pair2 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_2[[1]], dh_organoid_ids_2[[2]], sep = '-'), 'integrated_seurat_object'))
+
+```
+
+```{r include = FALSE}
+# GENERATING PSEUDO BULK SAMPLES
+# here we are finding first n number of columns that have the name of the first DH organoid id written
+
+# first sample 
+first_id <- length(grep(paste(dh_organoid_ids_1[[1]]), colnames(GetAssayData(integrated_pair1[['integrated']])), value = TRUE))
+first_id_summed <- as.data.frame(apply(GetAssayData(integrated_pair1[['integrated']])[, 1: first_id], 1, sum)) # now sum them for the first id
+
+second_id <- length(grep(paste(dh_organoid_ids_1[[2]]), colnames(GetAssayData(integrated_pair1[['integrated']])), value = TRUE))
+second_id_summed <- as.data.frame(apply(GetAssayData(integrated_pair1[['integrated']])[, first_id: second_id], 1, sum)) #  sum them for the 2nd id
+
+first_sample <- cbind(first_id_summed, second_id_summed)
+colnames(first_sample) <- c(paste(dh_organoid_ids_1[[1]]), paste(dh_organoid_ids_1[[2]]))
+  
+# second sample
+first_id <- length(grep(paste(dh_organoid_ids_2[[1]]), colnames(GetAssayData(integrated_pair2[['integrated']])), value = TRUE))
+first_id_summed <- as.data.frame(apply(GetAssayData(integrated_pair2[['integrated']])[, 1: first_id], 1, sum)) # now sum them for the first id
+
+second_id <- length(grep(paste(dh_organoid_ids_2[[2]]), colnames(GetAssayData(integrated_pair2[['integrated']])), value = TRUE))
+second_id_summed <- as.data.frame(apply(GetAssayData(integrated_pair2[['integrated']])[, first_id: second_id], 1, sum)) #  sum them for the 2nd id 
+
+second_sample <- cbind(first_id_summed, second_id_summed)
+colnames(second_sample) <- c(paste(dh_organoid_ids_2[[1]]), paste(dh_organoid_ids_2[[2]]))
+
+# turn rownames to a column 
+first_sample <- rownames_to_column(first_sample)
+second_sample <- rownames_to_column(second_sample)
+
+# alphabetize 
+first_sample <- first_sample[order(first_sample[, 1]),]
+second_sample <- second_sample[order(second_sample[, 1]),]
+
+# merge and only keep the common genes (row names)
+counts_data <- inner_join(first_sample, second_sample)
+counts_data <- column_to_rownames(counts_data)
+
+# remove the negative rows 
+counts_data <- counts_data[-c(which(counts_data < 0 )), ]
+counts_data <- counts_data[-c(which(counts_data < 0 )), ]
+
+counts_data <- counts_data[apply(counts_data, 1, function(counts_data) all(counts_data >= 0)), ]
+
+
+```
+
+```{r include = FALSE}
+
+# now we start some edgeR stuff 
+# make the DGE object 
+dgeObject <- DGEList(counts = counts_data, genes = rownames(counts_data), group = factor(c(1, 1, 2, 2)))
+
+# filter the lowly expressed genes - have at least in 0.5 cpm in at least 2 samples 
+keep <- rowSums(cpm(dgeObject) > 0.5) >= 2 
+dgeObject <- dgeObject[keep, ]
+
+# normalize using edgeR's method 
+dgeObject <- calcNormFactors(dgeObject)
+
+```
+
+```{r eval = FALSE}
+
+# this means we have 2 replicates of each type of treatment
+group <- factor(c(1, 1, 2, 2))
+
+designMatrix <- model.matrix(~group)
+
+# estimate the dispersion (variance) of genes 
+dgeObject <- estimateDisp(dgeObject, design = designMatrix)
+
+# fit negative binomial model to the data 
+fit <- glmQLFit(dgeObject, designMatrix, robust = TRUE)
+
+# compare group2 to 1  
+qlf <- glmQLFTest(fit, coef = 2)
+
+```
+
+```{r eval = FALSE}
+
+# Map gene names to entrez ids for goana and kegga. we have to convert from ensembl ids to entrez ids. 
+geneIDs <- ensembldb::select(EnsDb.Hsapiens.v75, keys = rownames(qlf), keytype = "SYMBOL", columns = c("SYMBOL","ENTREZID"))
+
+# sometimes we get duplicates, remove those 
+geneIDs <- geneIDs[!duplicated(geneIDs$SYMBOL), ]
+geneIDs <- geneIDs[!duplicated(geneIDs$ENTREZID), ]
+
+# lets make sure we have the same genes in both 
+idx <- is.na(geneIDs$ENTREZID)
+idx_keep <- which(idx == FALSE)
+qlf_modified <- qlf[idx_keep, ]
+
+# drop the NAs, these are the genes we couldn't find an entrez id for 
+geneIDs <- na.omit(geneIDs)
+
+rownames(qlf_modified) <- as.integer(geneIDs$ENTREZID)
+
+# do some gene enrichment 
+go <- goana(qlf_modified, species= "Hs") # entrez gene ids are in mapping 
+
+# visualize goana results 
+# topGO(go, sort="up") 
+
+keg <- kegga(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs")
+
+# visualize kegga results
+# topKEGG(keg, sort="up")
+```
+
+
+```{r include = FALSE}
+
+
+
+
+```
+
+
+
+
+
+
