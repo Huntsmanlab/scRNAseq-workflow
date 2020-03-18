@@ -15,7 +15,6 @@ It will separate the genes found in these two scripts into two categories: up an
 Besides showing the common genes in both, it will also show the logFC and p values for both.  
 Genes are ordered alphabetically. 
 
-
 ```{r include = FALSE}
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
@@ -119,7 +118,7 @@ write.csv(common_up_organized, file = here('..', 'data', 'dge', 'compare_dge_met
 write.csv(common_down_organized, file = here('..', 'data', 'dge', 'compare_dge_methods', 'downregulated_genes', paste(params$ids)))
 ```
 
-Table for the **up** regulated genes: 
+Table for the **up** regulated genes in the transduced sample: 
 ```{r echo = FALSE, message = FALSE}
 
 # show the tables we made earlier 
@@ -130,7 +129,7 @@ DT::datatable(common_up_organized,
 ```
 
 
-Table for the **down** regulated genes: 
+Table for the **down** regulated genes in the transduced sample: 
 ```{r echo = FALSE, message = FALSE}
 
 # show the tables we made earlier 
