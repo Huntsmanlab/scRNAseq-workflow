@@ -55,6 +55,7 @@ names(sce_list) <- dh_organoid_ids
 
 a <- plotTSNE(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', dh_organoid_ids[[1]], sep = '_'))
 b <- plotUMAP(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', dh_organoid_ids[[1]], sep = '_'))
+
 # plotPCA(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', dh_organoid_ids[[1]], sep = '_'))
 ```
 
@@ -75,6 +76,13 @@ gridExtra::grid.arrange(a, b, c, d, nrow = 2)
 Frequency table: 
 This table shows the frequency of cell id types in each sample.
 ```{r echo = FALSE, message = FALSE}
+
+# find the common genes between the sces 
+universal <- Reduce(intersect, list(rownames(sce_list[[1]]), rownames(sce_list[[2]])))
+
+# only keep the common genes in all sces 
+sce_list <- lapply(sce_list, function(sce) sce <- sce[universal, ])
+
 # we run this function on our sces here. we just convert them into seurat objects and do a bit of a clean up. function is defined in the utilities file. 
 sobject1 <- seuratClustering(sce_list[[1]], paste(dh_organoid_ids[[1]]))
 sobject2 <- seuratClustering(sce_list[[2]], paste(dh_organoid_ids[[2]]))
@@ -82,6 +90,10 @@ sobject2 <- seuratClustering(sce_list[[2]], paste(dh_organoid_ids[[2]]))
 # LETS START OUR INTEGRATION:
 # first combine the objects and add cell ids as well so that we know where each cell came from 
 DH.combined = merge(sobject1, y = sobject2, add.cell.ids = c(dh_organoid_ids[[1]], dh_organoid_ids[[2]]), project = "protocol")
+
+# save this object 
+saveRDS(DH.combined, file = here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids[[1]], dh_organoid_ids[[2]], sep = '-'), 'uncorrected_seurat_object'))
+
 
 # lets split by protocol 
 data.list <- SplitObject(DH.combined, split.by = "protocol")
@@ -99,10 +111,10 @@ if (dim(DH.combined)[[2]] > 200) {
   # these anchors represent cells with similar states between two samples 
   # seurat uses those samples to normalize the data. 
   # when we have less than 200 cells, we will use other normalization methods for batch normalization 
-  samples.anchors <- FindIntegrationAnchors(object.list = reference.list, dims = 1:30, k.filter = NA)
+  samples.anchors <- FindIntegrationAnchors(object.list = reference.list, dims = 1:30, anchor.features = 3000 )
   
   # integrate the two data sets 
-  samples.integrated <- IntegrateData(anchorset = samples.anchors, dims = 1:30)
+  samples.integrated <- IntegrateData(anchorset = samples.anchors, dims = 1:30, features.to.integrate = rownames(DH.combined))
   
   # set the default combined assay we will be using. we will be using the 'integrated', aka batch corrected assay, not the previous ones 
   DefaultAssay(samples.integrated) <- "integrated"
