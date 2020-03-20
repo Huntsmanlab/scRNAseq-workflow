@@ -7,8 +7,9 @@ output:
     code_folding: hide
 
 params:
-  id: 'id'
   ids: 'pair_ids'
+  output_uncorrected: 'output_uncorrected'
+  output_integrated: 'output_integrated'
 ---
 This report shows the results of clustering after we combine the samples.  
 We first show the results of clustering within each sample, then we compare those  
@@ -92,9 +93,8 @@ sobject2 <- seuratClustering(sce_list[[2]], paste(dh_organoid_ids[[2]]))
 # first combine the objects and add cell ids as well so that we know where each cell came from 
 DH.combined = merge(sobject1, y = sobject2, add.cell.ids = c(dh_organoid_ids[[1]], dh_organoid_ids[[2]]), project = "protocol")
 
-# save this object 
-saveRDS(DH.combined, file = here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids[[1]], dh_organoid_ids[[2]], sep = '-'), 'uncorrected_seurat_object'))
-
+# save this object, snakemake passes the filepath for the output object 
+saveRDS(DH.combined, file = 'output_uncorrected')
 
 # lets split by protocol 
 data.list <- SplitObject(DH.combined, split.by = "protocol")
@@ -223,7 +223,8 @@ if (dim(DH.combined)[[2]] > 200) {
   
 } # end of else 
 
-saveRDS(samples.integrated, file = here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids[[1]], dh_organoid_ids[[2]], sep = '-'), 'integrated_seurat_object'))
+# save the integrated object, snakemake passes the filepath for saving 
+saveRDS(samples.integrated, file = 'output_integrated')
 
 ```
 
