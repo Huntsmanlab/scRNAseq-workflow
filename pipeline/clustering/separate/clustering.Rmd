@@ -26,7 +26,7 @@ source(here('..', 'sourceFiles', 'utilities.R'))
 
 ```{r include = FALSE}
 # load the data - it has to be normalized sce with reduced dimensions 
-sce <- readRDS(here('data', 'normalized', params$id, 'sce_norm.rds'))
+sce <- readRDS(here('..', 'data', 'normalized', params$id, 'sce_norm.rds'))
 ```
 
 ### ALGORITHM: Shared neighbor
@@ -141,8 +141,6 @@ plotUMAP <- plotUMAP(sce, colour_by="cluster", text_by="cluster") + ggtitle(past
 plotPCA <- plotPCA(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', params$id, sep = '_'))
 
 ```
-
-
 
 
 ```{r echo= FALSE, message = FALSE}
