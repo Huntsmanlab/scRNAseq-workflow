@@ -101,7 +101,7 @@ makeTable <- function(df, index) {
     dplyr::select(id, cell_number, sum, detected, subsets_mito_sum, subsets_mito_percent) %>% 
     
     # and here we just rename them for clarity 
-    rename(RNA_reds = sum, detected_genes = detected, mito_reads = subsets_mito_sum, mito_percent = subsets_mito_percent)
+    rename(RNA_reads = sum, detected_genes = detected, mito_reads = subsets_mito_sum, mito_percent = subsets_mito_percent)
   
   return(df)
   
@@ -129,7 +129,8 @@ AFTERtable <- rbind(AFTERcontrolTable, AFTERexpTable)
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
 # here we just make the tables look nice and add a caption as well. 
 BEFOREtable %>% 
-  knitr::kable(caption = 'Table 1: Summary statistics showing cell number and mean values per cell- BEFORE quality control')
+  knitr::kable(caption = 'Table 1: Summary statistics showing cell number and mean values per cell- BEFORE quality control') %>% 
+  kable_styling(full_width = F)
 ```
 
 
@@ -539,7 +540,7 @@ gridExtra::grid.arrange(control_coolplot2, exp_coolplot2)
 Here we include the reduced dimensionality plots before and after batch normalization.  
 Note that these plots are only for the cells that underwent quality control.  
 
-```{r include = FALSE}
+```{r eval = FALSE, include = FALSE}
 # BEFORE BATCH NORM 
 
 # here, we need to use the normalized sces to run dim reduction. so lets load them and make a list. 
@@ -554,7 +555,7 @@ sce_norms <- lapply(sce_norms, function(sce){
     })
 
 # combine sces
-sce <- combine_sces(sce_list = sce_norms, prefix_col_name = 'id', prefix_cell_name = TRUE)
+sce <- combine_sces(sce_list = sce_norms)
   
 # Run UMAP, TSNE, PCA for visualization downstream steps: clustering, cellassign, ect.
 sce <- runPCA(sce, exprs_values = "logcounts", ncomponents = 200)
@@ -570,7 +571,7 @@ UMAP_noBatchNorm <- plotReducedDim(sce, dimred = 'UMAP') + ggtitle('before batch
 ```
 
 
-```{r include = FALSE}
+```{r eval = FALSE, include = FALSE}
 # AFTER BATCH NORM
 
 # here, we need to use the normalized sces to run dim reduction. so lets load them and make a list. 
@@ -580,7 +581,7 @@ sce_norms <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'no
 sce_norms <- scran_batch_norm(sce_norms)
 
 # combine sces
-sce <- combine_sces(sce_list = sce_norms, prefix_col_name = 'id', prefix_cell_name = TRUE)
+sce <- combine_sces(sce_list = sce_norms)
   
 # Run UMAP, TSNE, PCA for visualization downstream steps: clustering, cellassign, ect.
 sce <- runPCA(sce, exprs_values = "logcounts", ncomponents = 200)
@@ -596,13 +597,15 @@ PCAplot <- plotReducedDim(sce, 'PCA') + ggtitle('after batch Norm - PCA')
 ```
 
 TSNE
-```{r echo = FALSE, warning = FALSE, fig.height = 4, fig.width = 7}
+```{r eval = FALSE, include = FALSE}
+
+# witdh 7 ve 4 
 # now we visualize
 gridExtra::grid.arrange(TSNE_noBatchNorm, TSNEplot, nrow = 1)
 ```
 
 UMAP
-```{r echo = FALSE, warning = FALSE, fig.height = 4, fig.width = 7}
+```{eval = FALSE, include = FALSE}
 # now we visualize
 gridExtra::grid.arrange(UMAP_noBatchNorm, UMAPplot, nrow = 1)
 ```
