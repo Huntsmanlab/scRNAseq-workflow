@@ -2,9 +2,11 @@
 
 # Ignore the Snakefile
 Snakefile
+.snakemake
+
 # Ignore any created html files
 *.html
-.Rproj.user
 
 # ignore the rproject 
 scRNAseq-workflow.Rproj
+.Rproj.user
