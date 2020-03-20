@@ -9,7 +9,7 @@ output:
 
 params:
   ids_1: 'VOA11229_CCOC-DH7' # ovarian samples 
-  ids_2: 'DH10-DH3' # endometrial samples 
+  ids_2: 'DH3-DH10' # endometrial samples 
   seed: 123
 ---
 
@@ -32,7 +32,7 @@ ids_1 <- strsplit(params$ids_1, "-")[[1]] # split by "-" SO ID must NOT CONTAIN 
 dh_organoid_ids_1 <- list(ids_1[[1]], ids_1[[2]])
 
 # load the integrated seurat object 
-integrated_pair1 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_1[[1]], dh_organoid_ids_1[[2]], sep = '-'), 'integrated_seurat_object'))
+integrated_pair1 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_1[[1]], dh_organoid_ids_1[[2]], sep = '-'), 'integrated_seurat_object.rds'))
 
 # SECOND PAIR
 # load the sces
@@ -40,7 +40,7 @@ ids_2 <- strsplit(params$ids_2, "-")[[1]] # split by "-" SO ID must NOT CONTAIN 
 dh_organoid_ids_2 <- list(ids_2[[1]], ids_2[[2]])
 
 # load the integrated seurat object 
-integrated_pair2 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_2[[1]], dh_organoid_ids_2[[2]], sep = '-'), 'integrated_seurat_object'))
+integrated_pair2 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_2[[1]], dh_organoid_ids_2[[2]], sep = '-'), 'integrated_seurat_object.rds'))
 
 ```
 
@@ -48,9 +48,9 @@ integrated_pair2 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh
 
 ```{r include = FALSE}
 # load the combined but uncorrected seurat object 
-combined_ova <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_1[[1]], dh_organoid_ids_1[[2]], sep = '-'), 'uncorrected_seurat_object'))
+combined_ova <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_1[[1]], dh_organoid_ids_1[[2]], sep = '-'), 'uncorrected_seurat_object.rds'))
 
-combined_endo <- endo <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_2[[1]], dh_organoid_ids_2[[2]], sep = '-'), 'uncorrected_seurat_object'))
+combined_endo <- endo <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_2[[1]], dh_organoid_ids_2[[2]], sep = '-'), 'uncorrected_seurat_object.rds'))
 
 # find variable features
 combined_ova <- FindVariableFeatures(combined_ova)
@@ -75,7 +75,7 @@ combined_endo <- RunUMAP(combined_endo, dims = 1:30)
 
 #### ovarian clear cell tumors: VOA11229_CCOC-DH7  
 ##### before batch correction  
-``` {r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 7}
+``` {r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 12}
 
 tsne1 <- DimPlot(combined_ova, reduction = 'tsne', group.by = 'id', combine = FALSE)
 umap1 <- DimPlot (combined_ova, reduction = 'umap', group.by = 'id', combine = FALSE)
@@ -84,7 +84,7 @@ plot_grid(ggplotify::as.grob(tsne1[[1]]), ggplotify::as.grob(umap1[[1]]), labels
 ```
 
 ##### after batch correction  
-``` {r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 7}
+``` {r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 12}
 
 tsne1 <- DimPlot(integrated_pair1, reduction = 'tsne', group.by = 'id', combine = FALSE)
 umap1 <- DimPlot (integrated_pair1, reduction = 'umap', group.by = 'id', combine = FALSE)
@@ -230,7 +230,7 @@ keg <- kegga(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs")
 These plots are intended to give an idea about the model and whether it is a good fit to represent the data we are interested in analyzing. 
 
 Plot cells on a two-dimensional scatterplot so that distances on the plot approximate the expression differences between the cells  
-In the plot below, the distance between each pair of samples can be interpreted as the leading log-fold change between the samples for the genes that best distinguish that pair of samples. Therefore, samples shown farther apart are more different in terms of gene expression. Ideally we would expect to see the replicates closer together. 
+In the plot below, the distance between each pair of samples can be interpreted as the leading log-fold change between the samples for the genes that best distinguish that pair of samples. Therefore, samples shown farther apart are more different in terms of gene expression. Ideally we would expect to see the replicates closer together. However, note that decreasing the number of dimensions down to two may not represent the data as accurately. This plot is here only to give an idea about how similar the samples are. Dimensionality reduction plots given at above are more reliable to look at. 
 
 ```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 4}
 
