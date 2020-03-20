@@ -32,7 +32,7 @@ ids_1 <- strsplit(params$ids_1, "-")[[1]] # split by "-" SO ID must NOT CONTAIN 
 dh_organoid_ids_1 <- list(ids_1[[1]], ids_1[[2]])
 
 # load the integrated seurat object 
-integrated_pair1 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_1[[1]], dh_organoid_ids_1[[2]], sep = '-'), 'integrated_seurat_object'))
+integrated_pair1 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_1[[1]], dh_organoid_ids_1[[2]], sep = '-'), 'integrated_seurat_object.rds'))
 
 ```
 
@@ -45,7 +45,7 @@ ids_2 <- strsplit(params$ids_2, "-")[[1]] # split by "-" SO ID must NOT CONTAIN 
 dh_organoid_ids_2 <- list(ids_2[[1]], ids_2[[2]])
 
 # load the integrated seurat object 
-integrated_pair2 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_2[[1]], dh_organoid_ids_2[[2]], sep = '-'), 'integrated_seurat_object'))
+integrated_pair2 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_2[[1]], dh_organoid_ids_2[[2]], sep = '-'), 'integrated_seurat_object.rds'))
 
 ```
 
