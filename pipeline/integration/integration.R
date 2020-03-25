@@ -11,13 +11,21 @@ library(here)
 source(here('..', 'sourceFiles', 'utilities.R'))
 
 
+parser <- ArgumentParser(description = "integrate multiple datasets to remove batch effects")
 
+parser$add_argument('--path_to_sce_qc', metavar='DIRECTORY', type='character',
+                    help="Path to sce after quality control")
 
+parser$add_argument('--path_to_sce_norm', metavar='DIRECTORY', type='character',
+                    help="Path to sce after normalization")
 
+parser$add_argument('--output_file_name_uncorrected', metavar='FILE', type='character',
+                    help="path to the uncorrected but combined samples, has batch effects")
 
+parser$add_argument('--output_file_name_integrated', metavar='FILE', type='character',
+                    help="Path to integrated samples, doesnt have batch effects")
 
-
-
+args <- parser$parse_args()
 
 # update here when you have a new list. update the same update the 
 id.list <-list('VOA11068_ENOC', 'DH13', 'DH18', 'DH8', 'DH24', 'VOA11229_CCOC', 'DH7')
@@ -25,7 +33,7 @@ id.orig <- id.list
 
 # lets start! 
 # load the data, note that we aren't using the normalized data since we will use seurat's normalization method 
-sces <- lapply(id.list, function(id) readRDS(here('..', 'data', 'qc', id, 'sce_qc.rds')))
+sces <- readRDS(args$path_to_sce_qc)
 
 # subset to common genes across a group of sces 
 intersect_all <- function(sces){
@@ -82,28 +90,25 @@ integrated <- AddMetaData(integrated, sample_names, col.name = 'id')
 # the default assay is the new one 
 DefaultAssay(integrated) <- "integrated"
 
-# save the data, assuming you made the folder where the data would be saved 
-saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'integrated.rds' )) # corrected data 
-
 # then some standard workflow for visualization and dim reduction 
 integrated <- ScaleData(integrated, verbose = FALSE)
 integrated <- RunPCA(integrated, verbose = FALSE)
 integrated <- RunUMAP(integrated, dims = 1:30)
 integrated <- RunTSNE(integrated, dims = 1:30)
 
+# save the data
+saveRDS(integrated, file = args$output_file_name_integrated) # corrected data 
 
 plots <- DimPlot(integrated, group.by = c('id'), combine = FALSE)
 plots <- lapply(X = plots, FUN = function(x) x + theme(legend.position = "top") + guides(color = guide_legend(nrow = 3, 
                                                                                                               byrow = TRUE, override.aes = list(size = 3))))
 CombinePlots(plots)
 
-# save the data, assuming you made the folder where the data would be saved 
-saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'integrated.rds' )) # corrected data 
-
 # UNCORRECTED DATA
 # here we do the combined but uncorrected sample, with the batch effects
 # load the normalized data 
-sces_norm <- lapply(id.orig, function(id) readRDS(here('..', 'data', 'normalized', id, 'sce_norm.rds')))
+sces_norm <- readRDS(args$path_to_sce_norm)
+
 sces_norm <- intersect_all(sces_norm) # subset to common genes 
 combined <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]], sces_norm[[6]], sces_norm[[7]]) # combine the objects by doing a simple r bind 
 
@@ -116,7 +121,7 @@ combined <- runUMAP(combined)
 plotTSNE(combined, colour_by = 'id')
 
 # now save the object 
-saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'uncorrected.rds' )) # uncorrected data 
+saveRDS(combined, file = args$output_file_name_uncorrected) # uncorrected data 
 
 
 
