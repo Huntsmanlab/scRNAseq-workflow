@@ -11,7 +11,7 @@ library(here)
 source(here('..', 'sourceFiles', 'utilities.R'))
 
 # update here when you have a new list. update the same update the 
-id.list <-list('DH3', 'DH4', 'DH10', 'DH15', 'DH16', 'DH17')
+id.list <-list('VOA11068_ENOC', 'DH13', 'DH18', 'DH8', 'DH24', 'VOA11229_CCOC', 'DH7')
 id.orig <- id.list
 
 # lets start! 
@@ -73,11 +73,9 @@ integrated <- AddMetaData(integrated, sample_names, col.name = 'id')
 # the default assay is the new one 
 DefaultAssay(integrated) <- "integrated"
 
-# save the data, assuming you made the folder where the data would be saved 
-saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'integrated.rds' )) # corrected data 
-
 # then some standard workflow for visualization and dim reduction 
 integrated <- ScaleData(integrated, verbose = FALSE)
+set.seed(1998)
 integrated <- RunPCA(integrated, verbose = FALSE)
 integrated <- RunUMAP(integrated, dims = 1:30)
 integrated <- RunTSNE(integrated, dims = 1:30)
@@ -95,18 +93,16 @@ saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig
 # load the normalized data 
 sces_norm <- lapply(id.orig, function(id) readRDS(here('..', 'data', 'normalized', id, 'sce_norm.rds')))
 sces_norm <- intersect_all(sces_norm) # subset to common genes 
-combined <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]], sces_norm[[6]]) # combine the objects by doing a simple r bind 
+uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]], sces_norm[[6]], sces_norm[[7]]) 
 
 # some dim reduction 
 set.seed(1564)
-combined <- runPCA(combined)
-combined <- runTSNE(combined)
-combined <- runUMAP(combined)
-
-plotTSNE(combined, colour_by = 'id')
+uncorrected <- runPCA(uncorrected)
+uncorrected <- runTSNE(uncorrected)
+uncorrected <- runUMAP(uncorrected)
 
 # now save the object 
-saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'uncorrected.rds' )) # uncorrected data 
+saveRDS(uncorrected, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'uncorrected.rds' )) # uncorrected data 
 
 
 
