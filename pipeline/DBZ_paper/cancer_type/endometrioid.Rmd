@@ -326,7 +326,7 @@ abline(h=c(-1,1), col="blue")
 
 Now we take a look at the DE genes in a volcano plot. Note that we label the first 40 significantly up and downregulated genes in endometrial samples compared to ovarian samples.  
 Fold change cut off is 0.5, p value cut off is 10e-3.  
-```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 11}
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 13}
 # we need to work on qlf a little bit so that we can use the enhancedvolcano function 
 
 data <- qlf$table
@@ -352,7 +352,7 @@ EnhancedVolcano(data,
   widthConnectors = 0.4,
   colConnectors = 'black',
   pointSize = 0.7, 
-  xlim = c(-8, 8), 
+  xlim = c(-14, 10), 
   FCcutoff = 0.5, 
   pCutoff = 10e-3, 
   legend=c('not significant','Log (base 2) fold-change','P value',
