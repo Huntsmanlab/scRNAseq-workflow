@@ -10,7 +10,6 @@
 library(here)
 source(here('..', 'sourceFiles', 'utilities.R'))
 
-
 parser <- ArgumentParser(description = "integrate multiple datasets to remove batch effects")
 
 parser$add_argument('--path_to_sce_qc', metavar='DIRECTORY', type='character',
@@ -122,21 +121,3 @@ plotTSNE(combined, colour_by = 'id')
 
 # now save the object 
 saveRDS(combined, file = args$output_file_name_uncorrected) # uncorrected data 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

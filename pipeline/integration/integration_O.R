@@ -11,7 +11,7 @@ library(here)
 source(here('..', 'sourceFiles', 'utilities.R'))
 
 # update here when you have a new list. update the same update the 
-id.list <-list('VOA11068_ENOC', 'DH13', 'DH18', 'DH8', 'DH24', 'VOA11229_CCOC', 'DH7')
+id.list <-list('DH3', 'DH4', 'DH10', 'DH15', 'DH16', 'DH17')
 id.orig <- id.list
 
 # lets start! 
@@ -95,7 +95,7 @@ saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig
 # load the normalized data 
 sces_norm <- lapply(id.orig, function(id) readRDS(here('..', 'data', 'normalized', id, 'sce_norm.rds')))
 sces_norm <- intersect_all(sces_norm) # subset to common genes 
-combined <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]], sces_norm[[6]], sces_norm[[7]]) # combine the objects by doing a simple r bind 
+combined <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]], sces_norm[[6]]) # combine the objects by doing a simple r bind 
 
 # some dim reduction 
 set.seed(1564)
