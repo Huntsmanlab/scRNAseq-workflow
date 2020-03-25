@@ -4,11 +4,20 @@
 # run dim reduction plots on combined plots 
 # run DGE analysis across samples, we will need to remove batch effects for that. we can integrate data sets first here, then split if needed. 
 # data here is saved into the data/integrated folder/<name of integrated samples>
-# this is the one off script, we also have a version integrated into snakemake 
+# this is the version integrated into snakemake 
 
 # load a few necessary things 
 library(here)
 source(here('..', 'sourceFiles', 'utilities.R'))
+
+
+
+
+
+
+
+
+
 
 # update here when you have a new list. update the same update the 
 id.list <-list('VOA11068_ENOC', 'DH13', 'DH18', 'DH8', 'DH24', 'VOA11229_CCOC', 'DH7')
@@ -81,6 +90,7 @@ integrated <- ScaleData(integrated, verbose = FALSE)
 integrated <- RunPCA(integrated, verbose = FALSE)
 integrated <- RunUMAP(integrated, dims = 1:30)
 integrated <- RunTSNE(integrated, dims = 1:30)
+
 
 plots <- DimPlot(integrated, group.by = c('id'), combine = FALSE)
 plots <- lapply(X = plots, FUN = function(x) x + theme(legend.position = "top") + guides(color = guide_legend(nrow = 3, 
