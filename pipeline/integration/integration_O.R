@@ -11,7 +11,7 @@ library(here)
 source(here('..', 'sourceFiles', 'utilities.R'))
 
 # update here when you have a new list. update the same update the 
-id.list <-list('VOA11068_ENOC', 'DH13', 'DH18', 'DH8', 'DH24', 'VOA11229_CCOC', 'DH7')
+id.list <-list('VOA11068_ENOC', 'DH13', 'DH18')
 id.orig <- id.list
 
 # lets start! 
@@ -80,10 +80,6 @@ integrated <- RunPCA(integrated, verbose = FALSE)
 integrated <- RunUMAP(integrated, dims = 1:30)
 integrated <- RunTSNE(integrated, dims = 1:30)
 
-plots <- DimPlot(integrated, group.by = c('id'), combine = FALSE)
-plots <- lapply(X = plots, FUN = function(x) x + theme(legend.position = "top") + guides(color = guide_legend(nrow = 3, 
-                                                                                                              byrow = TRUE, override.aes = list(size = 3))))
-CombinePlots(plots)
 
 # save the data, assuming you made the folder where the data would be saved 
 saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'integrated.rds' )) # corrected data 
@@ -93,7 +89,7 @@ saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig
 # load the normalized data 
 sces_norm <- lapply(id.orig, function(id) readRDS(here('..', 'data', 'normalized', id, 'sce_norm.rds')))
 sces_norm <- intersect_all(sces_norm) # subset to common genes 
-uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]], sces_norm[[6]], sces_norm[[7]]) 
+uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]]) 
 
 # some dim reduction 
 set.seed(1564)

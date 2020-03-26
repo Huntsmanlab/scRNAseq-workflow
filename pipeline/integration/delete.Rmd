@@ -1,48 +1,29 @@
+---
+title: "delete"
+author: "asli"
+date: "3/26/2020"
+output: html_document
+---
+```{r include = FALSE}
 # This script is for integrating multiple data sets. integrating allows us to combine data sets and remove batch effects at the same time 
 # we may need to integrate data in various situations, so this script can be used in multiple types of analysis, such as: 
 # running a clustering analysis on the combined sample 
 # run dim reduction plots on combined plots 
 # run DGE analysis across samples, we will need to remove batch effects for that. we can integrate data sets first here, then split if needed. 
 # data here is saved into the data/integrated folder/<name of integrated samples>
-# this is the version integrated into snakemake 
+# this is the one off script, we also have a version integrated into snakemake 
 
 # load a few necessary things 
 library(here)
 source(here('..', 'sourceFiles', 'utilities.R'))
 
-parser <- ArgumentParser(description = "integrate multiple datasets to remove batch effects")
-
-parser$add_argument('--path_to_sce_qc', metavar='DIRECTORY', type='character',
-                    help="Path to sce after quality control")
-
-parser$add_argument('--path_to_sce_norm', metavar='DIRECTORY', type='character',
-                    help="Path to sce after normalization")
-
-parser$add_argument('--output_file_name_uncorrected', metavar='FILE', type='character',
-                    help="path to the uncorrected but combined samples, has batch effects")
-
-parser$add_argument('--output_file_name_integrated', metavar='FILE', type='character',
-                    help="Path to integrated samples, doesnt have batch effects")
-
-parser$add_argument('--ids_integrated', metavar='FILE', type='character',
-                    help="the name of the samples you want to integrate")
-
-
-args <- parser$parse_args()
-
-
-############################################################################################################################
-
-id.list <-args$ids_integrated
-
-id.list <- strsplit(id.list, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
-id.list <- list(id.list[[1]], id.list[[2]], id.list[[3]])
-
+# update here when you have a new list. update the same update the 
+id.list <-list('VOA11068_ENOC', 'DH13', 'DH18')
 id.orig <- id.list
 
 # lets start! 
 # load the data, note that we aren't using the normalized data since we will use seurat's normalization method 
-sces <- readRDS(args$path_to_sce_qc)
+sces <- lapply(id.list, function(id) readRDS(here('..', 'data', 'qc', id, 'sce_qc.rds')))
 
 # subset to common genes across a group of sces 
 intersect_all <- function(sces){
@@ -106,22 +87,28 @@ integrated <- RunPCA(integrated, verbose = FALSE)
 integrated <- RunUMAP(integrated, dims = 1:30)
 integrated <- RunTSNE(integrated, dims = 1:30)
 
-# save the data
-saveRDS(integrated, file = args$output_file_name_integrated) # corrected data 
+plots <- DimPlot(integrated, group.by = c('id'), combine = FALSE)
+plots <- lapply(X = plots, FUN = function(x) x + theme(legend.position = "top") + guides(color = guide_legend(nrow = 3, 
+                                                                                                              byrow = TRUE, override.aes = list(size = 3))))
+CombinePlots(plots)
+
+# save the data, assuming you made the folder where the data would be saved 
+saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'integrated.rds' )) # corrected data 
 
 # UNCORRECTED DATA
 # here we do the combined but uncorrected sample, with the batch effects
 # load the normalized data 
-sces_norm <- readRDS(args$path_to_sce_norm)
-
+sces_norm <- lapply(id.orig, function(id) readRDS(here('..', 'data', 'normalized', id, 'sce_norm.rds')))
 sces_norm <- intersect_all(sces_norm) # subset to common genes 
-combined <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]]) # combine the objects by doing a simple r bind 
+uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]]) 
 
 # some dim reduction 
 set.seed(1564)
-combined <- runPCA(combined)
-combined <- runTSNE(combined)
-combined <- runUMAP(combined)
+uncorrected <- runPCA(uncorrected)
+uncorrected <- runTSNE(uncorrected)
+uncorrected <- runUMAP(uncorrected)
 
 # now save the object 
-saveRDS(combined, file = args$output_file_name_uncorrected) # uncorrected data 
+saveRDS(uncorrected, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'uncorrected.rds' )) # uncorrected data 
+
+```

@@ -10,6 +10,17 @@ output:
 params:
   ids: 'DH3-DH4-DH10-DH15-DH16-DH17'
 ---
+###Endometrial primary tumors  
+The samples we show in this report are:  
+**endometrioid**  
+- DH4  
+- DH17  
+**clear cell**  
+- DH10  
+- DH3  
+**high grade serous**  
+- DH15  
+- DH16  
 
 #### Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots before and after batch normalization. 
 

@@ -8,9 +8,9 @@ output:
     code_folding: hide
 
 params:
-  ids_1: 'VOA11068_ENOC-DH13-DH18-DH13'
+  ids_1: 'VOA11068_ENOC-DH13-DH18'
   ids_2: 'DH15-DH16'
-  seed: 123
+  seed: 1234567
 ---
 
 #### In this document, we compare the DGE in ovarian HGS and endometrial HGS tumors.  
@@ -29,10 +29,10 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 # FIRST PAIR - ovarian 
 # load the sces
 ids_1 <- strsplit(params$ids_1, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
-dh_organoid_ids_1 <- list(ids_1[[1]], ids_1[[2]])
+dh_organoid_ids_1 <- list(ids_1[[1]], ids_1[[2]], ids_1[[3]])
 
 # load the integrated seurat object 
-integrated_pair1 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_1[[1]], dh_organoid_ids_1[[2]], sep = '-'), 'integrated_seurat_object'))
+integrated_pair1 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_1[[1]], dh_organoid_ids_1[[2]], dh_organoid_ids_1[[3]], sep = '-'), 'integrated_seurat_object.rds'))
 
 ```
 
@@ -45,7 +45,7 @@ ids_2 <- strsplit(params$ids_2, "-")[[1]] # split by "-" SO ID must NOT CONTAIN 
 dh_organoid_ids_2 <- list(ids_2[[1]], ids_2[[2]])
 
 # load the integrated seurat object 
-integrated_pair2 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_2[[1]], dh_organoid_ids_2[[2]], sep = '-'), 'integrated_seurat_object'))
+integrated_pair2 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_2[[1]], dh_organoid_ids_2[[2]], sep = '-'), 'integrated_seurat_object.rds'))
 
 ```
 
@@ -54,9 +54,9 @@ integrated_pair2 <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh
 
 ```{r include = FALSE}
 # load the combined but uncorrected seurat object 
-combined_ova <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_1[[1]], dh_organoid_ids_1[[2]], sep = '-'), 'uncorrected_seurat_object'))
+combined_ova <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_1[[1]], dh_organoid_ids_1[[2]], dh_organoid_ids_1[[3]], sep = '-'), 'uncorrected_seurat_object.rds'))
 
-combined_endo <- endo <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_2[[1]], dh_organoid_ids_2[[2]], sep = '-'), 'uncorrected_seurat_object'))
+combined_endo <- endo <- readRDS(here('..', 'data', 'clustered', 'combined', paste(dh_organoid_ids_2[[1]], dh_organoid_ids_2[[2]], sep = '-'), 'uncorrected_seurat_object.rds'))
 
 # find variable features
 combined_ova <- FindVariableFeatures(combined_ova)
@@ -81,7 +81,7 @@ combined_endo <- RunUMAP(combined_endo, dims = 1:30)
 
 #### ovarian HGS tumors: VOA11068_ENOC-DH13-DH18-DH13  
 ##### before batch correction  
-``` {r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 7}
+``` {r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 11}
 
 tsne1 <- DimPlot(combined_ova, reduction = 'tsne', group.by = 'id', combine = FALSE)
 umap1 <- DimPlot (combined_ova, reduction = 'umap', group.by = 'id', combine = FALSE)
@@ -90,7 +90,7 @@ plot_grid(ggplotify::as.grob(tsne1[[1]]), ggplotify::as.grob(umap1[[1]]), labels
 ```
 
 ##### after batch correction  
-``` {r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 7}
+``` {r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 11}
 
 tsne1 <- DimPlot(integrated_pair1, reduction = 'tsne', group.by = 'id', combine = FALSE)
 umap1 <- DimPlot (integrated_pair1, reduction = 'umap', group.by = 'id', combine = FALSE)
@@ -221,15 +221,8 @@ geneIDs <- na.omit(geneIDs)
 rownames(qlf_modified) <- as.integer(geneIDs$ENTREZID)
 
 # do some gene enrichment 
-go <- goana(qlf_modified, species= "Hs") # entrez gene ids are in mapping 
-
-# visualize goana results 
-# topGO(go, sort="up") 
-
+go <- goana(qlf_modified, species= "Hs") # entrez gene ids are in mapping
 keg <- kegga(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs")
-
-# visualize kegga results
-# topKEGG(keg, sort="up")
 ```
 
 ### Diagnostic Plots 
@@ -265,37 +258,6 @@ The plots gives an idea about how much the data was squeezed. The expected is to
 ```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 4}
 # Plot the genewise quasi-likelihood dispersion against the gene abundance (in ln counts per million).
 plotQLDisp(fit)
-
-```
-
-
-#### Plot the differentially expressed genes  
-The blue lines indicate 1-fold up or down. The number of genes that are significantly up or down regulated are shown in the table, according to the plot. Here, we compare the HGS endometrial tumors to HGS ovarian tumors. 
-```{r echo = FALSE, message = FALSE, fig.height = 7, fig.width = 4}
-# plot the differentially expressed genes 
-
-plotMD(qlf, main = 'DE genes', ylab = 'log2 fold change')
-abline(h=c(-1,1), col="blue")
-```
-
-
-Now we take a closer look at the genes visualized above. 
-This table compares HGS endometrial tumors to HGS ovarian tumors. 
-```{r, echo = FALSE, message = FALSE}
-
-summary <- summary(decideTests(qlf))
-
-summary %>% 
-    knitr::kable(caption = 'DE genes') %>% 
-    kable_styling(full_width = F)
-```
-
-
-Now we narrow down the DE genes a little bit to visualize genes with a reasonably large expression changes. This is helpful to list the biologically more meaningful genes.  
-We restrict the fold change to 0.5.  
-```{r echo = FALSE, message = FALSE, fig.height = 7, fig.width = 4}
-
-plotMD(qlf_threshold, main = 'DE genes', ylab = 'log2 fold change')
 
 ```
 
@@ -345,8 +307,68 @@ DT::datatable(downregulated_genes_table,
 ```
 
 
-This table tells us how many genes up or down regulated in the analysis with the given log fold change. 
-Note that we compare HGS endometrial tumors to HGS ovarian tumors. 
+#### Plot the differentially expressed genes  
+The blue lines indicate 1-fold up or down. The number of genes that are significantly up or down regulated are shown in the table, according to the plot. Here, we compare the HGS endometrial tumors to HGS ovarian tumors. 
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 5}
+# plot the differentially expressed genes 
+
+plotMD(qlf, main = 'DE genes', ylab = 'log2 fold change', cex = 0.4)
+abline(h=c(-1,1), col="blue")
+
+```
+
+Now we take a look at the DE genes in a volcano plot. Note that we label the first 40 significantly up and downregulated genes in endometrial samples compared to ovarian samples.  
+Fold change cut off is 0.5, p value cut off is 10e-3.  
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 13}
+# we need to work on qlf a little bit so that we can use the enhancedvolcano function 
+
+data <- qlf$table
+
+data <- data %>% 
+  dplyr::select(logFC, PValue) %>% 
+  rename(log2FoldChange = logFC, pvalue = PValue)
+
+cool_genes <- c(upregulated_genes_table[1][1: 15, ], downregulated_genes_table[1][1: 15, ])
+
+library(EnhancedVolcano)
+
+EnhancedVolcano(data,
+  lab = rownames(data),
+  x = 'log2FoldChange',
+  y = 'pvalue',
+  title = 'Differentially Expressed Genes',
+  subtitle = 'endometrium vs ovary', 
+  selectLab = cool_genes, 
+  labCol = 'black',
+  labFace = 'bold',
+  drawConnectors = TRUE,
+  widthConnectors = 0.4,
+  colConnectors = 'black',
+  pointSize = 0.7, 
+  xlim = c(-14, 10), 
+  FCcutoff = 0.5, 
+  pCutoff = 10e-3, 
+  legend=c('not significant','Log (base 2) fold-change','P value',
+      'P value & Log (base 2) fold-change'), 
+  legendPosition = 'right',
+  legendLabSize = 8,
+  legendIconSize = 5.0)
+
+
+```
+
+Number of DE genes in endometrial tumors compared to ovarian tumors: 
+```{r, echo = FALSE, message = FALSE}
+
+summary <- summary(decideTests(qlf))
+
+summary %>% 
+    knitr::kable(caption = 'DE genes') %>% 
+    kable_styling(full_width = F)
+```
+
+
+Same table as above, but now we only show the genes with fold change above 1. 
 ```{r echo = FALSE, message = FALSE}
 
 summary <- summary(decideTests(qlf_threshold))
@@ -400,39 +422,6 @@ DT::datatable(keggtable,
                  buttons = list("copy", "excel", "csv", "pdf")))
 
 ```
-
-```{r include = FALSE}
-# now we make a heatmap to visualize the DE genes 
-# convert the read counts into log2-counts-per-million (logCPM) values
-logCPM <- cpm(dgeObject, prior.count=2, log=TRUE)
-rownames(logCPM) <- dgeObject$genes$Symbol 
-colnames(logCPM) <- paste(dgeObject$samples$group, 1:2, sep="-")
-```
-
-
-```{r include = FALSE}
-
-# now we will look into conserved canoncial cell markers in each samples 
-# we start with the ovarian samples - DH8 / DH 
-# DefaultAssay(integrated_pair1) <- "RNA"
-# nk.markers <- FindConservedMarkers(integrated_pair1, ident.1 = 0, ident.2 = 1, grouping.var = "id", verbose = FALSE)
-# head(nk.markers)
-
-# FeaturePlot(integrated_pair1, features = c("FTL", "ARHGDIB", "LYZ"))
-
-
-
-```
-
-
-
-
-
-
-
-
-
-
 
 
 
