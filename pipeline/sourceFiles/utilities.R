@@ -72,6 +72,8 @@ theme_amunzur <- theme(
 # make_upreg_table()
 # make_downreg_table()
 # make_pseudo_counts()
+# make_pseudo_counts_seurat()
+# find_and_bind() ----- find common rows in two or more data frames, subset and cbind the common rows 
 # find_reporter_genes()
 # intersect_all()
 
@@ -278,6 +280,50 @@ make_pseudo_counts <- function(sce_list) {
   return(pseudoCountsList)
   
 } # end of function 
+
+####################################################################################################
+
+make_pseudo_counts_seurat <- function(sobject) {
+  
+  new_names <- strsplit(colnames(sobject), '.', fixed = TRUE)
+  new_names <- lapply(new_names, function(element) as.list(element)[[1]])
+  new_names <- c(unlist(new_names))
+  
+  sobject_df <- as.data.frame(GetAssayData(sobject))
+  colnames(sobject_df) <- new_names
+  
+  # here we sum the gene counts for the rows that have the same column name. this allows us to sum all the counts for a specific sample 
+  sobject_df <- sapply(unique(colnames(sobject_df)), function(x) rowSums(sobject_df[, colnames(sobject_df) == x, drop=FALSE]))
+  
+  sobject_df <- as.data.frame(sobject_df)
+  
+  return(sobject_df)
+}
+
+####################################################################################################
+
+find_and_bind <- function(df_list){
+  
+  # find common genes
+  universal <- intersect(rownames(df_list[[1]]), rownames(df_list[[2]]))
+
+  # subset to common genes 
+  df_list[[1]] <- df_list[[1]][universal, ]
+  df_list[[2]] <- df_list[[2]][universal, ]
+  
+  # order genes alphabetically so that samples will have the same order of genes 
+  df_list[[1]] <- df_list[[1]][ order(row.names(df_list[[1]])), ]
+  df_list[[2]] <- df_list[[2]][ order(row.names(df_list[[2]])), ]
+  
+  # now cbind: 
+  combined <- cbind(df_list[[1]], df_list[[2]])
+  
+  # remove negative counts
+  combined <- combined[apply(combined, 1, function(combined) all(combined >= 0)), ]
+
+  return(combined)
+
+}
 
 ####################################################################################################
 
