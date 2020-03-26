@@ -1,5 +1,5 @@
 ---
-title: '`r params$ids` Comparing endometrial endometrioid and ovarian endometrioid tumors'
+title: '`r params$ids` Dim reduction plots for ovarian and endometrial tumors'
 subtitle: 
 author: "aslı"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
