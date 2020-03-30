@@ -1,8 +1,8 @@
 ---
 title: 'DGE - Comparing sample2 to sample1'
-subtitle: '`r params$ids'
-data: '`r format(Sys.Date(), "%B %d, %Y")`'
-author: 'asli'
+subtitle: '`r params$ids`'
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+author: 'asli munzur'
 output: 
   html_document:
     code_folding: hide
