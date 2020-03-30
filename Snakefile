@@ -18,7 +18,7 @@ ids_integration = ['DH3-DH4-DH10-DH15-DH16-DH17']
 # second pair will be compared to the first one. 
 ids_dge = ['DH3-DH4-DH10-DH15-DH16-DH17=VOA11068_ENOC-DH13-DH18']
 
-# once you run the pipeline, snakemake will save all the outputs in my folders. 
+# once you run the pipeline, snakemake will save all the outputs in my folders. there is no need to change the following paths. 
 
 # these are the locations of the files snakemake will need, see below. 
 # it will go through the ids list and fill the {id} slot with variables from ids. 
