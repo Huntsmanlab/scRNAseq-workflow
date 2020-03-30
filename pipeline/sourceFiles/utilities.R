@@ -1,4 +1,4 @@
-# SOURCE THIS FILE IN EVERY SINGLE SCRIPT YOU WRITE, OK? 
+# SOURCE THIS FILE IN EVERY SINGLE SCRIPT 
 
 
 # LOAD PACKAGES ####
@@ -20,6 +20,7 @@ suppressPackageStartupMessages({
   library(gridExtra)
   library(styler)
   library(devtools)
+  library(SC3)
   library(pheatmap)
   library(here)
   library(knitr)
@@ -27,12 +28,18 @@ suppressPackageStartupMessages({
   library(Seurat)
   library(batchelor)
   library(edgeR)
+  library(limma)
   library(annotables)
   library(org.Hs.eg.db)
   library(EnsDb.Hsapiens.v75)
   library(AnnotationDbi)
   library(gtools)
+  library(formattable)
   library(DT)
+  library(grid)
+  library(ggplotify)
+  library(EnhancedVolcano)
+  library(ggrepel)
   
 })
 
@@ -65,17 +72,27 @@ theme_amunzur <- theme(
 # make_upreg_table()
 # make_downreg_table()
 # make_pseudo_counts()
+# make_pseudo_counts_seurat()
+# find_and_bind() ----- find common rows in two or more data frames, subset and cbind the common rows 
+# find_reporter_genes()
+# intersect_all()
 
-# from max's utilities folder: 
+# # from max's utilities folder: 
 # combine_sces()
 # gene_filter()
 # plotDEG_scran()
 # scran_batch_norm()
 ####################################################################################################
 
-# before using the combine funtion, run this function first to turn our sces into seurat object. 
-# run this function for each d
+# this fucntion finds common genes in a given list of sces and subsets them to the common genes 
+intersect_all <- function(sces){
+  rownames_list <- lapply(sces, function(sce) rownames(sce)) # extract row names 
+  universal <- Reduce(intersect, rownames_list) # find the common row names in the list 
+  sces <- lapply(sces, function(sce) sce[universal, ]) # subset to common genes 
+}
 
+
+# before using the combine funtion, run this function first to turn our sces into seurat object. 
 seuratClustering  <- function(sce, id) {
   
   # convert the sce into a seurat object 
@@ -130,11 +147,13 @@ combine_sces2 <- function(seurat_list, ids_list) {
 # this is to be used with DGE analysis with edge r. 
 make_upreg_table <- function(qlf)  {
   
-  up <- qlf$table[, c(1, 4)] %>% 
-    rownames_to_column() %>% # convert rownames to column to retain them in filter function 
-    dplyr::filter(logFC > 0.5) %>% # only keep the genes with a logFC more than 0.5 
-    dplyr::filter(PValue < 0.05) %>% # only keep the genes with p values less than 0.05 
-    column_to_rownames() # convert the gene names back to rownames 
+  up <- qlf$table[, c(1, 4)]
+  
+  # %>% 
+  #   rownames_to_column() %>% # convert rownames to column to retain them in filter function 
+  #   dplyr::filter(logFC > 0.5) %>% # only keep the genes with a logFC more than 0.5 
+  #   dplyr::filter(PValue < 0.05) %>% # only keep the genes with p values less than 0.05 
+  #   column_to_rownames() # convert the gene names back to rownames 
   
   
   # now we do the ranking. we will sort the logFC column from highest to lowest, gene at row1 (with the highest logFC) will be rank1, so the lowest rank. 
@@ -180,11 +199,16 @@ make_upreg_table <- function(qlf)  {
 
 make_downreg_table <- function(qlf)  {
   
-  down <- qlf$table[, c(1, 4)] %>% 
-    rownames_to_column() %>% # convert rownames to column to retain them in filter function 
-    dplyr::filter(logFC < -0.5) %>% # only keep the genes with a logFC more than 0.5 
-    dplyr::filter(PValue < 0.05) %>% # only keep the genes with p values less than 0.05 
-    column_to_rownames() # convert the gene names back to rownames 
+  down <- qlf$table[, c(1, 4)]
+  
+  
+  
+  
+  # %>%
+  #   rownames_to_column() %>% # convert rownames to column to retain them in filter function
+  #   dplyr::filter(logFC < -0.5) %>% # only keep the genes with a logFC more than 0.5
+  #   dplyr::filter(PValue < 0.05) %>% # only keep the genes with p values less than 0.05
+  #   column_to_rownames() # convert the gene names back to rownames
   
   
   # now we do the ranking. we will sort the logFC column from highest to lowest, gene at row1 (with the highest logFC) will be rank1, so the lowest rank. 
@@ -229,12 +253,10 @@ make_downreg_table <- function(qlf)  {
 ####################################################################################################
 
 # make pseudo counts 
-make_pseudo_counts <- function(sce_list, combos) {
+make_pseudo_counts <- function(sce_list) {
   
   i <-  1 
   pseudoCountsList <-  list() # make an empty list to append the results of the while loop 
-  
-  # sum across clusters to generate pseudo bulk counts. this allows us to treat each cluster as a replicate of the sample
   
   # make the pseudo bulk counts: 
   while (i <= length(sces)){
@@ -260,6 +282,66 @@ make_pseudo_counts <- function(sce_list, combos) {
 } # end of function 
 
 ####################################################################################################
+
+make_pseudo_counts_seurat <- function(sobject) {
+  
+  new_names <- strsplit(colnames(sobject), '.', fixed = TRUE)
+  new_names <- lapply(new_names, function(element) as.list(element)[[1]])
+  new_names <- c(unlist(new_names))
+  
+  sobject_df <- as.data.frame(GetAssayData(sobject))
+  colnames(sobject_df) <- new_names
+  
+  # here we sum the gene counts for the rows that have the same column name. this allows us to sum all the counts for a specific sample 
+  sobject_df <- sapply(unique(colnames(sobject_df)), function(x) rowSums(sobject_df[, colnames(sobject_df) == x, drop=FALSE]))
+  
+  sobject_df <- as.data.frame(sobject_df)
+  
+  return(sobject_df)
+}
+
+####################################################################################################
+
+find_and_bind <- function(df_list){
+  
+  # find common genes
+  universal <- intersect(rownames(df_list[[1]]), rownames(df_list[[2]]))
+
+  # subset to common genes 
+  df_list[[1]] <- df_list[[1]][universal, ]
+  df_list[[2]] <- df_list[[2]][universal, ]
+  
+  # order genes alphabetically so that samples will have the same order of genes 
+  df_list[[1]] <- df_list[[1]][ order(row.names(df_list[[1]])), ]
+  df_list[[2]] <- df_list[[2]][ order(row.names(df_list[[2]])), ]
+  
+  # now cbind: 
+  combined <- cbind(df_list[[1]], df_list[[2]])
+  
+  # remove negative counts
+  combined <- combined[apply(combined, 1, function(combined) all(combined >= 0)), ]
+
+  return(combined)
+
+}
+
+####################################################################################################
+
+
+find_reporter_genes <- function(reporter_name, sce) {
+  
+  index <- grep(reporter_name, rownames(counts(sce)), ignore.case=TRUE) # find the reporter gene index  
+  reporter_counts <- as.data.frame((counts(sce)[index, ])) # extract counts for the reporter gene 
+  
+  reporter_num <- apply(reporter_counts, 2, function(c) sum(c != 0)) # find the number of cells that express the reporter gene 
+  
+  return(reporter_num)
+  
+}
+
+
+####################################################################################################
+
 
 # This function creates and returns a plot of differentially expressed genes between two samples
 plotDEG_scran <- function(ids, markers, ntop) {

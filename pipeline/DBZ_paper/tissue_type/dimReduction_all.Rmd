@@ -1,0 +1,155 @@
+---
+title: '`r params$ids` Dim reduction plots for ovarian and endometrial tumors'
+subtitle: 
+author: "aslı"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  ova: 'VOA11068_ENOC-DH13-DH18-DH8-DH24-VOA11229_CCOC-DH7'
+  endo: 'DH3-DH4-DH10-DH15-DH16-DH17'
+  seed: 123
+---
+
+#### In this report we show dimensionality reduction plots for all of the ovarian and endometrial samples, plotted together. 
+We include these samples:  
+
+**Ovarian samples are:**  
+VOA11068_ENOC  
+DH13  
+DH18  
+DH8  
+DH24  
+VOA11229_CCOC  
+DH7  
+
+**Endometrial samples are:**  
+DH3  
+DH4  
+DH10  
+DH15  
+DH16  
+DH17  
+```{r include = FALSE}
+
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+
+```
+
+```{r include = FALSE}
+
+ova_uncorrected <- readRDS(here('..', 'data', 'integrated', 'VOA11068_ENOC-DH13-DH18-DH8-DH24-VOA11229_CCOC-DH7', 'uncorrected.rds'))
+ova_integrated <- readRDS(here('..', 'data', 'integrated', 'VOA11068_ENOC-DH13-DH18-DH8-DH24-VOA11229_CCOC-DH7', 'integrated.rds'))
+  
+endo_uncorrected <- readRDS(here('..', 'data', 'integrated', 'DH3-DH4-DH10-DH15-DH16-DH17', 'uncorrected.rds'))
+endo_integrated <- readRDS(here('..', 'data', 'integrated', 'DH3-DH4-DH10-DH15-DH16-DH17', 'integrated.rds'))
+
+```
+
+Plots for uncorrected samples with batch effects present: 
+```{r UNCORRECTED, echo = FALSE, message = FALSE, fig.height = 8, fig.width = 8}
+
+# UNCORRECTED PLOTS 
+# subset to common genes across a group of sces 
+intersect_all <- function(sces){
+  rownames_list <- lapply(sces, function(sce) rownames(sce)) # extract row names 
+  universal <- Reduce(intersect, rownames_list) # find the common row names in the list 
+  sces <- lapply(sces, function(sce) sce[universal, ]) # subset to common genes 
+}
+
+sces <- list(ova_uncorrected, endo_uncorrected)
+
+sces <- intersect_all(sces) # subset to common genes 
+
+# add tissue id for both 
+new_id_ova <- rep('ovary', length(sces[[1]]$id))
+sces[[1]]$tissue <- new_id_ova
+
+new_id_endo <- rep('endometrium', length(sces[[2]]$id))
+sces[[2]]$tissue <- new_id_endo
+
+uncorrected <- combine_sces(sces[[1]], sces[[2]]) # combine here
+
+# rerun dim reduction 
+uncorrected <- runPCA(uncorrected, exprs_values = "logcounts", ncomponents = 200)
+uncorrected <- runTSNE(uncorrected, exprs_values = "logcounts", ntop = 500, ncomponents = 3)
+uncorrected <- runUMAP(uncorrected, exprs_values = "logcounts", ntop = 500, ncomponents = 3,
+                    min_dist = 0.01, n_neighbors = 15, metric = "euclidean")
+
+# now plot them 
+p1 <- plotTSNE(uncorrected, colour_by = 'tissue')
+p2 <- plotTSNE(uncorrected, colour_by = 'id')
+  
+p3 <- plotUMAP(uncorrected, colour_by = 'tissue')
+p4 <- plotUMAP(uncorrected, colour_by = 'id')
+
+gridExtra::grid.arrange(p1, p2, p3, p4, nrow = 2)
+
+```
+
+Plots for the samples with removed batch effects: 
+```{r INTEGRATED, echo = FALSE, message = FALSE, fig.height = 8, fig.width = 8}
+
+# convert seurat to sce 
+ova_sce <- SingleCellExperiment(assays = list(logcounts = GetAssayData(object = ova_integrated, slot = "data")))
+endo_sce <- SingleCellExperiment(assays = list(logcounts = GetAssayData(object = endo_integrated, slot = "data")))
+
+# add cell id 
+ova_sce$id <- ova_integrated$id
+endo_sce$id <- endo_integrated$id
+
+# add tissue id
+new_id_ova <- rep('ovary', length(ova_sce$id))
+ova_sce$tissue <- new_id_ova
+
+new_id_endo <- rep('endometrium', length(endo_sce$id))
+endo_sce$tissue <- new_id_endo
+
+sces <- list(ova_sce, endo_sce)
+sces <- intersect_all(sces) # subset to common genes 
+
+integrated <- combine_sces(sces[[1]], sces[[2]]) # combine here
+
+# run dim reduction one once more 
+integrated <- runPCA(integrated, exprs_values = "logcounts", ncomponents = 200)
+integrated <- runTSNE(integrated, exprs_values = "logcounts", ntop = 500, ncomponents = 3)
+integrated <- runUMAP(integrated, exprs_values = "logcounts", ntop = 500, ncomponents = 3,
+                    min_dist = 0.01, n_neighbors = 15, metric = "euclidean")
+
+# now plot them 
+p5 <- plotTSNE(integrated, colour_by = 'tissue')
+p6 <- plotTSNE(integrated, colour_by = 'id')
+  
+p7 <- plotUMAP(integrated, colour_by = 'tissue')
+p8 <- plotUMAP(integrated, colour_by = 'id')
+
+gridExtra::grid.arrange(p5, p6, p7, p8, nrow = 2)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
