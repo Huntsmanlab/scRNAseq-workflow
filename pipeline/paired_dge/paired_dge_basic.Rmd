@@ -42,12 +42,8 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 ```{r}
 # extract this from passed in parameters
 
-ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+ids <- strsplit(pair_ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
 names(ids) <- c('transduced_id', 'control_id')
-```
-
-```{r include = FALSE}
-sce_list <- lapply(ids, function(id) readRDS(here('..', 'data', 'clustered', 'sce', id, 'sce_clus.rds')))
 ```
 
 ## DGEs
@@ -100,10 +96,6 @@ plot_markers <- function(ids, ntop = 50, negative_control){
 }
 
 outputs <- plot_markers(ids, ntop = 50, negative_control = FALSE)
-```
-
-
-```{r include = FALSE}
 saveRDS(outputs, file = params$output_path_paired)
 ```
 
