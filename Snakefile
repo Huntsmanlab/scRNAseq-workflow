@@ -13,7 +13,7 @@ pair_ids = ['DH15-DH16']
 # before we can do dge, we need to integrate them to remove batch effects. separate replicates by '-'. DO ONE GROUP AT A TIME.
 ids_integration = ['DH3-DH4-DH10-DH15-DH16-DH17']
 
-# if you are doing DGE analysis, write your pairs here. separate replicates by '-', separate different treatments by '%'. 
+# if you are doing DGE analysis, write your pairs here. separate replicates by '-', separate different treatments by '='. 
 # second pair will be compared to the first one. 
 ids_dge = ['DH3-DH4-DH10-DH15-DH16-DH17=VOA11068_ENOC-DH13-DH18']
 
