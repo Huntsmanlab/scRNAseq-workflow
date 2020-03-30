@@ -6,6 +6,7 @@
 # need to do it one pair at a time. 
 
 # most of the scripts we have will use these ids. regardless of the analysis you do, write all the samples you include in your analysis. 
+# we use the ids here for making sces, qc, normalization and clustering. 
 ids = ['DH3', 'DH4', 'DH10', 'DH15', 'DH16', 'DH17', 'VOA11068_ENOC', 'DH13', 'DH18']
 pair_ids = ['DH15-DH16']
 
@@ -17,7 +18,7 @@ ids_integration = ['DH3-DH4-DH10-DH15-DH16-DH17']
 # second pair will be compared to the first one. 
 ids_dge = ['DH3-DH4-DH10-DH15-DH16-DH17=VOA11068_ENOC-DH13-DH18']
 
-# once you run the pipeline, snakemake will save all the outputs in my folders. 
+# once you run the pipeline, snakemake will save all the outputs in my folders. there is no need to change the following paths. 
 
 # these are the locations of the files snakemake will need, see below. 
 # it will go through the ids list and fill the {id} slot with variables from ids. 
@@ -78,17 +79,15 @@ rule all:
     # sce_qc,
     # sce_norm,
     # sce_clus,
-    # sce_uncorrected,
-    # seurat_integ,
-    # integration_report,
-    # separate_clustering_report,
-    # combined_clustering_report,
+    # sce_uncorrected, # only combined sces, without removing batch effects 
+    # seurat_integ, # combined sces with batch effects removed 
+    # integration_report, # dim reduction plots before and after batch effect removal 
+    # separate_clustering_report, # cluster an sce alone
     # summary_stats_report,
-    # edgeR_report,
-    paired_dge_basic_report,
-    # compare_dge_report
-  
+    edgeR_report,
+    # paired_dge_basic_report
 
+# convert 10X counts to an sce 
 rule make_sce:
   input:
     "../data/raw/{id}"
@@ -103,7 +102,7 @@ rule make_sce:
      --id {params} "
 
 
-
+# perform quality control on the sce 
 rule make_sce_qc:
   params:
     whichMethod = 'default', # to use different parameters here, just update them.
@@ -128,7 +127,7 @@ rule make_sce_qc:
      --min_features {params.min_features}"
 
 
-
+# normalize the sce by taking log counts and perform dim reduction at the same time 
 rule normalize_sce:
   params:
     seed = 1756
@@ -142,7 +141,7 @@ rule normalize_sce:
      --output_file_name {output} \
      --seed {params.seed} "
 
-
+# cluster the sce alone 
 rule cluster_sce:
   params:
     curr_dir = os.getcwd(),
@@ -159,6 +158,7 @@ rule cluster_sce:
      params = list(id ='{params.sample}', output_path = '{output.output_path}'))\" "
 
 
+# integrate (remove batch effects) and cluster 2 sces together 
 rule combined_clustering:
   params:
     curr_dir = os.getcwd(), # project directory, parent of this Snakefile
@@ -182,6 +182,7 @@ rule combined_clustering:
 # these are the parameters
 
 
+# make summary stats for two sces at the same time 
 rule make_summary_stats:
   params:
     curr_dir = os.getcwd(),
@@ -198,7 +199,8 @@ rule make_summary_stats:
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
      params = list(ids ='{params.pair_ids}'))\" "
-     
+  
+# remove batch effects in multiple sces,      
 # we use this next rule for integrating more than 2 samples. note that this rule just generates the integrated objects, it doesnt 
 # make the integration report. we have the next rmarkdown rule for that. 
 rule multiple_integration: 
@@ -216,7 +218,7 @@ rule multiple_integration:
      --output_file_name_integrated {output} \
      --ids_integrated {input}"
      
-# this rule just makes a report, doesnt really compute objects 
+# show dim reduction plots before and after batch effect removal. 
 rule integration_report: 
   params: 
     curr_dir = os.getcwd(),
@@ -232,23 +234,25 @@ rule integration_report:
      knit_root_dir='{params.curr_dir}',\
      params = list(ids ='{params.ids}'))\" "
 
-# rule edgeR_basic:
-#   params:
-#     curr_dir = os.getcwd(),
-#     ids = ids_dge
-#   input:
-#     sce_uncorrected,
-#     seurat_integ
-#   output:
-#     report = edgeR_report
-#     output_path_up =
-#     output_path_down =
-#   shell:
-#     "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic.Rmd',\
-#      output_file='{params.curr_dir}/{output.report}', \
-#      knit_root_dir='{params.curr_dir}',\
-#      params = list(ids ='{params.ids}'))\" "
-     
+# compute dge analysis across multiple samples using edgeR 
+rule edgeR_basic:
+  params:
+    curr_dir = os.getcwd(),
+    ids = ids_dge
+  input:
+    sce_uncorrected,
+    seurat_integ
+  output:
+    report = edgeR_report
+    # output_path_up =
+    # output_path_down =
+  shell:
+    "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic.Rmd',\
+     output_file='{params.curr_dir}/{output.report}', \
+     knit_root_dir='{params.curr_dir}',\
+     params = list(ids ='{params.ids}'))\" "
+    
+# compute dge analysis in two samples using scran      
 rule paired_dge_basic: 
   params: 
     curr_dir = os.getcwd(),

@@ -89,7 +89,22 @@ saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig
 # load the normalized data 
 sces_norm <- lapply(id.orig, function(id) readRDS(here('..', 'data', 'normalized', id, 'sce_norm.rds')))
 sces_norm <- intersect_all(sces_norm) # subset to common genes 
+
+if (length(sces_norm) == 2 ){
+  uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]]) 
+} else if (length(sces_norm) == 3) {
 uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]]) 
+} else if (length(sces_norm) == 4) {
+uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]]) 
+} else if (length(sces_norm) == 5) {
+uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]]) 
+} else if (length(sces_norm) == 6) {
+uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]], sces_norm[[6]]) 
+} else if (length(sces_norm) == 7) {
+uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]], sces_norm[[6]], sces_norm[[7]]) 
+} else if (length(sces_norm) == 8) {
+uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]], sces_norm[[6]], sces_norm[[7]], sces_norm[[8]]) 
+}
 
 # some dim reduction 
 set.seed(1564)
