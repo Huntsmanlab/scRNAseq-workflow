@@ -354,7 +354,6 @@ EnhancedVolcano(data,
   legendLabSize = 8,
   legendIconSize = 5.0)
 
-
 ```
 
 Number of DE genes in endometrial tumors compared to ovarian tumors: 
