@@ -144,39 +144,6 @@ plotQLDisp(fit)
 
 ```
 
-#### Plot the differentially expressed genes 
-Red symbolizes upregulated genes in cluster2 compared to cluster1.  
-Blue symbolizes downpregulated genes in cluster2 compared to cluster1.  
-Black lines show 1 log fold change.  
-
-```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 6}
-# plot the differentially expressed genes 
-
-plotMD(qlf, main = 'DE genes', ylab = 'log2 fold change')
-abline(h=c(-1,1), col="black")
-
-```
-
-Now we take a closer look at the genes visualized above. 
-
-```{r, echo = FALSE, message = FALSE}
-
-summary <- summary(decideTests(qlf))
-
-summary %>% 
-    knitr::kable(caption = 'DE genes') %>% 
-    kable_styling(full_width = F)
-```
-
-Now we narrow down the DE genes a little bit to visualize genes with a reasonably large expression changes. This is helpful to list the biologically more meaningful genes.  
-
-```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 6}
-
-plotMD(qlf_threshold, main = 'DE genes', ylab = 'log2 fold change')
-abline(h = c(-1,1), col = "black")
-
-```
-
 #### Upregulated genes 
 Now we take a closer look at the **upregulated** genes. To look for interesting genes, we do the following filtering:  
 We don't show genes with log fold change (LogFC) less than 0.5. 
@@ -221,7 +188,20 @@ write.csv(downregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR_dow
 
 ```
 
-The same gene table, after we eliminate genes with logfold changes less than 1.   
+#### Plot the differentially expressed genes 
+Red symbolizes upregulated genes in cluster2 compared to cluster1.  
+Blue symbolizes downregulated genes in cluster2 compared to cluster1.  
+Black lines show 1 log fold change.  
+
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 6}
+# plot the differentially expressed genes 
+
+plotMD(qlf, main = 'DE genes', ylab = 'log2 fold change')
+abline(h=c(-1,1), col="black")
+
+```
+
+Now we take a closer look at the genes visualized above. 
 ```{r echo = FALSE, message = FALSE}
 
 summary <- summary(decideTests(qlf_threshold))
@@ -231,6 +211,47 @@ summary %>%
     kable_styling(full_width = F)
 
 ```
+
+Now we take a look at the DE genes in a volcano plot. Note that we label the first 40 significantly up and downregulated genes in endometrial samples compared to ovarian samples.  
+Fold change cut off is 1, p value cut off is 10e-5.  
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 11}
+# we need to work on qlf a little bit so that we can use the enhancedvolcano function 
+
+data <- qlf$table
+
+data <- data %>% 
+  dplyr::select(logFC, PValue) %>% 
+  rename(log2FoldChange = logFC, pvalue = PValue)
+
+cool_genes <- c(upregulated_genes_table[1][1: 15, ], downregulated_genes_table[1][1: 15, ])
+
+library(EnhancedVolcano)
+
+EnhancedVolcano(data,
+  lab = rownames(data),
+  x = 'log2FoldChange',
+  y = 'pvalue',
+  title = 'Differentially Expressed Genes',
+  subtitle = 'endometrium vs ovary', 
+  selectLab = cool_genes, 
+  labCol = 'black',
+  labFace = 'bold',
+  drawConnectors = TRUE,
+  widthConnectors = 0.4,
+  colConnectors = 'black',
+  pointSize = 0.7, 
+  xlim = c(-10, 10), 
+  FCcutoff = 1, 
+  pCutoff = 10e-5, 
+  legend=c('not significant','Log (base 2) fold-change','P value',
+      'P value & Log (base 2) fold-change'), 
+  legendPosition = 'right',
+  legendLabSize = 8,
+  legendIconSize = 5.0)
+
+
+```
+
 
 ### Gene enrichment  
 #### GO Pathway analysis  
