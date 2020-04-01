@@ -7,16 +7,16 @@
 
 # most of the scripts we have will use these ids. regardless of the analysis you do, write all the samples you include in your analysis. 
 # we use the ids here for making sces, qc, normalization and clustering. 
-ids = ['DH3', 'DH4', 'DH10', 'DH15', 'DH16', 'DH17', 'VOA11068_ENOC', 'DH13', 'DH18']
-pair_ids = ['DH15-DH16']
+ids = ['DH3', 'DH10']
+pair_ids = ['DH3-DH10']
 
 # LOOK HERE FOR DGE:
 # before we can do dge, we need to integrate them to remove batch effects. separate replicates by '-'. DO ONE GROUP AT A TIME.
-ids_integration = ['DH3-DH4-DH10-DH15-DH16-DH17']
+ids_integration = ['DH3-DH10']
 
 # if you are doing DGE analysis, write your pairs here. separate replicates by '-', separate different treatments by '='. 
 # second pair will be compared to the first one. 
-ids_dge = ['DH3-DH4-DH10-DH15-DH16-DH17=VOA11068_ENOC-DH13-DH18']
+ids_dge = ['DH3=DH10']
 
 # once you run the pipeline, snakemake will save all the outputs in my folders. there is no need to change the following paths. 
 
@@ -25,47 +25,33 @@ ids_dge = ['DH3-DH4-DH10-DH15-DH16-DH17=VOA11068_ENOC-DH13-DH18']
 # it will do that for each id in the ids list 
 
 # MODIFYING SCES: 
+sce_raw = expand('../data/processed/{id}/sce.rds', id = ids) # make sces
+sce_qc = expand('../data/qc/{id}/sce_qc.rds', id = ids) # perform quality control
+sce_norm = expand('../data/normalized/{id}/sce_norm.rds', id = ids) # normalize 
+sce_clus = expand('../data/clustered/sce/{id}/sce_clus.rds', id = ids) # clustering 
 
-# make sces
-sce_raw = expand('../data/processed/{id}/sce.rds', id = ids)
+# SEURAT INTEGRATION
+sce_uncorrected = expand('../data/integrated/{ids_integration}/uncorrected.rds', ids_integration = ids_integration) # combined, but not integrated (has batch effects)
+seurat_integ = expand('../data/integrated/{ids_integration}/integrated.rds', ids_integration = ids_integration) # integration (batch effects removed)
 
-# perform quality control
-sce_qc = expand('../data/qc/{id}/sce_qc.rds', id = ids)
+# BATCH CORRECTION 
+with_batch = expand('../data/batch_corrected/{ids_integration}/uncorrected.rds', ids_integration = ids_integration) # where we save the combined data with batch effects
+without_batch = expand('../data/batch_corrected/{ids_integration}/corrected.rds', ids_integration = ids_integration) # where we save the corrected data without batch effects
 
-# normalize 
-sce_norm = expand('../data/normalized/{id}/sce_norm.rds', id = ids)
-
-# clustering 
-sce_clus = expand('../data/clustered/sce/{id}/sce_clus.rds', id = ids)
-
-# combined, but not integrated (has batch effects)
-sce_uncorrected = expand('../data/integrated/{ids_integration}/uncorrected.rds', ids_integration = ids_integration)
-
-# integration (batch effects removed)
-seurat_integ = expand('../data/integrated/{ids_integration}/integrated.rds', ids_integration = ids_integration)
-
-# MARKDOWN REPORTS, we save all of these in the reports folder (not in pipeline). 
+# MARKDOWN REPORTS
 summary_stats_report = expand('../reports/summary_stats/{pair_ids}/summary_stats.html', pair_ids = pair_ids)
+separate_clustering_report = expand('../reports/separate_clustering/{id}/separate_clustering.html', id = ids) # this is clustering with only 1 data set
 
-# this is clustering with only 1 data set 
-separate_clustering_report = expand('../reports/separate_clustering/{id}/separate_clustering.html', id = ids)
+batch_correction_report = expand('../reports/batch_normalization/{ids_integration}/batch_correction.html', ids_integration = ids_integration)
 
-# this is the report we generate when we integrate multiple samples 
-integration_report = expand('../reports/integration/{ids_integration}/integration_report.html', ids_integration = ids_integration)
+integration_report = expand('../reports/integration/{ids_integration}/integration_report.html', ids_integration = ids_integration) # this is the report we generate when we integrate multiple samples 
 
-# COMBINED CLUSTERING 
-# where you save the output report 
 combined_clustering_report = expand('../reports/combined_clustering/{pair_ids}/combined_clustering.html', pair_ids = pair_ids)
-# where you save the uncorrected data 
-combined_clustering_uncorrected = expand('../data/clustered/combined/{pair_ids}/uncorrected_seurat_object.rds', pair_ids = pair_ids)
-# where you save the batch corrected data
-combined_clustering_integrated = expand('../data/clustered/combined/{pair_ids}/integrated_seurat_object.rds', pair_ids = pair_ids)
+combined_clustering_uncorrected = expand('../data/clustered/combined/{pair_ids}/uncorrected_seurat_object.rds', pair_ids = pair_ids) # where you save the uncorrected data 
+combined_clustering_integrated = expand('../data/clustered/combined/{pair_ids}/integrated_seurat_object.rds', pair_ids = pair_ids) # where you save the batch corrected data
 
-# paired differential gene expression analysis 
-paired_dge_basic_report = expand('../reports/paired_dge_basic/{pair_ids}/paired_dge_basic.html', pair_ids = pair_ids)
-
-# DGE analysis using edgeR 
-edgeR_report = expand('../reports/dge_edgeR/{ids_dge}/dge_analysis.html', ids_dge = ids_dge)
+paired_dge_basic_report = expand('../reports/paired_dge_basic/{pair_ids}/paired_dge_basic.html', pair_ids = pair_ids) # paired differential gene expression analysis 
+edgeR_report = expand('../reports/dge_edgeR/{ids_dge}/dge_analysis.html', ids_dge = ids_dge) # DGE analysis using edgeR 
 
 # compare scran and edgeR 
 edgeR_results_up = expand('../data/dge/edgeR_up/{pair_ids}', pair_ids = pair_ids) # upregulated genes in the transduced sample edgeR found 
@@ -83,8 +69,11 @@ rule all:
     # seurat_integ, # combined sces with batch effects removed 
     # integration_report, # dim reduction plots before and after batch effect removal 
     # separate_clustering_report, # cluster an sce alone
+    with_batch, 
+    without_batch,
+    batch_correction_report,
     # summary_stats_report,
-    edgeR_report,
+    # edgeR_report,
     # paired_dge_basic_report
 
 # convert 10X counts to an sce 
@@ -180,6 +169,23 @@ rule combined_clustering:
 # where we save the output, the html file
 # where the markdown file is running. just put the current directory
 # these are the parameters
+
+rule batch_correction:
+  params:
+    curr_dir = os.getcwd(), 
+    ids_integration = ids_integration
+  input:
+    sce_clus
+  output:
+    report = batch_correction_report,
+    output_uncorrected = with_batch,
+    output_corrected = without_batch
+  shell:
+    "Rscript -e \"rmarkdown::render('pipeline/batch_normalization/batch_normalization.Rmd',\
+     output_file='{params.curr_dir}/{output.report}', \
+     knit_root_dir='{params.curr_dir}',\
+     params = list(ids ='{params.ids_integration}', output_uncorrected = '{output.output_uncorrected}', output_corrected = '{output.output_corrected}'))\" "
+
 
 
 # make summary stats for two sces at the same time 
