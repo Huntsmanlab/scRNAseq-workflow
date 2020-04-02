@@ -1,6 +1,6 @@
 ---
 title: 'Correcting for batch effects'
-subtitle: '`r params$ids`'
+subtitle: '`r params$ids` - `r params$id_type` '
 author: 'asli'
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
@@ -11,9 +11,10 @@ params:
   ids: 'ids_integration'
   output_uncorrected: 'output_uncorrected'
   output_corrected: 'output_corrected'
+  id_type: 'id_type'
 ---
 
-#### Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots before and after batch normalization in `r params$ids`. 
+#### Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots before and after batch normalization in `r params$ids`. Analysis was done using scran and batchelor packages. 
 
 
 ```{r include = FALSE}
@@ -50,20 +51,20 @@ chosen.hvgs <- combined.var$bio > 0
 # combine without any correction yet
 combined <- do.call(correctExperiments, c(PARAM=NoCorrectParam(), sces))
 combined <- runPCA(combined, subset_row = chosen.hvgs)
-combined <- runTSNE(combined, dimred="PCA")
-combined <- runUMAP(combined, dimred="PCA")
+combined <- runTSNE(combined, dimred = "PCA")
+combined <- runUMAP(combined, dimred = "PCA")
 
-p1 <- plotTSNE(combined, colour_by="batch")
-p2 <- plotUMAP(combined, colour_by="batch")
+p1 <- plotTSNE(combined, colour_by = "id")
+p2 <- plotUMAP(combined, colour_by = "id")
 
 # batch correction! 
-batch_removed <- fastMNN(combined, batch = combined$batch, subset.row = chosen.hvgs)
+batch_removed <- fastMNN(combined, batch = combined$id, subset.row = chosen.hvgs)
 
-batch_removed <- runTSNE(batch_removed, dimred="corrected")
-batch_removed <- runUMAP(batch_removed, dimred="corrected")
+batch_removed <- runTSNE(batch_removed, dimred = "corrected")
+batch_removed <- runUMAP(batch_removed, dimred = "corrected")
 
-p3 <- plotTSNE(batch_removed, colour_by="batch")
-p4 <- plotUMAP(batch_removed, colour_by="batch")
+p3 <- plotTSNE(batch_removed, colour_by = "batch")
+p4 <- plotUMAP(batch_removed, colour_by = "batch")
 
 ```
 
