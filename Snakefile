@@ -7,12 +7,12 @@
 
 # most of the scripts we have will use these ids. regardless of the analysis you do, write all the samples you include in your analysis. 
 # we use the ids here for making sces, qc, normalization and clustering. 
-ids = ['DH3', 'DH10']
+ids = ['DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16']
 pair_ids = ['DH3-DH10']
 
 # LOOK HERE FOR DGE:
 # before we can do dge, we need to integrate them to remove batch effects. separate replicates by '-'. DO ONE GROUP AT A TIME.
-ids_integration = ['DH3-DH10']
+ids_integration = ['DH4-DH17-DH10-DH3-DH15-DH16']
 
 # if you are doing DGE analysis, write your pairs here. separate replicates by '-', separate different treatments by '='. 
 # second pair will be compared to the first one. 
@@ -44,7 +44,10 @@ separate_clustering_report = expand('../reports/separate_clustering/{id}/separat
 
 batch_correction_report = expand('../reports/batch_normalization/{ids_integration}/batch_correction.html', ids_integration = ids_integration)
 
-integration_report = expand('../reports/integration/{ids_integration}/integration_report.html', ids_integration = ids_integration) # this is the report we generate when we integrate multiple samples 
+integration_report = expand('../reports/integration/{ids_integration}/integration_report.html', ids_integration = ids_integration) # integration through seurat 
+# if you intend to run the script above, write here a clue to help identify what the cell types are. 
+# what is written here will be a part of the subtitle in the markdown report 
+id_type = ['ENDOMETRIAL']
 
 combined_clustering_report = expand('../reports/combined_clustering/{pair_ids}/combined_clustering.html', pair_ids = pair_ids)
 combined_clustering_uncorrected = expand('../data/clustered/combined/{pair_ids}/uncorrected_seurat_object.rds', pair_ids = pair_ids) # where you save the uncorrected data 
@@ -58,7 +61,6 @@ edgeR_results_up = expand('../data/dge/edgeR_up/{pair_ids}', pair_ids = pair_ids
 edgeR_results_down = expand('../data/dge/edgeR_down/{pair_ids}', pair_ids = pair_ids) # downregulated genes in the transduced sample edgeR found 
 compare_dge_report = expand('../reports/dge_comparison/{pair_ids}/dge_comparison.html', pair_ids = pair_ids)   # this is where we save the knitted html file that includes the comparison data 
 
-# integrate multiple data sets 
 rule all:
   input:
     # sce_raw,
@@ -67,9 +69,9 @@ rule all:
     # sce_clus,
     # sce_uncorrected, # only combined sces, without removing batch effects 
     # seurat_integ, # combined sces with batch effects removed 
-    # integration_report, # dim reduction plots before and after batch effect removal 
+    # integration_report, # dim reduction plots before and after batch effect removal
     # separate_clustering_report, # cluster an sce alone
-    with_batch, 
+    with_batch,
     without_batch,
     batch_correction_report,
     # summary_stats_report,
@@ -173,7 +175,8 @@ rule combined_clustering:
 rule batch_correction:
   params:
     curr_dir = os.getcwd(), 
-    ids_integration = ids_integration
+    ids_integration = ids_integration, 
+    id_type = id_type
   input:
     sce_clus
   output:
@@ -184,7 +187,7 @@ rule batch_correction:
     "Rscript -e \"rmarkdown::render('pipeline/batch_normalization/batch_normalization.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
-     params = list(ids ='{params.ids_integration}', output_uncorrected = '{output.output_uncorrected}', output_corrected = '{output.output_corrected}'))\" "
+     params = list(ids ='{params.ids_integration}', id_type = '{params.id_type}', output_uncorrected = '{output.output_uncorrected}', output_corrected = '{output.output_corrected}'))\" "
 
 
 
@@ -228,7 +231,8 @@ rule multiple_integration:
 rule integration_report: 
   params: 
     curr_dir = os.getcwd(),
-    ids = ids_integration
+    ids = ids_integration, 
+    id_type = id_type 
   input:
     sce_uncorrected, # these objects will be computed by the multiple integration rule, just above  
     seurat_integ 
@@ -238,7 +242,8 @@ rule integration_report:
     "Rscript -e \"rmarkdown::render('pipeline/integration/integration_report.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
-     params = list(ids ='{params.ids}'))\" "
+     params = list(ids ='{params.ids}', id_type = '{params.id_type}'))\" "
+     
 
 # compute dge analysis across multiple samples using edgeR 
 rule edgeR_basic:
