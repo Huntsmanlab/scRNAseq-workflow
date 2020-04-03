@@ -8,7 +8,7 @@ output:
     code_folding: hide
 
 params:
-  ids: 'ids_dge'
+  ids: 'DH22_control=DH25_control'
   output_path_up: 'output_path_up'
   output_path_down: 'output_path_down'
   seed: 123
@@ -20,20 +20,16 @@ params:
 library(here)
 source(here('..', 'sourceFiles', 'utilities.R'))
 
+```
+
+```{r include = FALSE}
+
 # generate the id lists 
-ids_1_name <- strsplit(params$ids, "=")[[1]][[1]] # split by "%" 
-ids_1 <- strsplit(ids_1_name, "-")[[1]]
-dh_organoid_ids_1 <- list(ids_1)
-ids_1 <- as.list(c(unlist(dh_organoid_ids_1)))
+ids_1_name <- strsplit(params$ids, "=")[[1]][[1]] # split by "=" 
+ids_1 <- ids_1_name
 
-ids_2_name <- strsplit(params$ids, "=")[[1]][[2]] # split by "%" 
-ids_2 <- strsplit(ids_2_name, "-")[[1]]
-dh_organoid_ids_2 <- list(ids_2)
-ids_2 <- as.list(c(unlist(dh_organoid_ids_2)))
-
-# load the integrated objects  
-integrated_pair1 <- readRDS(here('..', 'data', 'integrated', paste(ids_1_name), 'integrated.rds'))
-integrated_pair2 <- readRDS(here('..', 'data', 'integrated', paste(ids_2_name), 'integrated.rds'))
+ids_2_name <- strsplit(params$ids, "=")[[1]][[2]] # split by "=" 
+ids_2 <-ids_2_name
 
 ```
 
@@ -44,6 +40,10 @@ integrated_pair2 <- readRDS(here('..', 'data', 'integrated', paste(ids_2_name), 
 
 if (length(ids_2) + length(ids_1) >= 4) {
   
+  # load the objects 
+  integrated_pair1 <- readRDS(here('..', 'data', 'integrated', paste(ids_1_name), 'integrated.rds'))
+  integrated_pair2 <- readRDS(here('..', 'data', 'integrated', paste(ids_2_name), 'integrated.rds'))
+
   # make pseudo counts for each sample
   integrated_pair1_df <- make_pseudo_counts_seurat(integrated_pair1)
   integrated_pair2_df <- make_pseudo_counts_seurat(integrated_pair2)
@@ -56,9 +56,13 @@ if (length(ids_2) + length(ids_1) >= 4) {
 
 } else { # this is what we do if we dont have at least two replicates for each sample 
   
+   # load the integrated objects  
+  integrated_pair1 <- readRDS(here('..', 'data', 'clustered', 'sce', paste(ids_1_name), 'sce_clus.rds'))
+  integrated_pair2 <- readRDS(here('..', 'data', 'clustered', 'sce', paste(ids_2_name), 'sce_clus.rds'))
+  
   # extract assay data 
-  integrated_pair1_df <- as.data.frame(GetAssayData(integrated_pair1))
-  integrated_pair2_df <- as.data.frame(GetAssayData(integrated_pair2))
+  integrated_pair1_df <- as.data.frame(counts(integrated_pair1))
+  integrated_pair2_df <- as.data.frame(counts(integrated_pair2))
   
   # find common genes, subset to that and cbind all the samples
   combined <- find_and_bind(list(integrated_pair1_df, integrated_pair2_df))
@@ -131,7 +135,7 @@ In the plot below, the distance between each pair of samples can be interpreted 
 
 ```{r MDS_plot, echo = FALSE, message = FALSE, fig.height = 4, fig.width = 4}
 
-plotMDS(dgeObject, col = c('red', 'blue'))
+# plotMDS(dgeObject, col = c('red', 'blue'))
 
 ```
 
