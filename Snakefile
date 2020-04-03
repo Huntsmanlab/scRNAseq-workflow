@@ -7,12 +7,12 @@
 
 # most of the scripts we have will use these ids. regardless of the analysis you do, write all the samples you include in your analysis. 
 # we use the ids here for making sces, qc, normalization and clustering. 
-ids = ['DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16']
+ids = ['DH4', 'DH17', 'DH10']
 pair_ids = ['DH3-DH10']
 
 # LOOK HERE FOR DGE:
 # before we can do dge, we need to integrate them to remove batch effects. separate replicates by '-'. DO ONE GROUP AT A TIME.
-ids_integration = ['DH4-DH17-DH10-DH3-DH15-DH16']
+ids_integration = ['DH4-DH17-DH10']
 
 # if you are doing DGE analysis, write your pairs here. separate replicates by '-', separate different treatments by '='. 
 # second pair will be compared to the first one. 
@@ -44,6 +44,8 @@ separate_clustering_report = expand('../reports/separate_clustering/{id}/separat
 
 batch_correction_report = expand('../reports/batch_normalization/{ids_integration}/batch_correction.html', ids_integration = ids_integration)
 
+del_later_integration = expand('../reports/delete_later/{ids_integration}/delete_later.html', ids_integration = ids_integration)
+
 integration_report = expand('../reports/integration/{ids_integration}/integration_report.html', ids_integration = ids_integration) # integration through seurat 
 # if you intend to run the script above, write here a clue to help identify what the cell types are. 
 # what is written here will be a part of the subtitle in the markdown report 
@@ -71,11 +73,12 @@ rule all:
     # seurat_integ, # combined sces with batch effects removed 
     # integration_report, # dim reduction plots before and after batch effect removal
     # separate_clustering_report, # cluster an sce alone
+    del_later_integration,
     with_batch,
     without_batch,
     batch_correction_report,
     # summary_stats_report,
-    # edgeR_report,
+    edgeR_report,
     # paired_dge_basic_report
 
 # convert 10X counts to an sce 
@@ -212,20 +215,22 @@ rule make_summary_stats:
 # remove batch effects in multiple sces,      
 # we use this next rule for integrating more than 2 samples. note that this rule just generates the integrated objects, it doesnt 
 # make the integration report. we have the next rmarkdown rule for that. 
-rule multiple_integration: 
+rule multiple_integration:
+  params:
+    curr_dir = os.getcwd(),
+    ids = ids_integration
   input:
     sce_qc, # adding these here as inputs helps snakemake understand that we need to have QCed and normalized sces before we can run this rule 
     sce_norm
   output:
+    report = del_later_integration, 
     output_path_uncorrected = sce_uncorrected,
     output_path_integrated = seurat_integ
   shell:
-    "Rscript pipeline/integration/integration.R \
-     --path_to_sce_qc {input} \
-     --path_to_sce_norm {input} \
-     --output_file_name_uncorrected {output} \
-     --output_file_name_integrated {output} \
-     --ids_integrated {input}"
+    "Rscript -e \"rmarkdown::render('pipeline/integration/integration_seurat.Rmd',\
+     output_file='{params.curr_dir}/{output.report}', \
+     knit_root_dir='{params.curr_dir}',\
+     params = list(ids ='{params.ids}', output_path_integrated = '{output.output_path_integrated}', output_path_uncorrected = '{output.output_path_uncorrected}'))\" "
      
 # show dim reduction plots before and after batch effect removal. 
 rule integration_report: 
@@ -255,10 +260,8 @@ rule edgeR_basic:
     seurat_integ
   output:
     report = edgeR_report
-    # output_path_up =
-    # output_path_down =
   shell:
-    "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic.Rmd',\
+    "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic_integration.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
      params = list(ids ='{params.ids}'))\" "
