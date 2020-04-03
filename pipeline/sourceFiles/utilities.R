@@ -40,6 +40,8 @@ suppressPackageStartupMessages({
   library(ggplotify)
   library(EnhancedVolcano)
   library(ggrepel)
+  library(glue)
+  library(fgsea)
   
 })
 
@@ -306,7 +308,7 @@ find_and_bind <- function(df_list){
   
   # find common genes
   universal <- intersect(rownames(df_list[[1]]), rownames(df_list[[2]]))
-
+  
   # subset to common genes 
   df_list[[1]] <- df_list[[1]][universal, ]
   df_list[[2]] <- df_list[[2]][universal, ]
@@ -320,9 +322,9 @@ find_and_bind <- function(df_list){
   
   # remove negative counts
   combined <- combined[apply(combined, 1, function(combined) all(combined >= 0)), ]
-
+  
   return(combined)
-
+  
 }
 
 ####################################################################################################
