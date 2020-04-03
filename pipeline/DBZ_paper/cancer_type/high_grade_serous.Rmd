@@ -14,7 +14,7 @@ params:
 ---
 
 #### In this document, we compare the DGE in ovarian HGS and endometrial HGS tumors.  
-VOA11068_ENOC-DH13-DH18-DH13 contain the data for ovarian tissues.  
+VOA11068_ENOC-DH13-DH18 contain the data for ovarian tissues.  
 DH15-DH16 contain the data for endometrial tissues.  
 
 ```{r include = FALSE}

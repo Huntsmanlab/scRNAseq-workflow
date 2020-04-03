@@ -1,13 +1,10 @@
 # The gitignore!
-
 # Ignore snakemake file 
 .snakemake
-
 # Ignore any created html files
 *.html
-
 # ignore the rproject 
 scRNAseq-workflow.Rproj
 .Rproj.user
-
 .gitignore
+.httr-oauth
