@@ -127,18 +127,7 @@ keg <- kegga(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs")
 ```
 
 ### Diagnostic Plots 
-These plots are intended to give an idea about the model and whether it is a good fit to represent the data we are interested in analyzing. 
-
-Plot cells on a two-dimensional scatterplot so that distances on the plot approximate the expression differences between the cells  
-In the plot below, the distance between each pair of samples can be interpreted as the leading log-fold change between the samples for the genes that best distinguish that pair of samples. Therefore, samples shown farther apart are more different in terms of gene expression. Ideally we would expect to see the replicates closer together. However, note that decreasing the number of dimensions down to two may not represent the data as accurately. This plot is here only to give an idea about how similar the samples are. Dimensionality reduction plots are more reliable to look at. 
-
-
-```{r MDS_plot, echo = FALSE, message = FALSE, fig.height = 4, fig.width = 4}
-
-# plotMDS(dgeObject, col = c('red', 'blue'))
-
-```
-
+These plots are intended to give an idea about the model and whether it is a good fit to represent the data we are interested in analyzing. Make sure to check the dimensionality reduction reports as well. 
 
 #### Plot biological coefficient of variation against gene abundance, in log2 counts per million.  
 Biological coefficient of variation is the true variation between genes, and it corresponds to the dispersion parameter of the negative binomial model. To learn more about dispersion, variation and how they relate to one another, read more about the negative binomial model and its implementation in scRNA sequencing data.  
@@ -247,7 +236,7 @@ EnhancedVolcano(data,
   widthConnectors = 0.4,
   colConnectors = 'black',
   pointSize = 0.7, 
-  xlim = c(-5, 8), 
+  xlim = c(-12, 12), 
   FCcutoff = 1, 
   pCutoff = 10e-5, 
   legend=c('not significant','Log (base 2) fold-change','P value',
