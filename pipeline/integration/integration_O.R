@@ -11,7 +11,7 @@ library(here)
 source(here('..', 'sourceFiles', 'utilities.R'))
 
 # update here when you have a new list. update the same update the 
-id.list <-list('VOA11068_ENOC', 'DH13', 'DH18')
+id.list <-list('DH4', 'DH17')
 id.orig <- id.list
 
 # lets start! 
@@ -19,12 +19,6 @@ id.orig <- id.list
 sces <- lapply(id.list, function(id) readRDS(here('..', 'data', 'qc', id, 'sce_qc.rds')))
 
 # subset to common genes across a group of sces 
-intersect_all <- function(sces){
-  rownames_list <- lapply(sces, function(sce) rownames(sce)) # extract row names 
-  universal <- Reduce(intersect, rownames_list) # find the common row names in the list 
-  sces <- lapply(sces, function(sce) sce[universal, ]) # subset to common genes 
-}
-
 sces <- intersect_all(sces)
 
 # add the id number in front of cell barcodes
@@ -90,21 +84,8 @@ saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig
 sces_norm <- lapply(id.orig, function(id) readRDS(here('..', 'data', 'normalized', id, 'sce_norm.rds')))
 sces_norm <- intersect_all(sces_norm) # subset to common genes 
 
-if (length(sces_norm) == 2 ){
-  uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]]) 
-} else if (length(sces_norm) == 3) {
-uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]]) 
-} else if (length(sces_norm) == 4) {
-uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]]) 
-} else if (length(sces_norm) == 5) {
-uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]]) 
-} else if (length(sces_norm) == 6) {
-uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]], sces_norm[[6]]) 
-} else if (length(sces_norm) == 7) {
-uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]], sces_norm[[6]], sces_norm[[7]]) 
-} else if (length(sces_norm) == 8) {
-uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]], sces_norm[[4]], sces_norm[[5]], sces_norm[[6]], sces_norm[[7]], sces_norm[[8]]) 
-}
+# combine the normalized sces 
+uncorrected <- do.call(combine_sces, sces_norm)
 
 # some dim reduction 
 set.seed(1564)

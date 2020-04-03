@@ -1,14 +1,14 @@
 ---
 title: " `r params$ids` Summary stats and quality control results"
 author: "asli munzur"
-date: "11/5/2020"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
   html_document:
     code_folding: hide
 
 params:
-  id: 'id'
-  ids: 'pair_ids'
+  id: 'DH15'
+  ids: 'DH15-DH16'
 ---
 
 ```{r include = FALSE}
@@ -136,14 +136,15 @@ BEFOREtable %>%
 
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
 AFTERtable %>% 
-  knitr::kable(caption = 'Table 2: Summary statistics showing cell number and mean values per cell- AFTER quality control')
+  knitr::kable(caption = 'Table 2: Summary statistics showing cell number and mean values per cell- AFTER quality control') %>% 
+  kable_styling(full_width = F)
 ```
 
 ## BASIC QC METRICS  
 **These plots show these metrics:**  
 - Mean number of RNA reads per cell  
 - Mean number of detected genes per cell  
-- Mean percentage of mitochondrial genes per cell  
+- Mean percentage of mitochondrial genes per cell
 
 ```{r echo = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
 
@@ -278,12 +279,12 @@ plot4 <- makeQCplot(data4, data4$meanLibsize, 'chartreuse3', dh_organoid_ids, th
 
 
 # compare number of DETECTED - after 
-dataset5 <- list(mean(df_qcs[[1]]$detected ), mean(df_qcs[[2]]$sum))
-
-data5 <- data.frame(dataset = unlist(dh_organoid_ids), 
-                   meandetected = unlist(dataset5))
-
-plot5 <- makeQCplot(data5, data5$meandetected, 'brown3', dh_organoid_ids, theme_amunzur, 'mean detected genes', ymax_detected)
+# dataset5 <- list(mean(df_qcs[[1]]$detected ), mean(df_qcs[[2]]$sum))
+# 
+# data5 <- data.frame(dataset = unlist(dh_organoid_ids), 
+#                    meandetected = unlist(dataset5))
+# 
+# plot5 <- makeQCplot(data5, data5$meandetected, 'brown3', dh_organoid_ids, theme_amunzur, 'mean detected genes', ymax_detected)
 
 
 
@@ -536,76 +537,4 @@ gridExtra::grid.arrange(control_coolplot2, exp_coolplot2)
 ```
 
 
-### REDUCED DIMENSIONALITY PLOTS 
-Here we include the reduced dimensionality plots before and after batch normalization.  
-Note that these plots are only for the cells that underwent quality control.  
 
-```{r eval = FALSE, include = FALSE}
-# BEFORE BATCH NORM 
-
-# here, we need to use the normalized sces to run dim reduction. so lets load them and make a list. 
-sce_norms <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'normalized', id, 'sce_norm.rds')))
-
-# remove the reduced dimensions 
-sce_norms <- lapply(sce_norms, function(sce){
-      for(n in reducedDimNames(sce)){
-        reducedDim(sce, n) <- NULL
-      }
-      return(sce)
-    })
-
-# combine sces
-sce <- combine_sces(sce_list = sce_norms)
-  
-# Run UMAP, TSNE, PCA for visualization downstream steps: clustering, cellassign, ect.
-sce <- runPCA(sce, exprs_values = "logcounts", ncomponents = 200)
-sce <- runTSNE(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3)
-sce <- runUMAP(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3,
-                    min_dist = 0.01, n_neighbors = 15, metric = "euclidean")
-
-# make the reduced dims plots 
-PCA_noBatchNorm <- plotReducedDim(sce, dimred = 'PCA') + ggtitle('before batch norm - PCA')
-TSNE_noBatchNorm <- plotReducedDim(sce, dimred = 'TSNE') + ggtitle('before batch norm - TSNE')
-UMAP_noBatchNorm <- plotReducedDim(sce, dimred = 'UMAP') + ggtitle('before batch norm - UMAP')
-
-```
-
-
-```{r eval = FALSE, include = FALSE}
-# AFTER BATCH NORM
-
-# here, we need to use the normalized sces to run dim reduction. so lets load them and make a list. 
-sce_norms <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'normalized', id, 'sce_norm.rds')))
-
-# batch normalization 
-sce_norms <- scran_batch_norm(sce_norms)
-
-# combine sces
-sce <- combine_sces(sce_list = sce_norms)
-  
-# Run UMAP, TSNE, PCA for visualization downstream steps: clustering, cellassign, ect.
-sce <- runPCA(sce, exprs_values = "logcounts", ncomponents = 200)
-sce <- runTSNE(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3)
-sce <- runUMAP(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3,
-                    min_dist = 0.01, n_neighbors = 15, metric = "euclidean")
-
-# make the reduced dims plots
-TSNEplot <- plotReducedDim(sce, 'TSNE') + ggtitle('after batch Norm - TSNE')
-UMAPplot <- plotReducedDim(sce, 'UMAP') + ggtitle('after batch Norm - UMAP')
-PCAplot <- plotReducedDim(sce, 'PCA') + ggtitle('after batch Norm - PCA')
-
-```
-
-TSNE
-```{r eval = FALSE, include = FALSE}
-
-# witdh 7 ve 4 
-# now we visualize
-gridExtra::grid.arrange(TSNE_noBatchNorm, TSNEplot, nrow = 1)
-```
-
-UMAP
-```{eval = FALSE, include = FALSE}
-# now we visualize
-gridExtra::grid.arrange(UMAP_noBatchNorm, UMAPplot, nrow = 1)
-```

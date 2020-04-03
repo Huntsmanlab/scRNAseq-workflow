@@ -1,89 +1,92 @@
 ---
-title: 'DGE - Comparing sample2 to sample1'
-subtitle: '`r params$ids`'
+title: '`r params$ids` Comparing endometrial endometrioid and ovarian endometrioid tumors'
+subtitle: 
+author: "aslı"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
-author: 'asli munzur'
 output: 
   html_document:
     code_folding: hide
 
 params:
-  ids: 'DH22_control=DH25_control'
-  output_path_up: 'output_path_up'
-  output_path_down: 'output_path_down'
+  ova_id: 'VOA11068_ENOC-DH13-DH18-DH8-DH24-VOA11229_CCOC-DH7'
+  endo_id: 'DH3-DH4-DH10-DH15-DH16-DH17'
   seed: 123
 ---
 
-```{r PREPARE, include = FALSE}
+```{r include = FALSE}
 
-# source some files
 library(here)
 source(here('..', 'sourceFiles', 'utilities.R'))
+
+ova_integrated <- readRDS(here('..', 'data', 'integrated', params$ova_id, 'integrated.rds'))
+endo_integrated <- readRDS(here('..', 'data', 'integrated', params$endo_id, 'integrated.rds'))
+
+```
+
+In report we show the results of a clustering analysis done on the endometrial and ovarian samples, separately. The dim reduction plots shown below we done on the integrated samples with the batch effects removal. 
+
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 8}
+
+p3 <- DimPlot(ova_integrated, reduction = 'tsne', group.by = 'id', combine = FALSE) + labs(title = 'lol')
+p4 <- DimPlot(endo_integrated, reduction = 'tsne', group.by = 'id', combine = FALSE) 
+
+p3 <- ggplotify::as.grob(p3[[1]]) + ggtitle('ovary')
+p4 <- ggplotify::as.grob(p4[[1]]) + ggtitle('endometrium')
+
+gridExtra::grid.arrange(p3, p4, nrow = 1)
+
+DefaultAssay(ova_integrated) <- "RNA"
+markers <- FindAllMarkers(ova_integrated, test.use = "LR", latent.vars = "id")
 
 ```
 
 ```{r include = FALSE}
 
-# generate the id lists 
-ids_1_name <- strsplit(params$ids, "=")[[1]][[1]] # split by "=" 
-ids_1 <- ids_1_name
+# convert to sce 
+sce.ova <- SingleCellExperiment(assays = list(logcounts = GetAssayData(object = ova_integrated)))
+sce.ova <- runPCA(sce.ova)
+sce.ova <- runTSNE(sce.ova)
+sce.ova <- runUMAP(sce.ova)
 
-ids_2_name <- strsplit(params$ids, "=")[[1]][[2]] # split by "=" 
-ids_2 <-ids_2_name
-
-```
-
-```{r PSEUDOBULKING, include = FALSE}
-
-# now check how many samples we are given 
-# if we have at least two replicates for each sample, follow this path: 
-
-if (length(ids_2) + length(ids_1) >= 4) {
-  
-  # load the objects 
-  integrated_pair1 <- readRDS(here('..', 'data', 'integrated', paste(ids_1_name), 'integrated.rds'))
-  integrated_pair2 <- readRDS(here('..', 'data', 'integrated', paste(ids_2_name), 'integrated.rds'))
-
-  # make pseudo counts for each sample
-  integrated_pair1_df <- make_pseudo_counts_seurat(integrated_pair1)
-  integrated_pair2_df <- make_pseudo_counts_seurat(integrated_pair2)
-  
-  # find common genes, subset to that and cbind all the samples
-  combined <- find_and_bind(list(integrated_pair1_df, integrated_pair2_df))
-  
-  # now make the group, we will use this to make the DGE object later on 
-  group <- c(rep(1, length(ids_1)), rep(2, length(ids_2)))
-
-} else { # this is what we do if we dont have at least two replicates for each sample 
-  
-   # load the integrated objects  
-  integrated_pair1 <- readRDS(here('..', 'data', 'clustered', 'sce', paste(ids_1_name), 'sce_clus.rds'))
-  integrated_pair2 <- readRDS(here('..', 'data', 'clustered', 'sce', paste(ids_2_name), 'sce_clus.rds'))
-  
-  # extract assay data 
-  integrated_pair1_df <- as.data.frame(counts(integrated_pair1))
-  integrated_pair2_df <- as.data.frame(counts(integrated_pair2))
-  
-  # find common genes, subset to that and cbind all the samples
-  combined <- find_and_bind(list(integrated_pair1_df, integrated_pair2_df))
-  
-  # now make the group, we will use this to make the DGE object later on 
-  group <- c(rep(1, ncol(integrated_pair1_df)), rep(2, ncol(integrated_pair2_df)))
-
-} # end of else 
+# cluster the samples, two clusters each 
+clust.kmeans.ova <- kmeans(reducedDim(sce.ova, "TSNE"), centers=5)
+sce.ova$cluster <- factor(clust.kmeans.ova$cluster)
 
 ```
 
-```{r edgeR, include = FALSE}
+```{r include = FALSE}
+# make the counts matrix, for that extract coldata 
+col_df <- as.data.frame(colData(sce.ova))
+
+# where cluster num is 1 
+idx_1 <- which(col_df$cluster == 4)
+idx_else <- which(col_df$cluster != 4)
+
+# extract the counts data for these related cells that belong to cluster 1 
+logdata <- as.data.frame(logcounts(sce.ova))
+
+logdata_1 <- logdata[, idx_1]
+logdata_else <- logdata[, idx_else]
+
+# now combine 
+combined <- as.data.frame(cbind(logdata_1, logdata_else))
+
+group <- c(rep(1, ncol(logdata_1)), rep(2, ncol(logdata_else)))
+
+# remove neg counts 
+combined <- combined[apply(combined, 1, function(combined) all(combined >= 0)), ]
+
+
+
+```
+
+```{r include = FALSE}
 
 dgeObject <- DGEList(counts = combined, genes = rownames(combined), group = group)
 
 # filter the lowly expressed genes - have at least in 0.5 cpm in at least 2 samples 
 keep <- rowSums(cpm(dgeObject) > 0.5) >= 2 
 dgeObject <- dgeObject[keep, ]
-
-# normalize using edgeR's method 
-dgeObject <- calcNormFactors(dgeObject)
 
 designMatrix <- model.matrix(~group)
 
@@ -95,9 +98,6 @@ fit <- glmQLFit(dgeObject, designMatrix, robust = TRUE)
 
 # compare group2 to 1  
 qlf <- glmQLFTest(fit, coef = 2)
-
-# now do the comparison with a threshold of 0.5 for the fold change 
-qlf_threshold <- glmTreat(fit, coef = 2, lfc = 0.5)
 
 ```
 
@@ -127,7 +127,18 @@ keg <- kegga(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs")
 ```
 
 ### Diagnostic Plots 
-These plots are intended to give an idea about the model and whether it is a good fit to represent the data we are interested in analyzing. Make sure to check the dimensionality reduction reports as well. 
+These plots are intended to give an idea about the model and whether it is a good fit to represent the data we are interested in analyzing. 
+
+Plot cells on a two-dimensional scatterplot so that distances on the plot approximate the expression differences between the cells  
+In the plot below, the distance between each pair of samples can be interpreted as the leading log-fold change between the samples for the genes that best distinguish that pair of samples. Therefore, samples shown farther apart are more different in terms of gene expression. Ideally we would expect to see the replicates closer together. However, note that decreasing the number of dimensions down to two may not represent the data as accurately. This plot is here only to give an idea about how similar the samples are. Dimensionality reduction plots are more reliable to look at. 
+
+
+```{r MDS_plot, echo = FALSE, message = FALSE, fig.height = 4, fig.width = 4}
+
+# plotMDS(dgeObject, col = c('red', 'blue'))
+
+```
+
 
 #### Plot biological coefficient of variation against gene abundance, in log2 counts per million.  
 Biological coefficient of variation is the true variation between genes, and it corresponds to the dispersion parameter of the negative binomial model. To learn more about dispersion, variation and how they relate to one another, read more about the negative binomial model and its implementation in scRNA sequencing data.  
@@ -236,7 +247,7 @@ EnhancedVolcano(data,
   widthConnectors = 0.4,
   colConnectors = 'black',
   pointSize = 0.7, 
-  xlim = c(-12, 12), 
+  xlim = c(-2, 2), 
   FCcutoff = 1, 
   pCutoff = 10e-5, 
   legend=c('not significant','Log (base 2) fold-change','P value',
@@ -314,3 +325,9 @@ DT::datatable(keggtable,
                  buttons = list("copy", "excel", "csv", "pdf")))
 
 ```
+
+
+
+
+
+
