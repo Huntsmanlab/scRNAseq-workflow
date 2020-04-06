@@ -23,7 +23,7 @@ params:
 ```{r include = FALSE}
 # source the files for the functions we need 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R')) # has all the packages etc and basic functions we need 
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 source(here('pipeline', 'summary_stats', 'qcPlots.R')) # has summary stats specific functions
 
 ```
