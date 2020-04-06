@@ -18,8 +18,7 @@ params:
 
 # source some files
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
-
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 ```
 
 ```{r include = FALSE}

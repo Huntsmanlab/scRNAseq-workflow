@@ -1,7 +1,7 @@
 # this script has a function that makes a sce from cell ranger output. 
 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ##################################
 

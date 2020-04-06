@@ -24,7 +24,7 @@ To perform these analyses, fill in the ids in the Snakefile as shown:
 ids = ['DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16']  
 You can write as many as you need to; analysis steps mentioned above will be computed for each of the id. Afterwards, you may perform the next analyses which require more than one id to perfom. 
 
-#### Analyses including multiple data sets
+#### Analyses including multiple data sets  
 **seurat integration**  
 Integrate two or more data sets and show findings in a report. At the momennt, we use Seurat's integration techniques to remove batch effects between replicates. It's possible that integration causes subpopulation diversity to be eliminated as well. Run the pipeline with caution. If any of your samples have less than 200 cells, this will not work.  
 **batch correction**  

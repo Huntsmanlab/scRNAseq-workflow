@@ -20,7 +20,7 @@ params:
 ```{r include = FALSE}
 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ```
 

@@ -8,7 +8,7 @@
 
 # load a few necessary things 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 parser <- ArgumentParser(description = "integrate multiple datasets to remove batch effects")
 

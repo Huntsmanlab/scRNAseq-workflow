@@ -7,8 +7,8 @@ output:
     code_folding: hide
 
 params:
-  id: 'id'
-  output_path: 'output_path' # where we save the sce with clustering data 
+  id: 'DH16'
+  output_path: '/huntsman/amunzur/data/clustered/sce/DH16/sce_clus.rds' # where we save the sce with clustering data 
 ---
   
 In this report, we perform clustering in isolated samples and show the results in dimensionality  
