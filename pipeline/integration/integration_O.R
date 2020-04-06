@@ -8,7 +8,7 @@
 
 # load a few necessary things 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 # update here when you have a new list. update the same update the 
 id.list <-list('DH4', 'DH17')

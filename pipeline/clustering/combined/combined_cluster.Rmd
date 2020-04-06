@@ -31,7 +31,7 @@ Note that this script is also good for just integrating two samples and removing
 ```{r include = FALSE}
 # source the files we need. this file also contains the packages we need. 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ```
 

@@ -16,7 +16,7 @@ params:
 ```{r include = FALSE}
 # load a few necessary things 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 # update here when you have a new list. update the same update the 
 id.list <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"

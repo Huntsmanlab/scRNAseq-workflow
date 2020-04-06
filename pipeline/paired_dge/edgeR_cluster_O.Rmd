@@ -16,7 +16,6 @@ params:
 # source some files / packages 
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
-
 ```
 
 ```{r include = FALSE}

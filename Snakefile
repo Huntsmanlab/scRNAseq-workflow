@@ -7,7 +7,7 @@
 
 # most of the scripts we have will use these ids. regardless of the analysis you do, write all the samples you include in your analysis. 
 # we use the ids here for making sces, qc, normalization and clustering. 
-ids = ['DH4', 'DH17', 'DH10']
+ids = ['DH19']
 pair_ids = ['DH3-DH10']
 
 # LOOK HERE FOR DGE:
@@ -65,7 +65,7 @@ compare_dge_report = expand('../reports/dge_comparison/{pair_ids}/dge_comparison
 
 rule all:
   input:
-    # sce_raw,
+    sce_raw,
     # sce_qc,
     # sce_norm,
     # sce_clus,
@@ -73,12 +73,12 @@ rule all:
     # seurat_integ, # combined sces with batch effects removed 
     # integration_report, # dim reduction plots before and after batch effect removal
     # separate_clustering_report, # cluster an sce alone
-    del_later_integration,
-    with_batch,
-    without_batch,
-    batch_correction_report,
+    # del_later_integration,
+    # with_batch,
+    # without_batch,
+    # batch_correction_report,
     # summary_stats_report,
-    edgeR_report,
+    # edgeR_report,
     # paired_dge_basic_report
 
 # convert 10X counts to an sce 
