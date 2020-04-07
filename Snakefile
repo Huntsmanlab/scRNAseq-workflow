@@ -7,8 +7,18 @@
 
 # most of the scripts we have will use these ids. regardless of the analysis you do, write all the samples you include in your analysis. 
 # we use the ids here for making sces, qc, normalization and clustering. 
-ids = ['DH19']
-pair_ids = ['DH3-DH10']
+ids = ['bgi_175_001', 'bgi_176_001', 'bgi_176_002', 'ilm_175_001', 'ilm_176_001', 'ilm_176_002']
+pair_ids = ['bgi_175_001-ilm_175_001', 'bgi_176_001-ilm_176_001', 'bgi_176_002-ilm_176_002']
+
+# illumina_SCRNA10X_SA_CHIP0175_001
+# illumina_SCRNA10X_SA_CHIP0176_001
+# illumina_SCRNA10X_SA_CHIP0176_002
+
+# bgi_SCRNA10X_SA_CHIP0175_001
+# bgi_SCRNA10X_SA_CHIP0176_001
+# bgi_SCRNA10X_SA_CHIP0176_002
+
+
 
 # LOOK HERE FOR DGE:
 # before we can do dge, we need to integrate them to remove batch effects. separate replicates by '-'. DO ONE GROUP AT A TIME.
@@ -65,7 +75,7 @@ compare_dge_report = expand('../reports/dge_comparison/{pair_ids}/dge_comparison
 
 rule all:
   input:
-    sce_raw,
+    # sce_raw,
     # sce_qc,
     # sce_norm,
     # sce_clus,
@@ -77,14 +87,14 @@ rule all:
     # with_batch,
     # without_batch,
     # batch_correction_report,
-    # summary_stats_report,
+    summary_stats_report,
     # edgeR_report,
     # paired_dge_basic_report
 
 # convert 10X counts to an sce 
 rule make_sce:
   input:
-    "../data/raw/{id}"
+    "../data/raw/Daniel_data/{id}"
   output:
     "../data/processed/{id}/sce.rds"
   params:
@@ -205,7 +215,7 @@ rule make_summary_stats:
     sce_qc,
     sce_norm
   output:
-    output_path = '../data/integrated/{id_list}/integrated.rds'
+    report = summary_stats_report
   shell:
     "Rscript -e \"rmarkdown::render('pipeline/summary_stats/summary_stats.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
