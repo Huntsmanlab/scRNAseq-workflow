@@ -1,0 +1,278 @@
+---
+title: " `r params$ids` Summary stats and quality control results"
+subtitle: '`r params$pair_ids`'
+author: "Asli Munzur"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  pair_ids: 'DH15-DH16' # to run this, write TWO ids here, separated by -
+---
+
+```{css, echo=FALSE}
+    body .main-container {
+      max-width: 90% !important;
+      width: 90% !important;
+    }
+
+    body {
+      max-width: 90% !important;
+    }
+```
+
+```{r include = FALSE}
+# source the files for the functions we need 
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+
+```
+
+```{r include = FALSE}
+
+#extract the name_list from the parameters. we use the name list later on while making graphs. 
+ids <- strsplit(params$pair_ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+dh_organoid_ids <- list(ids[[1]], ids[[2]])
+```
+
+```{r include = FALSE}
+
+# extract some information 
+sce_raws <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'processed', id, 'sce.rds')))
+sce_qcs <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'qc', id, 'sce_qc.rds')))
+
+seurat_raws <- lapply(sce_raws, function(sce) CreateSeuratObject(counts = counts(sce), project = sce$id))
+seurat_qc <- lapply(sce_qcs, function(sce) CreateSeuratObject(counts = counts(sce), project = sce$id))
+
+df_raws <- lapply(sce_raws, function(sce) colData(sce)) # this one has metrics before removing low quality cells 
+df_qcs <- lapply(sce_qcs, function(sce) colData(sce)) # this one has metrics after removing loq quality cells 
+
+```
+
+```{r include = FALSE}
+# here we write a function to help us make dataframes that good for making plots later on 
+
+makeTable <- function(df, index) {
+  
+  # first we must go from S4 to data frame to be able to use dplyr
+  df <- as.data.frame(df) %>% 
+    
+    # get the mean for each column we are interested in 
+    summarize(sum = as.integer(mean(sum)), detected = as.integer(mean(detected)), subsets_mito_sum = as.integer(mean(subsets_mito_sum)), 
+              subsets_mito_percent =  as.integer(mean(subsets_mito_percent))) %>% 
+
+    mutate(id = dh_organoid_ids[[index]]) %>% 
+
+    # add a new column with the number of cells 
+    mutate(cell_number = nrow(df)) %>% 
+    
+    # here we take advantage of the select function to reorder the columns 
+    dplyr::select(id, cell_number, sum, detected, subsets_mito_sum, subsets_mito_percent) %>% 
+    
+    # and here we just rename them for clarity 
+    rename(RNA_reads = sum, detected_genes = detected, mito_reads = subsets_mito_sum, mito_percent = subsets_mito_percent)
+  
+  return(df)
+  
+} # end of function 
+```
+
+```{r echo = FALSE, warning = FALSE}
+# we gotta add some tables here before we jump into graphs. 
+# we first make a very very basic table, then make it look better. 
+
+BEFOREcontrolTable <- makeTable(df_raws[[1]], 1)
+BEFOREexpTable <- makeTable(df_raws[[2]], 2)
+
+# combine data from control and treatment in one table 
+BEFOREtable <- rbind(BEFOREcontrolTable, BEFOREexpTable)
+
+AFTERcontrolTable <- makeTable(df_qcs[[1]], 1)
+AFTERexpTable <- makeTable(df_qcs[[2]], 2)
+
+# combine data from control and treatment in one table 
+AFTERtable <- rbind(AFTERcontrolTable, AFTERexpTable)
+
+```
+
+```{r echo = FALSE, warning = FALSE, results = 'asis'}
+# here we just make the tables look nice and add a caption as well. 
+BEFOREtable %>% 
+  knitr::kable(caption = 'Table 1: Summary statistics showing cell number and mean values per cell- BEFORE quality control') %>% 
+  kable_styling(full_width = F)
+```
+
+
+```{r echo = FALSE, warning = FALSE, results = 'asis'}
+AFTERtable %>% 
+  knitr::kable(caption = 'Table 2: Summary statistics showing cell number and mean values per cell- AFTER quality control') %>% 
+  kable_styling(full_width = F)
+```
+
+```{r include = FALSE}
+
+all_raw <- merge(seurat_raws[[1]], seurat_raws[[2]], add.cell.ids = c(dh_organoid_ids[[1]], dh_organoid_ids[[2]]))
+all_qc <- merge(seurat_qc[[1]], seurat_qc[[2]], add.cell.ids = c(dh_organoid_ids[[1]], dh_organoid_ids[[2]]))
+
+all_raw[["percent_mito"]] <- PercentageFeatureSet(all_raw, pattern = "^MT-")
+all_qc[["percent_mito"]] <- PercentageFeatureSet(all_qc, pattern = "^MT-")
+
+all_raw[["percent_ribo"]] <- PercentageFeatureSet(all_raw, pattern = "^RP[SL]")
+all_qc[["percent_ribo"]] <- PercentageFeatureSet(all_qc, pattern = "^RP[SL]")
+
+feats <- c("nFeature_RNA","nCount_RNA","percent_mito","percent_ribo")
+
+```
+
+#### BEFORE QUALITY CONTROL
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 13}
+
+VlnPlot(all_raw, group.by= "orig.ident", features = feats, pt.size = 0.1,ncol = 4) 
+
+```
+
+#### AFTER QUALITY CONTROL
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 13}
+
+VlnPlot(all_qc, group.by= "orig.ident", features = feats, pt.size = 0.1,ncol = 4)
+
+```
+
+We can also visualize the information given above in scatter plots to better understand how they align, as shown below. Pearson correlation between the two features is displayed above the plot. 
+
+#### BEFORE QUALITY CONTROL 
+
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 17}
+
+cowplot::plot_grid(ncol = 4,
+  FeatureScatter(all_raw, "nCount_RNA"  , "nFeature_RNA", group.by = "orig.ident", pt.size = .5),
+  FeatureScatter(all_raw, "percent_mito", "nFeature_RNA", group.by = "orig.ident", pt.size = .5),
+  FeatureScatter(all_raw, "percent_ribo", "nFeature_RNA", group.by = "orig.ident", pt.size = .5),
+  FeatureScatter(all_raw, "percent_ribo", "percent_mito", group.by = "orig.ident", pt.size = .5)
+)
+
+```
+#### AFTER QUALITY CONTROL 
+
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 17}
+
+cowplot::plot_grid(ncol = 4,
+  FeatureScatter(all_qc, "nCount_RNA"  , "nFeature_RNA", group.by = "orig.ident", pt.size = .5),
+  FeatureScatter(all_qc, "percent_mito", "nFeature_RNA", group.by = "orig.ident", pt.size = .5),
+  FeatureScatter(all_qc, "percent_ribo", "nFeature_RNA", group.by = "orig.ident", pt.size = .5),
+  FeatureScatter(all_qc, "percent_ribo", "percent_mito", group.by = "orig.ident", pt.size = .5)
+)
+
+```
+
+### Dimensionality reduction plots 
+
+Next we include some dimensionality reduction plots. Plots on the left are before quality control, plots on the right are after. 
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
+
+all_raw <- FindVariableFeatures(all_raw)
+all_raw <- ScaleData(all_raw)
+
+all_raw <- RunPCA(all_raw, verbose = FALSE)
+all_raw <- RunUMAP(all_raw, dims = 1:30)
+all_raw <- RunTSNE(all_raw, dims = 1:30, check_duplicates = FALSE)
+
+p1 <- DimPlot(all_raw, reduction = 'pca', group.by = 'orig.ident', combine = FALSE)
+p2 <- DimPlot(all_raw, reduction = 'tsne', group.by = 'orig.ident', combine = FALSE)
+p3 <- DimPlot(all_raw, reduction = 'umap', group.by = 'orig.ident', combine = FALSE)
+
+all_qc <- FindVariableFeatures(all_qc)
+all_qc <- ScaleData(all_qc)
+
+all_qc <- RunPCA(all_qc, verbose = FALSE)
+all_qc <- RunUMAP(all_qc, dims = 1:30)
+all_qc <- RunTSNE(all_qc, dims = 1:30, check_duplicates = FALSE)
+
+p4 <- DimPlot(all_qc, reduction = 'pca', group.by = 'orig.ident', combine = FALSE)
+p5 <- DimPlot(all_qc, reduction = 'tsne', group.by = 'orig.ident', combine = FALSE)
+p6 <- DimPlot(all_qc, reduction = 'umap', group.by = 'orig.ident', combine = FALSE)
+
+```
+
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
+
+grid.arrange(ggplotify::as.grob(p1[[1]]), ggplotify::as.grob(p4[[1]]), nrow = 1)
+
+```
+
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
+
+grid.arrange(ggplotify::as.grob(p2[[1]]), ggplotify::as.grob(p5[[1]]), nrow = 1)
+
+```
+
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
+
+grid.arrange(ggplotify::as.grob(p3[[1]]), ggplotify::as.grob(p5[[1]]), nrow = 1)
+
+```
+
+### Most variable features  
+Here we find the 3000 most variable features (genes) in two datasets **after** quality control. Datatables below have include these genes, but we label the top 15 genes for both datasets. 
+
+```{r include = FALSE}
+
+seurat_qc[[1]] <- FindVariableFeatures(seurat_qc[[1]], selection.method = "vst", nfeatures = 3000)
+seurat_qc[[2]] <- FindVariableFeatures(seurat_qc[[2]], selection.method = "vst", nfeatures = 3000)
+
+
+# Identify the 10 most highly variable genes
+top10_1 <- head(VariableFeatures(seurat_qc[[1]]), 15)
+top10_2 <- head(VariableFeatures(seurat_qc[[2]]), 15)
+
+# all the variable genes 
+one_all <- VariableFeatures(seurat_qc[[1]])
+two_all <- VariableFeatures(seurat_qc[[2]])
+
+
+# plot variable features with labels
+plot1 <- VariableFeaturePlot(seurat_qc[[1]])
+plot2 <- LabelPoints(plot = plot1, points = top10_1, repel = TRUE)
+plot2 <- plot2 + ggtitle(paste(dh_organoid_ids[[1]])) + theme(legend.position = "bottom")
+
+
+plot3 <- VariableFeaturePlot(seurat_qc[[2]])
+plot4 <- LabelPoints(plot = plot3, points = top10_2, repel = TRUE)
+plot4 <- plot4 + ggtitle(paste(dh_organoid_ids[[2]])) + theme(legend.position = "bottom")
+
+
+
+```
+
+
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 10}
+
+grid.arrange(plot2, plot4, nrow = 1)
+
+```
+
+
+#### Most variable genes in `r paste(dh_organoid_ids[[1]])`  
+```{r}
+
+DT::datatable(HVFInfo(seurat_qc[[1]])[VariableFeatures(seurat_qc[[1]]), ],
+  extensions = 'Buttons',
+  options = list(dom = 'Bfrtip',
+                 buttons = list("copy", "excel", "csv", "pdf")))
+
+
+```
+
+
+#### Most variable genes in `r paste(dh_organoid_ids[[2]])`  
+```{r}
+
+DT::datatable(HVFInfo(seurat_qc[[2]])[VariableFeatures(seurat_qc[[2]]), ],
+  extensions = 'Buttons',
+  options = list(dom = 'Bfrtip',
+                 buttons = list("copy", "excel", "csv", "pdf")))
+
+
+```
+
