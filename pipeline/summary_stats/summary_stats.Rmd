@@ -7,8 +7,8 @@ output:
     code_folding: hide
 
 params:
-  id: 'DH15'
-  ids: 'DH15-DH16'
+  id: 'id'
+  ids: 'pair_ids'
 ---
 
 ```{r include = FALSE}
