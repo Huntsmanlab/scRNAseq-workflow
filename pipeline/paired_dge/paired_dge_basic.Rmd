@@ -1,6 +1,6 @@
 ---
 title: "DGE_Experimental_vs_Control"
-subtitle: 'DH25  vs DH25_control'
+subtitle: '`r params$pair_ids`'
 author: "Asli Munzur"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 
@@ -42,7 +42,7 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 ```{r}
 # extract this from passed in parameters
 
-ids <- strsplit(pair_ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
 names(ids) <- c('transduced_id', 'control_id')
 ```
 
