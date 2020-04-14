@@ -1,0 +1,76 @@
+---
+title: "Untitled"
+author: "asli"
+date: "4/14/2020"
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  id: 'DH13'
+  output_path: '/huntsman/amunzur/data/clustered/sce/DH16/sce_clus.rds' # where we save the sce with clustering data 
+---
+
+```{r include=FALSE}
+
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'cellassign', 'create_marker_matrix.R'))
+source(here('pipeline', 'cellassign', 'assign_cell_type.R'))
+
+
+```
+
+
+```{r include = FALSE}
+
+#### Run Cell Assign to get cell type ids 
+# To run cell-assign we first must be in the virtual environment so that tensorflow can be found and library(cellassign) doesn't fail
+# As usual, do the standard 'source bin/activate' in our home dir.
+
+# Construct the marker gene matrix (use ensembl IDs rather than gene symbol)
+
+
+marker_mat <- create_marker_mat(output_file_name = here('..', 'data', 'cellassign', params$id, 'marker_mat.rds'), 
+                  mode = "split_epithelial")
+
+#### Run cell assign
+find_cell_type(path_to_sceqc = here('..', 'data', 'normalized', params$id, 'sce_norm.rds'), 
+               path_to_marker_mat = here('..', 'data', 'cellassign', params$id, 'marker_mat.rds'),  
+               output_file_name1 = here('..', 'data', 'cellassign', params$id, 'sce_norm_cas.rds'), 
+               output_file_name2 = here('..', 'data', 'cellassign', params$id, 'cellassignment.rds'))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
