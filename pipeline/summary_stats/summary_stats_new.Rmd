@@ -34,6 +34,7 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 #extract the name_list from the parameters. we use the name list later on while making graphs. 
 ids <- strsplit(params$pair_ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
 dh_organoid_ids <- list(ids[[1]], ids[[2]])
+
 ```
 
 ```{r include = FALSE}
@@ -42,8 +43,15 @@ dh_organoid_ids <- list(ids[[1]], ids[[2]])
 sce_raws <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'processed', id, 'sce.rds')))
 sce_qcs <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'qc', id, 'sce_qc.rds')))
 
+# combine the sces 
+sce_raws_combined <- do.call(combine_sces, sce_raws)
+sce_qcs_combined <- do.call(combine_sces, sce_qcs)
+
 seurat_raws <- lapply(sce_raws, function(sce) CreateSeuratObject(counts = counts(sce), project = sce$id))
 seurat_qc <- lapply(sce_qcs, function(sce) CreateSeuratObject(counts = counts(sce), project = sce$id))
+
+seurat_raws_2 <- seurat_raws
+seurat_qc_2 <- seurat_qc
 
 df_raws <- lapply(sce_raws, function(sce) colData(sce)) # this one has metrics before removing low quality cells 
 df_qcs <- lapply(sce_qcs, function(sce) colData(sce)) # this one has metrics after removing loq quality cells 
@@ -59,8 +67,12 @@ makeTable <- function(df, index) {
   df <- as.data.frame(df) %>% 
     
     # get the mean for each column we are interested in 
-    summarize(sum = as.integer(mean(sum)), detected = as.integer(mean(detected)), subsets_mito_sum = as.integer(mean(subsets_mito_sum)), 
-              subsets_mito_percent =  as.integer(mean(subsets_mito_percent))) %>% 
+    summarize(sum = as.integer(mean(sum)), 
+              detected = as.integer(mean(detected)), 
+              subsets_mito_sum = as.integer(mean(subsets_mito_sum)), 
+              subsets_mito_percent = as.integer(mean(subsets_mito_percent)), 
+              subsets_ribo_sum = as.integer(mean(subsets_ribo_sum)), 
+              subsets_ribo_percent = as.integer(mean(subsets_ribo_percent))) %>% 
 
     mutate(id = dh_organoid_ids[[index]]) %>% 
 
@@ -68,14 +80,61 @@ makeTable <- function(df, index) {
     mutate(cell_number = nrow(df)) %>% 
     
     # here we take advantage of the select function to reorder the columns 
-    dplyr::select(id, cell_number, sum, detected, subsets_mito_sum, subsets_mito_percent) %>% 
+    dplyr::select(id, 
+                  cell_number, 
+                  sum, 
+                  detected, 
+                  subsets_mito_sum, 
+                  subsets_mito_percent, 
+                  subsets_ribo_sum, 
+                  subsets_ribo_percent) %>% 
     
     # and here we just rename them for clarity 
-    rename(RNA_reads = sum, detected_genes = detected, mito_reads = subsets_mito_sum, mito_percent = subsets_mito_percent)
+    rename(RNA_reads = sum, 
+           detected_genes = detected, 
+           mito_reads = subsets_mito_sum, 
+           mito_percent = subsets_mito_percent, 
+           ribo_reads = subsets_ribo_sum, 
+           ribo_percent = subsets_ribo_percent)
   
   return(df)
   
 } # end of function 
+
+makeTableMedian <- function(df, index) {
+  
+  # first we must go from S4 to data frame to be able to use dplyr
+  df <- as.data.frame(df) %>% 
+    
+    mutate(RNA_reads = as.integer(median(sum)), 
+           detected_genes = as.integer(median(detected)), 
+           mito_reads = as.integer(median(subsets_mito_sum)), 
+           mito_percent = as.integer(median(subsets_mito_percent)), 
+           ribo_reads = as.integer(median(subsets_ribo_sum)), 
+           ribo_percent = as.integer(median(subsets_ribo_percent))) %>% 
+    
+    summarize(RNA_reads = as.integer(mean(RNA_reads)), 
+              detected_genes = as.integer(mean(detected_genes)), 
+              mito_reads = as.integer(mean(mito_reads)), 
+              mito_percent = as.integer(mean(mito_percent)), 
+              ribo_reads = as.integer(mean(ribo_reads)), 
+              ribo_percent = as.integer(mean(ribo_percent))) %>% 
+    
+    mutate(id = dh_organoid_ids[[index]]) %>% 
+    
+    dplyr::select(id, 
+                  RNA_reads, 
+                  detected_genes, 
+                  mito_reads, 
+                  mito_percent, 
+                  ribo_reads, 
+                  ribo_percent) 
+                
+  return(df)
+  
+} # end of function 
+
+
 ```
 
 ```{r echo = FALSE, warning = FALSE}
@@ -94,6 +153,20 @@ AFTERexpTable <- makeTable(df_qcs[[2]], 2)
 # combine data from control and treatment in one table 
 AFTERtable <- rbind(AFTERcontrolTable, AFTERexpTable)
 
+# MEDIAN TABLE 
+BEFOREcontrolTable_median <- makeTableMedian(df_raws[[1]], 1)
+BEFOREexpTable_median <- makeTableMedian(df_raws[[2]], 2)
+
+# combine data from control and treatment in one table 
+BEFOREtable_median <- rbind(BEFOREcontrolTable_median, BEFOREexpTable_median)
+
+AFTERcontrolTable_median <- makeTableMedian(df_qcs[[1]], 1)
+AFTERexpTable_median <- makeTableMedian(df_qcs[[2]], 2)
+
+# combine data from control and treatment in one table 
+AFTERtable_median <- rbind(AFTERcontrolTable_median, AFTERexpTable_median)
+
+
 ```
 
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
@@ -103,12 +176,24 @@ BEFOREtable %>%
   kable_styling(full_width = F)
 ```
 
-
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
 AFTERtable %>% 
   knitr::kable(caption = 'Table 2: Summary statistics showing cell number and mean values per cell- AFTER quality control') %>% 
   kable_styling(full_width = F)
 ```
+
+```{r echo = FALSE, warning = FALSE, results = 'asis'}
+BEFOREtable_median %>% 
+  knitr::kable(caption = 'Table 3: Summary statistics showing cell number and median values per cell- BEFORE quality control') %>% 
+  kable_styling(full_width = F)
+```
+
+```{r echo = FALSE, warning = FALSE, results = 'asis'}
+AFTERtable_median %>% 
+  knitr::kable(caption = 'Table 4: Summary statistics showing cell number and median values per cell- AFTER quality control') %>% 
+  kable_styling(full_width = F)
+```
+
 
 ```{r include = FALSE}
 
@@ -132,12 +217,105 @@ VlnPlot(all_raw, group.by= "orig.ident", features = feats, pt.size = 0.1,ncol = 
 
 ```
 
+Now we visualize the plots above using data from top 50, top 100 and top 500 genes.  
+#### total number of RNA reads detected  
+
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
+
+a <- plotColData(sce_raws_combined, x = 'percent_top_50', y = 'sum', colour_by = 'id') + xlim(0, 100)
+b <- plotColData(sce_raws_combined, x = 'percent_top_100', y = 'sum', colour_by = 'id') + xlim(0, 100)
+c <- plotColData(sce_raws_combined, x = 'percent_top_500', y = 'sum', colour_by = 'id') + xlim(0, 100)
+
+grid.arrange(a, b, c, nrow = 1)
+
+```
+
+#### total number of genes detected 
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
+
+d <- plotColData(sce_raws_combined, x = 'percent_top_50', y = 'detected', colour_by = 'id') + xlim(0, 100)
+e <- plotColData(sce_raws_combined, x = 'percent_top_100', y = 'detected', colour_by = 'id') + xlim(0, 100)
+f <- plotColData(sce_raws_combined, x = 'percent_top_500', y = 'detected', colour_by = 'id') + xlim(0, 100)
+
+grid.arrange(d, e, f, nrow = 1)
+
+```
+
+#### mitochondrial RNA percentage 
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
+
+g <- plotColData(sce_raws_combined, x = 'percent_top_50', y = 'subsets_mito_percent', colour_by = 'id') + xlim(0, 100)
+h <- plotColData(sce_raws_combined, x = 'percent_top_100', y = 'subsets_mito_percent', colour_by = 'id') + xlim(0, 100)
+i <- plotColData(sce_raws_combined, x = 'percent_top_500', y = 'subsets_mito_percent', colour_by = 'id') + xlim(0, 100)
+
+grid.arrange(g, h, i, nrow = 1)
+
+```
+
+#### ribosomal RNA percentage 
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
+
+j <- plotColData(sce_raws_combined, x = 'percent_top_50', y = 'subsets_ribo_percent', colour_by = 'id') + xlim(0, 100)
+k <- plotColData(sce_raws_combined, x = 'percent_top_100', y = 'subsets_ribo_percent', colour_by = 'id') + xlim(0, 100)
+l <- plotColData(sce_raws_combined, x = 'percent_top_500', y = 'subsets_ribo_percent', colour_by = 'id') + xlim(0, 100)
+
+grid.arrange(j, k, l, nrow = 1)
+
+```
+
 #### AFTER QUALITY CONTROL
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 13}
 
 VlnPlot(all_qc, group.by= "orig.ident", features = feats, pt.size = 0.1,ncol = 4)
 
 ```
+
+Now we visualize the plots above using data from top 50, top 100 and top 500 genes.  
+
+#### total number of RNA reads detected  
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
+
+a <- plotColData(sce_qcs_combined, x = 'percent_top_50', y = 'sum', colour_by = 'id') + xlim(0, 100)
+b <- plotColData(sce_qcs_combined, x = 'percent_top_100', y = 'sum', colour_by = 'id') + xlim(0, 100)
+c <- plotColData(sce_qcs_combined, x = 'percent_top_500', y = 'sum', colour_by = 'id') + xlim(0, 100)
+
+grid.arrange(a, b, c, nrow = 1)
+
+```
+
+#### total number of genes detected 
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
+
+d <- plotColData(sce_qcs_combined, x = 'percent_top_50', y = 'detected', colour_by = 'id') + xlim(0, 100)
+e <- plotColData(sce_qcs_combined, x = 'percent_top_100', y = 'detected', colour_by = 'id') + xlim(0, 100)
+f <- plotColData(sce_qcs_combined, x = 'percent_top_500', y = 'detected', colour_by = 'id') + xlim(0, 100)
+
+grid.arrange(d, e, f, nrow = 1)
+
+```
+
+#### mitochondrial RNA percentage 
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
+
+g <- plotColData(sce_qcs_combined, x = 'percent_top_50', y = 'subsets_mito_percent', colour_by = 'id') + xlim(0, 100)
+h <- plotColData(sce_qcs_combined, x = 'percent_top_100', y = 'subsets_mito_percent', colour_by = 'id') + xlim(0, 100)
+i <- plotColData(sce_qcs_combined, x = 'percent_top_500', y = 'subsets_mito_percent', colour_by = 'id') + xlim(0, 100)
+
+grid.arrange(g, h, i, nrow = 1)
+
+```
+
+#### ribosomal RNA percentage 
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
+
+j <- plotColData(sce_qcs_combined, x = 'percent_top_50', y = 'subsets_ribo_percent', colour_by = 'id') + xlim(0, 100)
+k <- plotColData(sce_qcs_combined, x = 'percent_top_100', y = 'subsets_ribo_percent', colour_by = 'id') + xlim(0, 100)
+l <- plotColData(sce_qcs_combined, x = 'percent_top_500', y = 'subsets_ribo_percent', colour_by = 'id') + xlim(0, 100)
+
+grid.arrange(j, k, l, nrow = 1)
+
+```
+
 
 We can also visualize the information given above in scatter plots to better understand how they align, as shown below. Pearson correlation between the two features is displayed above the plot. 
 
@@ -153,6 +331,7 @@ cowplot::plot_grid(ncol = 4,
 )
 
 ```
+
 #### AFTER QUALITY CONTROL 
 
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 17}
@@ -171,6 +350,17 @@ cowplot::plot_grid(ncol = 4,
 Next we include some dimensionality reduction plots. Plots on the left are before quality control, plots on the right are after. 
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
 
+# Calculate number of cells per cluster from object@ident
+cell.num <- table(all_raw@active.ident)
+
+# Add cell number per cluster to cluster labels
+ClusterLabels = paste("Cluster", names(cell.num), paste0("(n = ", cell.num, ")"))
+
+# Order legend labels in plot in the same order as 'ClusterLabels'
+ClusterBreaks = names(cell.num)
+
+
+
 all_raw <- FindVariableFeatures(all_raw)
 all_raw <- ScaleData(all_raw)
 
@@ -179,8 +369,28 @@ all_raw <- RunUMAP(all_raw, dims = 1:30)
 all_raw <- RunTSNE(all_raw, dims = 1:30, check_duplicates = FALSE)
 
 p1 <- DimPlot(all_raw, reduction = 'pca', group.by = 'orig.ident', combine = FALSE)
-p2 <- DimPlot(all_raw, reduction = 'tsne', group.by = 'orig.ident', combine = FALSE)
+# p2 <- DimPlot(all_raw, reduction = 'tsne', group.by = 'orig.ident', combine = FALSE, do.label = TRUE)
 p3 <- DimPlot(all_raw, reduction = 'umap', group.by = 'orig.ident', combine = FALSE)
+
+# Plot tSNE with new legend labels for clusters
+p2 <- DimPlot(object = all_raw, 
+              reduction = 'tsne', 
+              do.return = T) +
+  scale_colour_discrete(breaks = ClusterBreaks, 
+                        labels = ClusterLabels) +
+  labs(x = "t-SNE 1",
+       y = "t-SNE 2")
+
+
+# Calculate number of cells per cluster from object@ident
+cell.num <- table(all_qc@active.ident)
+
+# Add cell number per cluster to cluster labels
+ClusterLabels = paste("Cluster", names(cell.num), paste0("(n = ", cell.num, ")"))
+
+# Order legend labels in plot in the same order as 'ClusterLabels'
+ClusterBreaks = names(cell.num)
+
 
 all_qc <- FindVariableFeatures(all_qc)
 all_qc <- ScaleData(all_qc)
@@ -189,8 +399,18 @@ all_qc <- RunPCA(all_qc, verbose = FALSE)
 all_qc <- RunUMAP(all_qc, dims = 1:30)
 all_qc <- RunTSNE(all_qc, dims = 1:30, check_duplicates = FALSE)
 
+# Plot tSNE with new legend labels for clusters
+p5 <- DimPlot(object = all_qc, 
+              reduction = 'tsne', 
+              do.return = T) +
+  scale_colour_discrete(breaks = ClusterBreaks, 
+                        labels = ClusterLabels) +
+  labs(x = "t-SNE 1",
+       y = "t-SNE 2")
+
+
 p4 <- DimPlot(all_qc, reduction = 'pca', group.by = 'orig.ident', combine = FALSE)
-p5 <- DimPlot(all_qc, reduction = 'tsne', group.by = 'orig.ident', combine = FALSE)
+# p5 <- DimPlot(all_qc, reduction = 'tsne', group.by = 'orig.ident', combine = FALSE)
 p6 <- DimPlot(all_qc, reduction = 'umap', group.by = 'orig.ident', combine = FALSE)
 
 ```
@@ -203,13 +423,13 @@ grid.arrange(ggplotify::as.grob(p1[[1]]), ggplotify::as.grob(p4[[1]]), nrow = 1)
 
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
 
-grid.arrange(ggplotify::as.grob(p2[[1]]), ggplotify::as.grob(p5[[1]]), nrow = 1)
+grid.arrange(p2, p5, nrow = 1)
 
 ```
 
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
 
-grid.arrange(ggplotify::as.grob(p3[[1]]), ggplotify::as.grob(p5[[1]]), nrow = 1)
+grid.arrange(ggplotify::as.grob(p3[[1]]), ggplotify::as.grob(p6[[1]]), nrow = 1)
 
 ```
 
@@ -275,4 +495,202 @@ DT::datatable(HVFInfo(seurat_qc[[2]])[VariableFeatures(seurat_qc[[2]]), ],
 
 
 ```
+
+```{r include = FALSE}
+# 
+
+#### Number of variable features  
+# Here we find the number of variable features with various cutoffs after quality control. 
+
+raw_bgi <- seurat_raws[[1]]
+raw_ilm <- seurat_raws[[2]]
+
+qc_bgi <- seurat_qc[[1]]
+qc_ilm <- seurat_qc[[2]]
+
+qc_bgi <- NormalizeData(qc_bgi)
+qc_ilm <- NormalizeData(qc_ilm)
+
+
+qc_bgi <- FindVariableFeatures(qc_bgi, selection.method = 'dispersion', mean.cutoff = c(0.005, 1))
+
+qc_ilm <- FindVariableFeatures(qc_ilm, selection.method = 'dispersion', mean.cutoff = c(0.005, 1))
+
+getNumberOfHVG <- function(object, threshold){
+  
+  df <- as.data.frame(HVFInfo(object = object)) %>% 
+    dplyr::select(dispersion.scaled) %>% 
+    dplyr::filter(dispersion.scaled > threshold)
+  
+  return(nrow(df))
+  
+}
+
+a <- getNumberOfHVG(qc_bgi, 0.5)
+b <- getNumberOfHVG(qc_bgi, 1.0)
+c <- getNumberOfHVG(qc_bgi, 1.5)
+d <- getNumberOfHVG(qc_bgi, 2.0)
+e <- getNumberOfHVG(qc_bgi, 2.5)
+
+f <- getNumberOfHVG(qc_ilm, 0.5)
+g <- getNumberOfHVG(qc_ilm, 1.0)
+h <- getNumberOfHVG(qc_ilm, 1.5)
+i <- getNumberOfHVG(qc_ilm, 2.0)
+j <- getNumberOfHVG(qc_ilm, 2.5)
+
+HVG_bgi <- c(a, b, c, d, e)
+HVG_ilm <- c(f, g, h, i, j)
+dispersion_cutoff <- c(0.5, 1.0, 1.5, 2.0, 2.5)
+
+df <- as.data.frame(cbind(dispersion_cutoff, HVG_bgi, HVG_ilm))
+
+```
+
+```{r}
+
+df %>% 
+  knitr::kable(caption = 'Table 5: Number of HVG after quality control') %>% 
+  kable_styling(full_width = F)
+
+```
+
+#### Clustering
+
+```{r include = FALSE}
+
+qc_bgi <- ScaleData(qc_bgi)
+
+qc_bgi <- RunPCA(qc_bgi, verbose = FALSE)
+qc_bgi <- RunUMAP(qc_bgi, dims = 1:30)
+qc_bgi <- RunTSNE(qc_bgi, dims = 1:30, check_duplicates = FALSE)
+
+qc_bgi <- FindNeighbors(qc_bgi, dims = 1:10)
+
+
+qc_bgi <- FindClusters(qc_bgi, resolution = 0.1)
+a <- length(unique(qc_bgi$seurat_clusters))
+
+qc_bgi <- FindClusters(qc_bgi, resolution = 0.2)
+b <- length(unique(qc_bgi$seurat_clusters))
+
+qc_bgi <- FindClusters(qc_bgi, resolution = 0.3)
+c <- length(unique(qc_bgi$seurat_clusters))
+
+qc_bgi <- FindClusters(qc_bgi, resolution = 0.5)
+d <- length(unique(qc_bgi$seurat_clusters))
+
+qc_bgi <- FindClusters(qc_bgi, resolution = 0.7)
+e <- length(unique(qc_bgi$seurat_clusters))
+
+qc_bgi <- FindClusters(qc_bgi, resolution = 1.0)
+f <- length(unique(qc_bgi$seurat_clusters))
+
+DimPlot(qc_bgi, reduction = "umap")
+
+############################
+
+
+qc_ilm <- ScaleData(qc_ilm)
+
+qc_ilm <- RunPCA(qc_ilm, verbose = FALSE)
+qc_ilm <- RunUMAP(qc_ilm, dims = 1:30)
+qc_ilm <- RunTSNE(qc_ilm, dims = 1:30, check_duplicates = FALSE)
+
+qc_ilm <- FindNeighbors(qc_ilm, dims = 1:10)
+
+qc_ilm <- FindClusters(qc_ilm, resolution = 0.1)
+g <- length(unique(qc_ilm$seurat_clusters))
+
+qc_ilm <- FindClusters(qc_ilm, resolution = 0.2)
+h <- length(unique(qc_ilm$seurat_clusters))
+
+qc_ilm <- FindClusters(qc_ilm, resolution = 0.3)
+i <- length(unique(qc_ilm$seurat_clusters))
+
+qc_ilm <- FindClusters(qc_ilm, resolution = 0.5)
+j <- length(unique(qc_ilm$seurat_clusters))
+
+qc_ilm <- FindClusters(qc_ilm, resolution = 0.7)
+k <- length(unique(qc_ilm$seurat_clusters))
+
+qc_ilm <- FindClusters(qc_ilm, resolution = 1.0)
+l <- length(unique(qc_ilm$seurat_clusters))
+
+
+```
+
+```{r include = FALSE}
+
+resolution <- c(01, 0.2, 0.3, 0.5, 0.7, 1)
+
+bgi <- c(a, b, c, d, e, f)
+
+illumina <- c(g, h, i, j, k, l)
+
+df <- as.data.frame(cbind(resolution, bgi, illumina))
+
+```
+
+Here we show the number of clusters under various resolutions. Nearest neighbors algorithm was used in the clustering analysis. 
+```{r}
+
+df %>% 
+  knitr::kable(caption = 'Table 6: Number of clusters') %>% 
+  kable_styling(full_width = F)
+
+```
+
+
+### Differential Gene Expression  
+
+Here we find the differentially expressed markers between clusters. First we show the tSNE plots where we highlight the clusters we are interested in. The resolution of the tSNE plot was set to 0.2. Cluster 0 was compared to cluster 1. 
+
+#### sample 1  
+
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.height = 5}
+
+qc_bgi <- FindClusters(qc_bgi, resolution = 0.2)
+DimPlot(qc_bgi, reduction = "tsne")
+
+cluster0.markers <- FindMarkers(qc_bgi, ident.1 = 0, ident.2 = 1, min.pct = 0.25)
+
+DT::datatable(cluster0.markers,
+  extensions = 'Buttons',
+  options = list(dom = 'Bfrtip',
+                 buttons = list("copy", "excel", "csv", "pdf")))
+
+```
+
+#### sample 2
+
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.height = 5}
+
+qc_ilm <- FindClusters(qc_ilm, resolution = 0.2)
+DimPlot(qc_ilm, reduction = "tsne")
+
+cluster0.markers <- FindMarkers(qc_ilm, ident.1 = 0, ident.2 = 1, min.pct = 0.25)
+
+DT::datatable(cluster0.markers,
+  extensions = 'Buttons',
+  options = list(dom = 'Bfrtip',
+                 buttons = list("copy", "excel", "csv", "pdf")))
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
