@@ -1,6 +1,6 @@
 ---
 title: "Cell assign results for scRNAseq data "
-subtitle: '`r params$ids`'
+subtitle: '`r params$sample`'
 author: "Asli Munzur"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
@@ -8,7 +8,7 @@ output:
     code_folding: hide
 
 params:
-  id: 'id'
+  sample: 'ids'
 ---
 
 ```{r include=FALSE}
@@ -24,7 +24,7 @@ source(here('pipeline', 'cellassign', 'assign_cell_type.R'))
 ```{r echo = FALSE, message = FALSE}
 
 # load sce qc
-sce_norm <- readRDS(here('..', 'data', 'normalized', params$id, 'sce_norm.rds'))
+sce_norm <- readRDS(here('..', 'data', 'normalized', params$sample, 'sce_norm.rds'))
 
 # clustering 
 # Do clustering on scRNAseq data
@@ -42,7 +42,7 @@ table(sce_norm$cluster) %>%
 
 ```{r include = FALSE}
 
-p1 <- plotReducedDim(sce_norm, dimred = 'TSNE', colour_by = 'cluster') + labs(title = paste(params$id, 'Clustering - TSNE', sep = '-'))
+p1 <- plotReducedDim(sce_norm, dimred = 'TSNE', colour_by = 'cluster') + labs(title = paste(params$sample, 'Clustering - TSNE', sep = '-'))
 
 markers <- findMarkers(sce_norm, sce_norm$cluster, direction = "up")
 marker.set <- markers[["1"]]
@@ -56,7 +56,7 @@ p_heat <- plotHeatmap(sce_norm, features=top.markers, center = TRUE, order_colum
 ```{r include = FALSE}
 
 # load cell assign result
-sce_norm_cas <- readRDS(here('..', 'data', 'cellassign', params$id, 'sce_norm_cas.rds'))
+sce_norm_cas <- readRDS(here('..', 'data', 'cellassign', params$sample, 'sce_norm_cas.rds'))
 
 seur_sce <- as.Seurat(sce_norm_cas)
 Idents(seur_sce) <- "cluster"
@@ -67,7 +67,7 @@ p2 <- DimPlot(object = seur_sce,
               group.by = 'cell_type', 
               pt.size = 1.5, 
               cols = c('green3', 'magenta4', 'blue3', 'cyan4', 'darkorange3', 'deepskyblue1', 'red4')) +
-  labs(title = paste(params$id, 'Cell Assign for scRNAseq Cells', sep = '-'))
+  labs(title = paste(params$sample, 'Cell Assign for scRNAseq Cells', sep = '-'))
 
 ```
 
