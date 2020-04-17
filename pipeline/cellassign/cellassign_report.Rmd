@@ -8,7 +8,7 @@ output:
     code_folding: hide
 
 params:
-  sample: 'ids'
+  sample: 'DH18'
 ---
 
 ```{r include=FALSE}
@@ -65,8 +65,9 @@ p2 <- DimPlot(object = seur_sce,
               dims = c(1, 2), 
               reduction = 'TSNE', 
               group.by = 'cell_type', 
-              pt.size = 1.5, 
-              cols = c('green3', 'magenta4', 'blue3', 'cyan4', 'darkorange3', 'deepskyblue1', 'red4')) +
+              pt.size = 1.5) +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  scale_fill_viridis(discrete = TRUE) +
   labs(title = paste(params$sample, 'Cell Assign for scRNAseq Cells', sep = '-'))
 
 ```
