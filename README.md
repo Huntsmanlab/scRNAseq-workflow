@@ -22,7 +22,9 @@ The following steps of the scRNA workflow use the same wildcards:
 - clustering  
 To perform these analyses, fill in the ids in the Snakefile as shown:  
 ids = ['DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16']  
-You can write as many as you need to; analysis steps mentioned above will be computed for each of the id. Afterwards, you may perform the next analyses which require more than one id to perfom. 
+You can write as many as you need to; analysis steps mentioned above will be computed for each of the id. Afterwards, you may perform the next analyses which require more than one id to perfom.  
+
+To run the pipeline using snakemake, change the name of the snakefile from 'sample_snakefile' to 'Snakefile' on your local machine after pulling from master. 
 
 #### Analyses including multiple data sets  
 **seurat integration**  

@@ -42,6 +42,7 @@ suppressPackageStartupMessages({
   library(ggrepel)
   library(glue)
   library(fgsea)
+  library(viridis)
   
 })
 

@@ -1,0 +1,114 @@
+---
+title: "Cell assign results for scRNAseq data "
+subtitle: '`r params$sample`'
+author: "Asli Munzur"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  sample: 'DH18'
+---
+
+```{r include=FALSE}
+
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'cellassign', 'create_marker_matrix.R'))
+source(here('pipeline', 'cellassign', 'assign_cell_type.R'))
+
+
+```
+
+```{r echo = FALSE, message = FALSE}
+
+# load sce qc
+sce_norm <- readRDS(here('..', 'data', 'normalized', params$sample, 'sce_norm.rds'))
+
+# clustering 
+# Do clustering on scRNAseq data
+g <- buildSNNGraph(sce_norm, k = 8, use.dimred = 'PCA')
+clust <- igraph::cluster_walktrap(g)$membership
+sce_norm$cluster <- factor(clust)
+
+table(sce_norm$cluster) %>% 
+  knitr::kable(caption = 'Table 1: number of cells in each cluster', 
+               col.names = c('cluster', 'number of cells')) %>% 
+  kable_styling(full_width = F)
+
+
+```
+
+```{r include = FALSE}
+
+p1 <- plotReducedDim(sce_norm, dimred = 'TSNE', colour_by = 'cluster') + labs(title = paste(params$sample, 'Clustering - TSNE', sep = '-'))
+
+markers <- findMarkers(sce_norm, sce_norm$cluster, direction = "up")
+marker.set <- markers[["1"]]
+head(marker.set[,1:8], 10) # only first 8 columns, for brevity
+top.markers <- rownames(marker.set)[marker.set$Top <= 10]
+p_heat <- plotHeatmap(sce_norm, features=top.markers, center = TRUE, order_columns_by="cluster")
+
+
+```
+
+```{r include = FALSE}
+
+# load cell assign result
+sce_norm_cas <- readRDS(here('..', 'data', 'cellassign', params$sample, 'sce_norm_cas.rds'))
+
+seur_sce <- as.Seurat(sce_norm_cas)
+Idents(seur_sce) <- "cluster"
+
+p2 <- DimPlot(object = seur_sce, 
+              dims = c(1, 2), 
+              reduction = 'TSNE', 
+              group.by = 'cell_type', 
+              pt.size = 1.5) +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  scale_fill_viridis(discrete = TRUE) +
+  labs(title = paste(params$sample, 'Cell Assign for scRNAseq Cells', sep = '-'))
+
+```
+
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 14}
+
+grid.arrange(p1, p2, nrow = 1)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

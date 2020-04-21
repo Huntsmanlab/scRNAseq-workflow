@@ -7,26 +7,20 @@
 
 # most of the scripts we have will use these ids. regardless of the analysis you do, write all the samples you include in your analysis. 
 # we use the ids here for making sces, qc, normalization and clustering. 
-ids = ['bgi_175_001', 'bgi_176_001', 'bgi_176_002', 'ilm_175_001', 'ilm_176_001', 'ilm_176_002']
-pair_ids = ['bgi_175_001-ilm_175_001', 'bgi_176_001-ilm_176_001', 'bgi_176_002-ilm_176_002']
+ids = ['DH21_NEW', 'DH22_NEW'] # separate the ids with a comma 
+pair_ids = ['DH21_NEW-DH22_NEW'] # separate the pairs with a "-", no quotation marks 
 
-# illumina_SCRNA10X_SA_CHIP0175_001
-# illumina_SCRNA10X_SA_CHIP0176_001
-# illumina_SCRNA10X_SA_CHIP0176_002
-
-# bgi_SCRNA10X_SA_CHIP0175_001
-# bgi_SCRNA10X_SA_CHIP0176_001
-# bgi_SCRNA10X_SA_CHIP0176_002
-
-
+# ilm_175_001, bgi_175_001
+# 'bgi_175_001-ilm_175_001' 'bgi_176_001-ilm_176_001', 'bgi_176_002-ilm_176_002' 'DH13', 'DH18', 'VOA11229_CCOC', 'DH7', 'DH8', 'DH24'
+# 'DH13', 'DH18', 'VOA11229_CCOC', 'DH7', 'DH8', 'DH24', 'DH7', 'DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16'
 
 # LOOK HERE FOR DGE:
 # before we can do dge, we need to integrate them to remove batch effects. separate replicates by '-'. DO ONE GROUP AT A TIME.
-ids_integration = ['DH4-DH17-DH10']
+ids_integration = ['DH21_NEW-DH21_control']
 
 # if you are doing DGE analysis, write your pairs here. separate replicates by '-', separate different treatments by '='. 
 # second pair will be compared to the first one. 
-ids_dge = ['DH3=DH10']
+ids_dge = ['DH25=DH25_control']
 
 # once you run the pipeline, snakemake will save all the outputs in my folders. there is no need to change the following paths. 
 
@@ -39,6 +33,7 @@ sce_raw = expand('../data/processed/{id}/sce.rds', id = ids) # make sces
 sce_qc = expand('../data/qc/{id}/sce_qc.rds', id = ids) # perform quality control
 sce_norm = expand('../data/normalized/{id}/sce_norm.rds', id = ids) # normalize 
 sce_clus = expand('../data/clustered/sce/{id}/sce_clus.rds', id = ids) # clustering 
+sce_cas = expand('../data/cellassign/{id}/sce_norm_cas.rds', id = ids) # sce with cell type data after running cell assign 
 
 # SEURAT INTEGRATION
 sce_uncorrected = expand('../data/integrated/{ids_integration}/uncorrected.rds', ids_integration = ids_integration) # combined, but not integrated (has batch effects)
@@ -50,11 +45,15 @@ without_batch = expand('../data/batch_corrected/{ids_integration}/corrected.rds'
 
 # MARKDOWN REPORTS
 summary_stats_report = expand('../reports/summary_stats/{pair_ids}/summary_stats.html', pair_ids = pair_ids)
+summary_stats_report_new = expand('../reports/summary_stats_new/{pair_ids}/summary_stats.html', pair_ids = pair_ids)
+
 separate_clustering_report = expand('../reports/separate_clustering/{id}/separate_clustering.html', id = ids) # this is clustering with only 1 data set
 
 batch_correction_report = expand('../reports/batch_normalization/{ids_integration}/batch_correction.html', ids_integration = ids_integration)
 
 del_later_integration = expand('../reports/delete_later/{ids_integration}/delete_later.html', ids_integration = ids_integration)
+
+cellassign_report = expand('../reports/cellassign/{id}/cellassign_report.html', id = ids)
 
 integration_report = expand('../reports/integration/{ids_integration}/integration_report.html', ids_integration = ids_integration) # integration through seurat 
 # if you intend to run the script above, write here a clue to help identify what the cell types are. 
@@ -87,14 +86,17 @@ rule all:
     # with_batch,
     # without_batch,
     # batch_correction_report,
-    summary_stats_report,
+    # summary_stats_report,
+    summary_stats_report_new,
     # edgeR_report,
-    # paired_dge_basic_report
+    # paired_dge_basic_report,
+    # sce_cas,
+    # cellassign_report
 
 # convert 10X counts to an sce 
 rule make_sce:
   input:
-    "../data/raw/Daniel_data/{id}"
+    "../data/raw/{id}"
   output:
     "../data/processed/{id}/sce.rds"
   params:
@@ -111,8 +113,9 @@ rule make_sce_qc:
   params:
     whichMethod = 'default', # to use different parameters here, just update them.
     min_features = 1000,
-    mito_thresh_max = 15,
+    mito_thresh_max = 25,
     mito_thresh_min = 1,
+    ribo_thresh_max = 60, 
     nmads = 3,
     seed = 1756
   input:
@@ -126,10 +129,10 @@ rule make_sce_qc:
      --output_file_name {output} \
      --mito_thresh_max {params.mito_thresh_max} \
      --mito_thresh_min {params.mito_thresh_min} \
+     --ribo_thresh_max {params.ribo_thresh_max} \
      --nmads {params.nmads} \
      --seed {params.seed} \
      --min_features {params.min_features}"
-
 
 # normalize the sce by taking log counts and perform dim reduction at the same time 
 rule normalize_sce:
@@ -220,7 +223,22 @@ rule make_summary_stats:
     "Rscript -e \"rmarkdown::render('pipeline/summary_stats/summary_stats.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
-     params = list(ids ='{params.pair_ids}'))\" "
+     params = list(ids ='{params.pair_ids}', id = '{params.id}'))\" "
+     
+rule make_summary_stats_new:
+  params:
+    curr_dir = os.getcwd(),
+    pair_ids = pair_ids
+  input:
+    sce_raw,
+    sce_qc
+  output:
+    report = summary_stats_report_new
+  shell:
+    "Rscript -e \"rmarkdown::render('pipeline/summary_stats/summary_stats_new.Rmd',\
+     output_file='{params.curr_dir}/{output.report}', \
+     knit_root_dir='{params.curr_dir}',\
+     params = list(pair_ids ='{params.pair_ids}'))\" "
   
 # remove batch effects in multiple sces,      
 # we use this next rule for integrating more than 2 samples. note that this rule just generates the integrated objects, it doesnt 
@@ -237,7 +255,7 @@ rule multiple_integration:
     output_path_uncorrected = sce_uncorrected,
     output_path_integrated = seurat_integ
   shell:
-    "Rscript -e \"rmarkdown::render('pipeline/integration/integration_seurat.Rmd',\
+    "Rscript -e \"rmarkdown::render('pipeline/seurat_integration/integration_seurat.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
      params = list(ids ='{params.ids}', output_path_integrated = '{output.output_path_integrated}', output_path_uncorrected = '{output.output_path_uncorrected}'))\" "
@@ -254,7 +272,7 @@ rule integration_report:
   output:
     report = integration_report
   shell:
-    "Rscript -e \"rmarkdown::render('pipeline/integration/integration_report.Rmd',\
+    "Rscript -e \"rmarkdown::render('pipeline/seurat_integration/integration_report.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
      params = list(ids ='{params.ids}', id_type = '{params.id_type}'))\" "
@@ -271,7 +289,7 @@ rule edgeR_basic:
   output:
     report = edgeR_report
   shell:
-    "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic_integration.Rmd',\
+    "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
      params = list(ids ='{params.ids}'))\" "
@@ -282,7 +300,7 @@ rule paired_dge_basic:
     curr_dir = os.getcwd(),
     ids = pair_ids
   input:
-    sce_qc 
+    sce_clus 
   output:
     output_path_paired = '../data/dge/paired_dge_basic/{pair_ids}/outputsTEST.rds',
     report = '../reports/paired_dge_basic/{pair_ids}/paired_dge_basic.html'
@@ -292,4 +310,44 @@ rule paired_dge_basic:
      knit_root_dir='{params.curr_dir}',\
      params = list(ids ='{params.ids}, {output.output_path_paired}'))\" "
 
+# run cell assign in a single sample 
+rule run_cellassign: 
+  params: 
+    mode = 'split_epithelial' # or nosplit epithelial 
+  input: 
+    '../data/normalized/{id}/sce_norm.rds'
+  output: 
+    sce_cas = '../data/cellassign/{id}/sce_norm_cas.rds',
+    marker_mat_path = '../data/cellassign/{id}/marker.mat.rds',
+    cellassignment_path = '../data/cellassign/{id}/cellassignment.rds',
+  shell:
+    "Rscript pipeline/cellassign/run_cellassign.R \
+     --sce_norm {input} \
+     --mode {params.mode} \
+     --sce_cas {output.sce_cas} \
+     --marker_mat_path {output.marker_mat_path}\
+     --cellassignment_path {output.cellassignment_path}"
+     
 
+# make report of cell assign run in a single sample
+rule cellassign_report: 
+  params: 
+    curr_dir = os.getcwd(),
+    sample = ids
+  input: 
+    '../data/cellassign/{id}/sce_norm_cas.rds'
+  output:
+    report = '../reports/cellassign/{id}/cellassign_report.html'
+  shell:
+    "Rscript -e \"rmarkdown::render('pipeline/cellassign/cellassign_report.Rmd',\
+     output_file='{params.curr_dir}/{output.report}', \
+     knit_root_dir='{params.curr_dir}',\
+     params = list(sample ='{params.sample}'))\" "
+
+  
+  
+  
+  
+  
+  
+  
