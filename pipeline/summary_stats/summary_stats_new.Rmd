@@ -8,8 +8,20 @@ output:
     code_folding: hide
 
 params:
-  pair_ids: 'pair_ids'
+  pair_ids: 'DH21_NEW-DH21_control'
 ---
+
+In this document, we show the results of quality control on the samples. The steps below encompass the standard pre-processing workflow for scRNA-seq data in Seurat. These represent the selection and filtration of cells based on QC metrics, data normalization and scaling, and the detection of highly variable features.  
+
+While filtering low quality cells, we consider the following:  
+- Total number of RNA reads detected in each cell  
+- The number of unique genes detected in each cell  
+Low-quality cells or empty droplets will often have very few genes while cell doublets or multiplets may exhibit an aberrantly high gene count.  
+- The percentage of reads that map to the mitochondrial genome  
+Low-quality / dying cells often exhibit extensive mitochondrial contamination. We restrict the mitochondrial content to 25% of all the reads.  
+- The percentage of reads that ribosomal RNA  
+Ribosomal content is restricted to 60% per cell.  
+
 
 ```{css, echo=FALSE}
     body .main-container {
@@ -172,25 +184,25 @@ AFTERtable_median <- rbind(AFTERcontrolTable_median, AFTERexpTable_median)
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
 # here we just make the tables look nice and add a caption as well. 
 BEFOREtable %>% 
-  knitr::kable(caption = 'Table 1: Summary statistics showing cell number and mean values per cell- BEFORE quality control') %>% 
+  knitr::kable(caption = 'Table 1: Summary statistics showing cell number and MEAN values per cell- BEFORE quality control') %>% 
   kable_styling(full_width = F)
 ```
 
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
 AFTERtable %>% 
-  knitr::kable(caption = 'Table 2: Summary statistics showing cell number and mean values per cell- AFTER quality control') %>% 
+  knitr::kable(caption = 'Table 2: Summary statistics showing cell number and MEAN values per cell- AFTER quality control') %>% 
   kable_styling(full_width = F)
 ```
 
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
 BEFOREtable_median %>% 
-  knitr::kable(caption = 'Table 3: Summary statistics showing cell number and median values per cell- BEFORE quality control') %>% 
+  knitr::kable(caption = 'Table 3: Summary statistics showing cell number and MEDIAN values per cell- BEFORE quality control') %>% 
   kable_styling(full_width = F)
 ```
 
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
 AFTERtable_median %>% 
-  knitr::kable(caption = 'Table 4: Summary statistics showing cell number and median values per cell- AFTER quality control') %>% 
+  knitr::kable(caption = 'Table 4: Summary statistics showing cell number and MEDIAN values per cell- AFTER quality control') %>% 
   kable_styling(full_width = F)
 ```
 
@@ -217,51 +229,6 @@ VlnPlot(all_raw, group.by= "orig.ident", features = feats, pt.size = 0.1,ncol = 
 
 ```
 
-Now we visualize the plots above using data from top 50, top 100 and top 500 genes.  
-#### total number of RNA reads detected  
-
-```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
-
-a <- plotColData(sce_raws_combined, x = 'percent_top_50', y = 'sum', colour_by = 'id') + xlim(0, 100)
-b <- plotColData(sce_raws_combined, x = 'percent_top_100', y = 'sum', colour_by = 'id') + xlim(0, 100)
-c <- plotColData(sce_raws_combined, x = 'percent_top_500', y = 'sum', colour_by = 'id') + xlim(0, 100)
-
-grid.arrange(a, b, c, nrow = 1)
-
-```
-
-#### total number of genes detected 
-```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
-
-d <- plotColData(sce_raws_combined, x = 'percent_top_50', y = 'detected', colour_by = 'id') + xlim(0, 100)
-e <- plotColData(sce_raws_combined, x = 'percent_top_100', y = 'detected', colour_by = 'id') + xlim(0, 100)
-f <- plotColData(sce_raws_combined, x = 'percent_top_500', y = 'detected', colour_by = 'id') + xlim(0, 100)
-
-grid.arrange(d, e, f, nrow = 1)
-
-```
-
-#### mitochondrial RNA percentage 
-```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
-
-g <- plotColData(sce_raws_combined, x = 'percent_top_50', y = 'subsets_mito_percent', colour_by = 'id') + xlim(0, 100)
-h <- plotColData(sce_raws_combined, x = 'percent_top_100', y = 'subsets_mito_percent', colour_by = 'id') + xlim(0, 100)
-i <- plotColData(sce_raws_combined, x = 'percent_top_500', y = 'subsets_mito_percent', colour_by = 'id') + xlim(0, 100)
-
-grid.arrange(g, h, i, nrow = 1)
-
-```
-
-#### ribosomal RNA percentage 
-```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
-
-j <- plotColData(sce_raws_combined, x = 'percent_top_50', y = 'subsets_ribo_percent', colour_by = 'id') + xlim(0, 100)
-k <- plotColData(sce_raws_combined, x = 'percent_top_100', y = 'subsets_ribo_percent', colour_by = 'id') + xlim(0, 100)
-l <- plotColData(sce_raws_combined, x = 'percent_top_500', y = 'subsets_ribo_percent', colour_by = 'id') + xlim(0, 100)
-
-grid.arrange(j, k, l, nrow = 1)
-
-```
 
 #### AFTER QUALITY CONTROL
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 13}
@@ -270,54 +237,8 @@ VlnPlot(all_qc, group.by= "orig.ident", features = feats, pt.size = 0.1,ncol = 4
 
 ```
 
-Now we visualize the plots above using data from top 50, top 100 and top 500 genes.  
 
-#### total number of RNA reads detected  
-```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
-
-a <- plotColData(sce_qcs_combined, x = 'percent_top_50', y = 'sum', colour_by = 'id') + xlim(0, 100)
-b <- plotColData(sce_qcs_combined, x = 'percent_top_100', y = 'sum', colour_by = 'id') + xlim(0, 100)
-c <- plotColData(sce_qcs_combined, x = 'percent_top_500', y = 'sum', colour_by = 'id') + xlim(0, 100)
-
-grid.arrange(a, b, c, nrow = 1)
-
-```
-
-#### total number of genes detected 
-```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
-
-d <- plotColData(sce_qcs_combined, x = 'percent_top_50', y = 'detected', colour_by = 'id') + xlim(0, 100)
-e <- plotColData(sce_qcs_combined, x = 'percent_top_100', y = 'detected', colour_by = 'id') + xlim(0, 100)
-f <- plotColData(sce_qcs_combined, x = 'percent_top_500', y = 'detected', colour_by = 'id') + xlim(0, 100)
-
-grid.arrange(d, e, f, nrow = 1)
-
-```
-
-#### mitochondrial RNA percentage 
-```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
-
-g <- plotColData(sce_qcs_combined, x = 'percent_top_50', y = 'subsets_mito_percent', colour_by = 'id') + xlim(0, 100)
-h <- plotColData(sce_qcs_combined, x = 'percent_top_100', y = 'subsets_mito_percent', colour_by = 'id') + xlim(0, 100)
-i <- plotColData(sce_qcs_combined, x = 'percent_top_500', y = 'subsets_mito_percent', colour_by = 'id') + xlim(0, 100)
-
-grid.arrange(g, h, i, nrow = 1)
-
-```
-
-#### ribosomal RNA percentage 
-```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 13}
-
-j <- plotColData(sce_qcs_combined, x = 'percent_top_50', y = 'subsets_ribo_percent', colour_by = 'id') + xlim(0, 100)
-k <- plotColData(sce_qcs_combined, x = 'percent_top_100', y = 'subsets_ribo_percent', colour_by = 'id') + xlim(0, 100)
-l <- plotColData(sce_qcs_combined, x = 'percent_top_500', y = 'subsets_ribo_percent', colour_by = 'id') + xlim(0, 100)
-
-grid.arrange(j, k, l, nrow = 1)
-
-```
-
-
-We can also visualize the information given above in scatter plots to better understand how they align, as shown below. Pearson correlation between the two features is displayed above the plot. 
+We can also look into the relationship between certain values in scatter plots. Pearson correlation between the two features is displayed above the plot. 
 
 #### BEFORE QUALITY CONTROL 
 
@@ -348,6 +269,7 @@ cowplot::plot_grid(ncol = 4,
 ### Dimensionality reduction plots 
 
 Next we include some dimensionality reduction plots. Plots on the left are before quality control, plots on the right are after. 
+
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
 
 # Calculate number of cells per cluster from object@ident
@@ -434,7 +356,7 @@ grid.arrange(ggplotify::as.grob(p3[[1]]), ggplotify::as.grob(p6[[1]]), nrow = 1)
 ```
 
 ### Most variable features  
-Here we find the 3000 most variable features (genes) in two datasets **after** quality control. Datatables below have include these genes, but we label the top 15 genes for both datasets. 
+We next calculate a subset of features that exhibit high cell-to-cell variation in the dataset (i.e, they are highly expressed in some cells, and lowly expressed in others). Focusing on these genes in downstream analysis helps to highlight biological signal in single-cell datasets. Here we find the 3000 most variable features (genes) in two datasets **after** quality control. Datatables below have include these genes, but we label the top 15 genes for both datasets. 
 
 ```{r include = FALSE}
 
@@ -497,7 +419,6 @@ DT::datatable(HVFInfo(seurat_qc[[2]])[VariableFeatures(seurat_qc[[2]]), ],
 ```
 
 ```{r include = FALSE}
-# 
 
 #### Number of variable features  
 # Here we find the number of variable features with various cutoffs after quality control. 
@@ -544,7 +465,20 @@ dispersion_cutoff <- c(0.5, 1.0, 1.5, 2.0, 2.5)
 
 df <- as.data.frame(cbind(dispersion_cutoff, HVG_bgi, HVG_ilm))
 
+col1Name <- paste('HVG', dh_organoid_ids[[1]], sep = '_')
+col2Name <- paste('HVG', dh_organoid_ids[[2]], sep = '_')
+
+
+
+# rename the columns 
+names(df)[names(df) == "HVG_bgi"] <- paste('HVG', dh_organoid_ids[[1]], sep = '_')
+names(df)[names(df) == "HVG_ilm"] <- paste('HVG', dh_organoid_ids[[2]], sep = '_')
+
+
 ```
+
+#### Number of highly variable genes (HVG)
+Number of HVG for both samples are given below for various gene dispersion (variance) cut offs.  
 
 ```{r}
 
@@ -554,9 +488,19 @@ df %>%
 
 ```
 
-#### Clustering
+#### Clustering  
+Clustering cells and running a DE analysis between clusters can give an idea about different cell populations that may exist in the samples and various gene expression patterns. To better understand the composition of the clusters, we will look into these factors and show them on plots:  
+- mitochondrial content (percentage)  
+- ribosomal content (percentage)  
+- number of detected genes  
+0.5 was chosen as a resolution. 
 
-```{r include = FALSE}
+Now let's look at the chosen resolutions in more detail. We visualize the clusters in a dimensionality reduction plots (tSNE) below. 
+
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
+
+
+# qc_bgi$seurat_clusters <- as.numeric(qc_bgi$seurat_clusters) + 1
 
 qc_bgi <- ScaleData(qc_bgi)
 
@@ -565,30 +509,9 @@ qc_bgi <- RunUMAP(qc_bgi, dims = 1:30)
 qc_bgi <- RunTSNE(qc_bgi, dims = 1:30, check_duplicates = FALSE)
 
 qc_bgi <- FindNeighbors(qc_bgi, dims = 1:10)
-
-
-qc_bgi <- FindClusters(qc_bgi, resolution = 0.1)
-a <- length(unique(qc_bgi$seurat_clusters))
-
-qc_bgi <- FindClusters(qc_bgi, resolution = 0.2)
-b <- length(unique(qc_bgi$seurat_clusters))
-
-qc_bgi <- FindClusters(qc_bgi, resolution = 0.3)
-c <- length(unique(qc_bgi$seurat_clusters))
-
 qc_bgi <- FindClusters(qc_bgi, resolution = 0.5)
-d <- length(unique(qc_bgi$seurat_clusters))
 
-qc_bgi <- FindClusters(qc_bgi, resolution = 0.7)
-e <- length(unique(qc_bgi$seurat_clusters))
-
-qc_bgi <- FindClusters(qc_bgi, resolution = 1.0)
-f <- length(unique(qc_bgi$seurat_clusters))
-
-DimPlot(qc_bgi, reduction = "umap")
-
-############################
-
+#########################
 
 qc_ilm <- ScaleData(qc_ilm)
 
@@ -597,100 +520,85 @@ qc_ilm <- RunUMAP(qc_ilm, dims = 1:30)
 qc_ilm <- RunTSNE(qc_ilm, dims = 1:30, check_duplicates = FALSE)
 
 qc_ilm <- FindNeighbors(qc_ilm, dims = 1:10)
-
-qc_ilm <- FindClusters(qc_ilm, resolution = 0.1)
-g <- length(unique(qc_ilm$seurat_clusters))
-
-qc_ilm <- FindClusters(qc_ilm, resolution = 0.2)
-h <- length(unique(qc_ilm$seurat_clusters))
-
-qc_ilm <- FindClusters(qc_ilm, resolution = 0.3)
-i <- length(unique(qc_ilm$seurat_clusters))
-
 qc_ilm <- FindClusters(qc_ilm, resolution = 0.5)
-j <- length(unique(qc_ilm$seurat_clusters))
 
-qc_ilm <- FindClusters(qc_ilm, resolution = 0.7)
-k <- length(unique(qc_ilm$seurat_clusters))
 
-qc_ilm <- FindClusters(qc_ilm, resolution = 1.0)
-l <- length(unique(qc_ilm$seurat_clusters))
+Dimplot1 <- DimPlot(qc_bgi, reduction = "tsne") + ggtitle(paste(dh_organoid_ids[[1]]))
+Dimplot2 <- DimPlot(qc_ilm, reduction = "tsne") + ggtitle(paste(dh_organoid_ids[[2]]))
 
+grid.arrange(Dimplot1, Dimplot2, nrow = 1)
 
 ```
+Now we will look into the contents of these clusters and visualize these values in the violin plots below.  
 
 ```{r include = FALSE}
 
-resolution <- c(01, 0.2, 0.3, 0.5, 0.7, 1)
+# now lets compute the statistics above in plots, for that we need to add the clusters information to the sce objects 
 
-bgi <- c(a, b, c, d, e, f)
+sce_bgi <- sce_qcs[[1]]
+sce_ilm <- sce_qcs[[2]]
+  
+# bgi (sample one)
+clusters <- qc_bgi$seurat_clusters
+mito_percentage <- sce_bgi$subsets_mito_percent
+ribo_percentage <- sce_bgi$subsets_ribo_percent
+detected_genes <- sce_bgi$detected
 
-illumina <- c(g, h, i, j, k, l)
+# make a df from them 
+bgi_info_df <- as.data.frame(cbind(clusters, mito_percentage, ribo_percentage, detected_genes))
 
-df <- as.data.frame(cbind(resolution, bgi, illumina))
+# df makes 0 turn into 1, so subtract 1 from each row of the clusters 
+bgi_info_df$clusters <- bgi_info_df$clusters - 1
 
-```
+# now we make the plots 
+plot_bgi_mito <- ggplot(bgi_info_df, aes(x = factor(clusters), y = mito_percentage, fill = factor(clusters))) + geom_violin() + geom_jitter(height = 0.1, width = 0.08) + theme_classic() + ggtitle('mitochondrial content')
 
-Here we show the number of clusters under various resolutions. Nearest neighbors algorithm was used in the clustering analysis. 
-```{r}
+plot_bgi_ribo <- ggplot(bgi_info_df, aes(x = factor(clusters), y = ribo_percentage, fill = factor(clusters))) + geom_violin() + geom_jitter(height = 0.1, width = 0.08) + theme_classic() + ggtitle('ribosomal content') + ylim(0, 40)
 
-df %>% 
-  knitr::kable(caption = 'Table 6: Number of clusters') %>% 
-  kable_styling(full_width = F)
+plot_bgi_genes <- ggplot(bgi_info_df, aes(x = factor(clusters), y = detected_genes, fill = factor(clusters))) + geom_violin() + geom_jitter(height = 0.1, width = 0.08) + theme_classic() + ggtitle('detected genes') + ylim(0, 10000)
 
-```
+##################################
 
+# ilm (sample two)
+clusters <- qc_ilm$seurat_clusters
+mito_percentage <- sce_ilm$subsets_mito_percent
+ribo_percentage <- sce_ilm$subsets_ribo_percent
+detected_genes <- sce_ilm$detected
 
-### Differential Gene Expression  
+# make a df from them 
+ilm_info_df <- as.data.frame(cbind(clusters, mito_percentage, ribo_percentage, detected_genes))
 
-Here we find the differentially expressed markers between clusters. First we show the tSNE plots where we highlight the clusters we are interested in. The resolution of the tSNE plot was set to 0.2. Cluster 0 was compared to cluster 1. 
+# df makes 0 turn into 1, so subtract 1 from each row of the clusters 
+ilm_info_df$clusters <- ilm_info_df$clusters - 1
 
-#### sample 1  
+# now we make the plots 
+plot_ilm_mito <- ggplot(ilm_info_df, aes(x = factor(clusters), y = mito_percentage, fill = factor(clusters))) + geom_violin() + geom_jitter(height = 0.1, width = 0.08) + theme_classic() + ggtitle('mitochondrial content')
 
-```{r echo = FALSE, message = FALSE, fig.height = 4, fig.height = 5}
+plot_ilm_ribo <- ggplot(ilm_info_df, aes(x = factor(clusters), y = ribo_percentage, fill = factor(clusters))) + geom_violin() + geom_jitter(height = 0.1, width = 0.08) + theme_classic() + ggtitle('ribosomal content') + ylim(0, 40)
 
-qc_bgi <- FindClusters(qc_bgi, resolution = 0.2)
-DimPlot(qc_bgi, reduction = "tsne")
-
-cluster0.markers <- FindMarkers(qc_bgi, ident.1 = 0, ident.2 = 1, min.pct = 0.25)
-
-DT::datatable(cluster0.markers,
-  extensions = 'Buttons',
-  options = list(dom = 'Bfrtip',
-                 buttons = list("copy", "excel", "csv", "pdf")))
-
-```
-
-#### sample 2
-
-```{r echo = FALSE, message = FALSE, fig.height = 4, fig.height = 5}
-
-qc_ilm <- FindClusters(qc_ilm, resolution = 0.2)
-DimPlot(qc_ilm, reduction = "tsne")
-
-cluster0.markers <- FindMarkers(qc_ilm, ident.1 = 0, ident.2 = 1, min.pct = 0.25)
-
-DT::datatable(cluster0.markers,
-  extensions = 'Buttons',
-  options = list(dom = 'Bfrtip',
-                 buttons = list("copy", "excel", "csv", "pdf")))
-
+plot_ilm_genes <- ggplot(ilm_info_df, aes(x = factor(clusters), y = detected_genes, fill = factor(clusters))) + geom_violin() + geom_jitter(height = 0.1, width = 0.08) + theme_classic() + ggtitle('detected genes') + ylim(0, 10000)
 
 
 ```
 
+#### `r paste(dh_organoid_ids[[1]])`
+
+```{r echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 18}
+
+# now organize them
+grid.arrange(plot_bgi_mito, plot_bgi_ribo, plot_bgi_genes, nrow = 1)
 
 
+```
+
+#### `r paste(dh_organoid_ids[[2]])`
+
+```{r echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 18}
+
+# now organize them
+grid.arrange(plot_ilm_mito, plot_ilm_ribo, plot_ilm_genes, nrow = 1)
 
 
-
-
-
-
-
-
-
-
-
+```
 
 
