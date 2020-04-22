@@ -2,7 +2,8 @@
 
 # Any created data files
 data/
-# Ignore snakemake file
+# Ignore snakemake files
+Snakefile
 .snakemake
 # Ignore any created html files
 *.html
