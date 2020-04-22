@@ -8,7 +8,7 @@ output:
     code_folding: hide
 
 params:
-  pair_ids: 'pair_ids'
+  pair_ids: 'bgi_175_001-ilm_175_001'
 ---
 
 In this document, we show the results of quality control on the samples. The steps below encompass the standard pre-processing workflow for scRNA-seq data in Seurat. These represent the selection and filtration of cells based on QC metrics, data normalization and scaling, and the detection of highly variable features.  
