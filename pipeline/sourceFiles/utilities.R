@@ -68,7 +68,8 @@ master_cell_types <- c("B cells",
                        "Myofibroblast",
                        "other",                        
                        "Plasma cells",
-                       "T cells"  )
+                       "T cells",
+                       "Vascular smooth muscle cells")
 
 master_color_palette <- c(
   "cyan2", # red
@@ -84,10 +85,43 @@ master_color_palette <- c(
   'royalblue1',
   'chartreuse1',
   'mediumorchid2',
-  'khaki1')
+  'khaki1', 
+  'thistle4')
 
 # to visualize these colors 
-pie(rep(1, 14), col = master_color_palette)
+# pie(rep(1, 15), col = master_color_palette)
+
+# this function plots cell assign results in a dim reduction plot. 
+visualize_cellassign <- function(seurat_object, reduction_type, group_by, master_color_palette, master_cell_types){
+  
+  # find cell types present in the seurat object, sort them alphabetically
+  unique_cell_types <- as.vector(sort(unique(seurat_object$cell_types)))
+  
+  # find common cell types between our lists and the master cell type list 
+  common <- intersect(unique_cell_types, master_cell_types)
+  
+  # find the indices where we have common these cell types in the master cell type list 
+  idx <- match(common, master_cell_types)
+  
+  # pick colors that correspond to the indices
+  colors_chosen <- master_color_palette[idx]
+  
+  # make cell assign plot
+  plot <- DimPlot(object = seurat_object,
+                  dims = c(1, 2),
+                  reduction = reduction_type,
+                  group.by = group_by,
+                  pt.size = 1.5) +
+    scale_color_manual(values = colors_chosen)
+
+  return(plot)
+  
+} # end of function
+
+
+
+
+
 
 #ADD THEME #### 
 theme_amunzur <- theme(
