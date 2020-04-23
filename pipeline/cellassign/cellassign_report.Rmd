@@ -8,7 +8,7 @@ output:
     code_folding: hide
 
 params:
-  sample: 'DH18'
+  sample: 'ids'
 ---
 
 ```{r include=FALSE}

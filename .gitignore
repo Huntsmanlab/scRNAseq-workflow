@@ -1,5 +1,4 @@
 # The gitignore!
-
 # Any created data files
 data/
 # Ignore snakemake files
