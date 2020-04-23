@@ -50,6 +50,28 @@ Given a list of sces, sum the expression of cells in each cluster to make pseudo
 Warning: This is a badly written function. Next few ones are better suited for pseudo-bulking. 
 
  - sce_list: a list of sces that you want to use in the DGE analysis
+ 
+8. make_pseudo_counts_seurat()
+Given a combined seurat object, make pseudo bulk counts for each separate sample found in the combined seurat object. This function is commonly used in various edgeR scripts. Let's say you have 4 seurat objects and you want to do DE analysis between them using edgeR. You would merge them into one seurat object and and use the merged object as an input. The output of the function is a data frame that can directly be used in edgeR to make a DGElist object. Each row is a gene, and each column is a sample. Note that when you merge the objects, you subset all the seurat objects to the common genes between the objects. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
