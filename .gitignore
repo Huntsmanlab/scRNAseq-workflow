@@ -1,5 +1,6 @@
 # The gitignore!
-# Ignore snakemake file 
+# Ignore snakemake file and Snakefile
+Snakefile
 .snakemake
 # Ignore any created html files
 *.html
