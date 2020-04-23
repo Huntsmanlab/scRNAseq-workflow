@@ -7,20 +7,20 @@
 
 # most of the scripts we have will use these ids. regardless of the analysis you do, write all the samples you include in your analysis. 
 # we use the ids here for making sces, qc, normalization and clustering. 
-ids = ['VOA11068_ENOC', 'DH13', 'DH18', 'VOA11229_CCOC', 'DH7', 'DH8', 'DH24', 'DH7', 'DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16']
-pair_ids = ['bgi_176_002-ilm_176_002']
+ids = ['VOA11229_CCOC', 'DH7'] # separate the ids with a comma 
+pair_ids = ['DH8-DH24'] # separate the pairs with a "-", no quotation marks 
 
-# ilm_175_001, bgi_175_001
+# To make it easy to copy, I added the samples here: 
 # 'bgi_175_001-ilm_175_001' 'bgi_176_001-ilm_176_001', 'bgi_176_002-ilm_176_002' 'DH13', 'DH18', 'VOA11229_CCOC', 'DH7', 'DH8', 'DH24'
-# 
+# 'DH13', 'DH18', 'VOA11229_CCOC', 'DH7', 'DH8', 'DH24', 'DH7', 'DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16'
 
 # LOOK HERE FOR DGE:
 # before we can do dge, we need to integrate them to remove batch effects. separate replicates by '-'. DO ONE GROUP AT A TIME.
-ids_integration = ['DH4-DH17-DH10']
+ids_integration = ['DH21_NEW-DH21_control']
 
 # if you are doing DGE analysis, write your pairs here. separate replicates by '-', separate different treatments by '='. 
 # second pair will be compared to the first one. 
-ids_dge = ['DH3=DH10']
+ids_dge = ['DH25=DH25_control']
 
 # once you run the pipeline, snakemake will save all the outputs in my folders. there is no need to change the following paths. 
 
@@ -39,6 +39,8 @@ sce_cas = expand('../data/cellassign/{id}/sce_norm_cas.rds', id = ids) # sce wit
 sce_uncorrected = expand('../data/integrated/{ids_integration}/uncorrected.rds', ids_integration = ids_integration) # combined, but not integrated (has batch effects)
 seurat_integ = expand('../data/integrated/{ids_integration}/integrated.rds', ids_integration = ids_integration) # integration (batch effects removed)
 
+sce_cas_integrated = expand('../data/integrated_cellassign/{pair_ids}/integrated_cas.rds', pair_ids = pair_ids) # integrated seurat objects with cell assign information 
+
 # BATCH CORRECTION 
 with_batch = expand('../data/batch_corrected/{ids_integration}/uncorrected.rds', ids_integration = ids_integration) # where we save the combined data with batch effects
 without_batch = expand('../data/batch_corrected/{ids_integration}/corrected.rds', ids_integration = ids_integration) # where we save the corrected data without batch effects
@@ -55,10 +57,12 @@ del_later_integration = expand('../reports/delete_later/{ids_integration}/delete
 
 cellassign_report = expand('../reports/cellassign/{id}/cellassign_report.html', id = ids)
 
+celassign_multiple_report = expand('../reports/cellassign_integrated/{pair_ids}/cellassign_integrated_report.html', pair_ids = pair_ids)
+
 integration_report = expand('../reports/integration/{ids_integration}/integration_report.html', ids_integration = ids_integration) # integration through seurat 
 # if you intend to run the script above, write here a clue to help identify what the cell types are. 
 # what is written here will be a part of the subtitle in the markdown report 
-id_type = ['ENDOMETRIAL']
+id_type = ['Ovary - Endometrioid']
 
 combined_clustering_report = expand('../reports/combined_clustering/{pair_ids}/combined_clustering.html', pair_ids = pair_ids)
 combined_clustering_uncorrected = expand('../data/clustered/combined/{pair_ids}/uncorrected_seurat_object.rds', pair_ids = pair_ids) # where you save the uncorrected data 
@@ -90,8 +94,11 @@ rule all:
     # summary_stats_report_new,
     # edgeR_report,
     # paired_dge_basic_report,
-    sce_cas, 
-    cellassign_report
+    # sce_cas,
+    # sce_cas_integrated
+    # cellassign_report
+    celassign_multiple_report
+    
 
 # convert 10X counts to an sce 
 rule make_sce:
@@ -255,7 +262,7 @@ rule multiple_integration:
     output_path_uncorrected = sce_uncorrected,
     output_path_integrated = seurat_integ
   shell:
-    "Rscript -e \"rmarkdown::render('pipeline/integration/integration_seurat.Rmd',\
+    "Rscript -e \"rmarkdown::render('pipeline/seurat_integration/integration_seurat.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
      params = list(ids ='{params.ids}', output_path_integrated = '{output.output_path_integrated}', output_path_uncorrected = '{output.output_path_uncorrected}'))\" "
@@ -272,7 +279,7 @@ rule integration_report:
   output:
     report = integration_report
   shell:
-    "Rscript -e \"rmarkdown::render('pipeline/integration/integration_report.Rmd',\
+    "Rscript -e \"rmarkdown::render('pipeline/seurat_integration/integration_report.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
      params = list(ids ='{params.ids}', id_type = '{params.id_type}'))\" "
@@ -289,7 +296,7 @@ rule edgeR_basic:
   output:
     report = edgeR_report
   shell:
-    "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic_integration.Rmd',\
+    "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
      params = list(ids ='{params.ids}'))\" "
@@ -313,7 +320,7 @@ rule paired_dge_basic:
 # run cell assign in a single sample 
 rule run_cellassign: 
   params: 
-    mode = 'split_epithelial'
+    mode = 'split_epithelial' # or nosplit epithelial 
   input: 
     '../data/normalized/{id}/sce_norm.rds'
   output: 
@@ -329,7 +336,8 @@ rule run_cellassign:
      --cellassignment_path {output.cellassignment_path}"
      
 
-# make report of cell assign run in a single sample
+# make report of cell assign run in a single sample. this one just gives output of one single sample. 
+# if you wish to visualize a few samples together, use the next rule! 
 rule cellassign_report: 
   params: 
     curr_dir = os.getcwd(),
@@ -343,11 +351,42 @@ rule cellassign_report:
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
      params = list(sample ='{params.sample}'))\" "
+     
+# this rule integrates two samples AFTER cell assign has been run on them      
+# rule integrate_cellassign: 
+#   params: 
+#     curr_dir = os.getcwd(),
+#     ids = pair_ids # you can integrate more than two samples even though it says 'pair'
+#   input: 
+#     '../data/cellassign/{id}/sce_norm_cas.rds' # normalized sces with cell assign information 
+#   output:
+#     report = '../reports/cellassign/{id}/cellassign_report.html',
+      # output_path = '../data/integrated_cellassign/{pair_ids}/integrated_cas.rds'
+#   shell:
+#     "Rscript -e \"rmarkdown::render('pipeline/cellassign/integration_seurat_cellassign.Rmd',\
+#      output_file='{params.curr_dir}/{output.report}', \
+#      knit_root_dir='{params.curr_dir}',\
+#      params = list(sample ='{params.sample}'))\" "
+
+# this one will visualize results from multiple samples in the same report 
+rule cellassign_report_multiple_samples: 
+  params: 
+    curr_dir = os.getcwd(),
+    pair_ids = pair_ids, # you can have more than one cell sample here even though it says 'pair'
+    id_type = id_type 
+  input: 
+    '../data/integrated_cellassign/{pair_ids}/integrated_cas.rds' # integrated samples with cell type information 
+  output:
+    report = '../reports/cellassign_integrated/{pair_ids}/cellassign_integrated_report.html',
+  shell:
+    "Rscript -e \"rmarkdown::render('pipeline/cellassign/integration_report_cellassign.Rmd',\
+     output_file='{params.curr_dir}/{output.report}', \
+     knit_root_dir='{params.curr_dir}',\
+     params = list(pair_ids ='{params.pair_ids}', id_type = '{params.id_type}'))\" "
 
   
-  
-  
-  
+
+  # sce_cas_integrated
   
   
   

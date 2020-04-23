@@ -1,10 +1,12 @@
 # The gitignore!
-# Ignore snakemake file and Snakefile
+# Any created data files
+data/
+# Ignore snakemake files
 Snakefile
 .snakemake
 # Ignore any created html files
 *.html
-# ignore the rproject 
+# ignore the rproject
 scRNAseq-workflow.Rproj
 .Rproj.user
 .gitignore
