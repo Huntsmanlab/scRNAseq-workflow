@@ -8,7 +8,6 @@ output:
 
 params:
   ids: 'pair_ids'
-  path_to_sce_clus_list: 'sce_clus'
   output_uncorrected: 'output_uncorrected'
   output_integrated: 'output_integrated'
 ---
@@ -43,16 +42,11 @@ ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
 dh_organoid_ids <- list(ids[[1]], ids[[2]])
 ```
 
-```{r include = FALSE, message = FALSE}
-
-# snakemake passes the paths as one long string separated by spaces. take care of that here: 
-sce_clus_paths <- as.list(unlist(strsplit(params$path_to_sce_clus_list, ' '))) 
-message(length(sce_clus_paths))
-
+```{r include = FALSE}
 # load the sce objects we will be working on 
-sce_list <- lapply(sce_clus_paths, function(some_path) readRDS(some_path))
+sce_list <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'clustered', 'sce', id, 'sce_clus.rds')))
 
-#name them 
+#name them nicely 
 names(sce_list) <- dh_organoid_ids
 ```
 

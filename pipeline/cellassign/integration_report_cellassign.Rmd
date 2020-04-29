@@ -1,6 +1,6 @@
 ---
 title: Cell assign results 
-subtitle: '`r params$ids_integration` - `r params$id_type`'
+subtitle: '`r params$pair_ids` - `r params$id_type`'
 author: "aslı"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
@@ -8,11 +8,8 @@ output:
     code_folding: hide
 
 params:
-  ids_integration: 'ids_integration' # write here the ids you want to integrate, separate by '-'
-  id_type: 'id_type' # here you can write a quick summary of what these ids_integration are, like tissue types etc. 
-  sce_cas_list: 'sce_cas_list'
-  uncorrected_object: 'uncorrected_object'
-  integrated_object: 'integrated_object'
+  pair_ids: 'VOA11068_ENOC-DH13-DH18' # write here the ids you want to integrate, separate by '-'
+  id_type: 'id_type' # here you can write a quick summary of what these pair_ids are, like tissue types etc. 
 ---
 
 #### In this report we show the results of cell assign runs on the samples. We include some dim reduction plots with cell types and clustering information. We first show results of cell assign run on integrated sample, then we give the plots for individual tumours.   
@@ -43,8 +40,8 @@ source(here('pipeline', 'cellassign', 'assign_cell_type.R'))
 
 ```{r include = FALSE}
 
-# get separate ids from the params$ids_integration
-id.list <- strsplit(params$ids_integration, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+# get separate ids from the params$pair_ids
+id.list <- strsplit(params$pair_ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
 id.list <- as.list(c(unlist(list(id.list))))
 
 ```
@@ -53,7 +50,7 @@ id.list <- as.list(c(unlist(list(id.list))))
 ```{r include = FALSE}
 # we start with the plots for uncorrected samples  
 
-uncorrected <- readRDS(params$uncorrected_object)
+uncorrected <- readRDS(here('..', 'data', 'integrated', params$pair_ids, 'uncorrected.rds'))
 
 # some dim red plots 
 p1 <- plotReducedDim(uncorrected, "TSNE", colour_by = "id") 
@@ -63,21 +60,21 @@ p2 <- plotReducedDim(uncorrected, "UMAP", colour_by = "id")
 
 ```{r include = FALSE}
 # now plots for batch corrected (integrated) samples 
-integrated <- readRDS(params$integrated_object)
+integrated <- readRDS(here('..', 'data', 'integrated_cellassign', params$pair_ids, 'integrated_cas.rds'))
 
 # some dim red plots, start by preparing the colors we will use 
 
 p3 <- DimPlot(integrated, reduction = 'tsne', group.by = 'id', combine = TRUE) + 
-  ggtitle(paste(params$ids_integration, 'tsne showing sample ids', sep = '/'))
+  ggtitle(paste(params$pair_ids, 'tsne showing sample ids', sep = '/'))
 
 p4 <- visualize_cellassign(integrated, 'tsne', 'cell_types', master_color_palette, master_cell_types) + 
-  ggtitle(paste(params$ids_integration, 'tsne showing cell types', sep = '/'))
+  ggtitle(paste(params$pair_ids, 'tsne showing cell types', sep = '/'))
 
 p5 <- DimPlot(integrated, reduction = 'umap', group.by = 'id', combine = TRUE) + 
-  ggtitle(paste(params$ids_integration, 'umap showing sample ids', sep = '/'))
+  ggtitle(paste(params$pair_ids, 'umap showing sample ids', sep = '/'))
           
 p6 <- visualize_cellassign(integrated, 'umap', 'cell_types', master_color_palette, master_cell_types) + 
-    ggtitle(paste(params$ids_integration, 'umap showing cell types', sep = '/'))
+    ggtitle(paste(params$pair_ids, 'umap showing cell types', sep = '/'))
 
 
 ```
@@ -173,9 +170,9 @@ Next we include some clustering and cell type plots. On the left, we show the tS
 integrated <- FindNeighbors(integrated, dims = 1:10)
 integrated <- FindClusters(integrated, resolution = 0.5)
 
-clustering_plot <- DimPlot(integrated, reduction = 'tsne', group.by = 'seurat_clusters', combine = TRUE) + ggtitle(paste(params$ids_integration, 'clustering', sep = ' / '))
+clustering_plot <- DimPlot(integrated, reduction = 'tsne', group.by = 'seurat_clusters', combine = TRUE) + ggtitle(paste(params$pair_ids, 'clustering', sep = ' / '))
 
-cell_type_plot <- visualize_cellassign(integrated, 'tsne', 'cell_types', master_color_palette, master_cell_types) + ggtitle(paste(params$ids_integration, 'cell types', sep = ' / '))
+cell_type_plot <- visualize_cellassign(integrated, 'tsne', 'cell_types', master_color_palette, master_cell_types) + ggtitle(paste(params$pair_ids, 'cell types', sep = ' / '))
 
 
 ```

@@ -10,8 +10,6 @@ output:
 params:
   ids: 'ids_integration'
   id_type: 'id_type'
-  path_to_uncorrected: 'path_to_uncorrected'
-  path_to_integrated:  'path_to_integrated'
 ---
 
 #### Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots before and after batch normalization through Seurat's integration method. 
@@ -24,8 +22,8 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 ```
 
 ```{r include = FALSE}
-# we start with the plots for uncorrected samples 
-uncorrected <- readRDS(params$path_to_uncorrected)
+# we start with the plots for uncorrected samples  
+uncorrected <- readRDS(here('..', 'data', 'integrated', params$ids, 'uncorrected.rds'))
 
 # some dim red plots 
 p1 <- plotReducedDim(uncorrected, "TSNE", colour_by = "id") 
@@ -35,7 +33,7 @@ p2 <- plotReducedDim(uncorrected, "UMAP", colour_by = "id")
 
 ```{r include = FALSE}
 # now plots for batch corrected (integrated) samples 
-integrated <- readRDS(params$path_to_integrated)
+integrated <- readRDS(here('..', 'data', 'integrated', params$ids, 'integrated.rds'))
 
 # some dim red plots 
 p3 <- DimPlot(integrated, reduction = 'tsne', group.by = 'id', combine = FALSE)
