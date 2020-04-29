@@ -8,8 +8,9 @@ output:
 
 params:
   ids: 'DH25_control=DH25' # write the control first
-  output_path_up: 'output_path_up'
-  output_path_down: 'output_path_down'
+  seurat_integ: 'seurat_integ'
+  sce_clus: 'sce_clus'
+  
   seed: 123
 ---
 
@@ -31,16 +32,19 @@ ids_2 <-ids_2_name
 
 ```
 
-```{r PSEUDOBULKING, include = FALSE}
+```{r PSEUDOBULKING, include = FALSE, message = FALSE}
 
 # now check how many samples we are given 
 # if we have at least two replicates for each sample, follow this path: 
 
 if (length(ids_2) + length(ids_1) >= 4) {
   
+  # extract individual paths from strings passed through snakemake 
+  path_list <- as.list(unlist(strsplit(params$seurat_integ[[1]], ' '))) 
+  
   # load the objects 
-  integrated_pair1 <- readRDS(here('..', 'data', 'integrated', paste(ids_1_name), 'integrated.rds'))
-  integrated_pair2 <- readRDS(here('..', 'data', 'integrated', paste(ids_2_name), 'integrated.rds'))
+  integrated_pair1 <- readRDS(path_list[0])
+  integrated_pair2 <- readRDS(path_list[1])
 
   # make pseudo counts for each sample
   integrated_pair1_df <- make_pseudo_counts_seurat(integrated_pair1)
@@ -54,9 +58,18 @@ if (length(ids_2) + length(ids_1) >= 4) {
 
 } else { # this is what we do if we dont have at least two replicates for each sample 
   
-   # load the integrated objects  
-  integrated_pair1 <- readRDS(here('..', 'data', 'clustered', 'sce', paste(ids_1_name), 'sce_clus.rds'))
-  integrated_pair2 <- readRDS(here('..', 'data', 'clustered', 'sce', paste(ids_2_name), 'sce_clus.rds'))
+  # extract individual paths from strings passed through snakemake 
+  path <- params$sce_clus[1]
+  
+  path_sample1 <- as.list(unlist(strsplit(path, ' ')))[[1]]
+  path_sample2 <- as.list(unlist(strsplit(path, ' ')))[[2]]
+  
+  message(print(path_sample1))
+  message(print(path_sample2))
+
+  # load the integrated objects  
+  integrated_pair1 <- readRDS(path_sample1[1])
+  integrated_pair2 <- readRDS(path_sample2[1])
   
   # extract assay data 
   integrated_pair1_df <- as.data.frame(counts(integrated_pair1))
@@ -172,7 +185,7 @@ DT::datatable(upregulated_genes_table,
                  buttons = list("copy", "excel", "csv", "pdf")))
 
 # save the table to be loaded later 
-saveRDS(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR', paste(params$ids, 'up.rds')))
+# saveRDS(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR', paste(params$ids, 'up.rds')))
 
 ```
 
@@ -191,7 +204,7 @@ DT::datatable(downregulated_genes_table,
                  buttons = list("copy", "excel", "csv", "pdf")))
 
 # save the table to be loaded later 
-saveRDS(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR', paste(params$ids, 'down.rds')))
+# saveRDS(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR', paste(params$ids, 'down.rds')))
 
 ```
 
@@ -218,6 +231,8 @@ data <- data %>%
 
 cool_genes <- c(upregulated_genes_table[1][1: 15, ], downregulated_genes_table[1][1: 15, ])
 
+x_limits = max(max(upregulated_genes_table[, 2]), abs(min(downregulated_genes_table[, 2])))
+
 library(EnhancedVolcano)
 
 EnhancedVolcano(data,
@@ -233,7 +248,7 @@ EnhancedVolcano(data,
   widthConnectors = 0.4,
   colConnectors = 'black',
   pointSize = 0.7, 
-  xlim = c(-3, 3), 
+  xlim = c(-x_limits, x_limits), 
   FCcutoff = 1, 
   pCutoff = 10e-5, 
   legend=c('not significant','Log (base 2) fold-change','P value',
