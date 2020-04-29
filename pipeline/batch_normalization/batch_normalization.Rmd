@@ -8,10 +8,12 @@ output:
     code_folding: hide
 
 params:
-  ids: 'ids_integration'
+  ids: 'ids'
+  path_to_sce_clus: 'path_to_sce_clus'
   output_uncorrected: 'output_uncorrected'
   output_corrected: 'output_corrected'
   id_type: 'id_type'
+  
 ---
 
 #### Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots before and after batch normalization in `r params$ids`. Analysis was done using scran and batchelor packages. 
@@ -24,13 +26,15 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ```
 
-```{r include = FALSE}
+```{r include = FALSE, message = FALSE}
+
+# lol <- list('/huntsman/amunzur/scRNAseq-workflow/../data/clustered/sce/DH7/sce_clus.rds', '/huntsman/amunzur/scRNAseq-workflow/../data/clustered/sce/DH24/sce_clus.rds')
+
+# snakemake passes the input files as one string separated by a space. we need to divide them into separate lists: 
+paths <- as.list(unlist(strsplit(params$path_to_sce_clus[[1]], ' '))) 
 
 # load the sces
-ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
-dh_organoid_ids <- as.list(c(unlist(ids)))
-
-sces <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'clustered', 'sce', id, 'sce_clus.rds')))
+sces <- lapply(paths, function(some_path) readRDS(some_path)) 
 
 ```
 

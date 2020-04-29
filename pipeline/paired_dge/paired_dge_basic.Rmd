@@ -6,7 +6,8 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 
 params:
   ids: 'pair_ids'
-  output_path_paired: '../data/dge/paired_dge_basic/{pair_ids}/outputsTEST.rds'
+  sce_clus: 'sce_clus'
+  output_path_paired: 'output_path_paired'
   pathwayHmark: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/h.all.v6.2.symbols.gmt'
   pathwayGO: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/c5.all.v6.2.symbols.gmt'
   pathwayReact: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/c2.cp.reactome.v7.0.symbols.gmt'
@@ -39,23 +40,24 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ```
 
-```{r}
-# extract this from passed in parameters
-
-ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
-names(ids) <- c('transduced_id', 'control_id')
-```
-
 ## DGEs
 
-```{r}
+```{r message = FALSE}
 
 plot_markers <- function(ids, ntop = 50, negative_control){
   
-  sce_list <- lapply(ids, function(id) readRDS(here('..', 'data', 'clustered', 'sce', id, 'sce_clus.rds')))
-  names(sce_list) <- ids
-
-  sce_list2 <- scran_batch_norm(sce_list)
+  paths <- as.list(unlist(strsplit(params$sce_clus[[1]], ' '))) 
+  
+  sce_list <- lapply(paths, function(some_path) readRDS(some_path))
+  
+  ids <- lapply(sce_list, function(sce) unique(sce$id))
+  
+  # sce_list <- scran_batch_norm(sce_list)
+  sce_list <- intersect_all(sce_list)
+  # sce_list <- do.call(batchelor::multiBatchNorm, c(sce_list, assay.type="counts", min.mean = 0.1))
+  
+  # before combining make sure we have the same row numbers in our sces 
+  # intersect_all
   
   sce <- combine_sces(sce_list = sce_list, prefix_col_name = 'id', prefix_cell_name = TRUE)
   

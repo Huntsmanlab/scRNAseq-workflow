@@ -9,6 +9,8 @@ output:
 
 params:
   pair_ids: 'pair_ids'
+  path_to_sce_raw: 'sce_raw'
+  path_to_sce_qc: 'sce_qc'
 ---
 
 In this document, we show the results of quality control on the samples. The steps below encompass the standard pre-processing workflow for scRNA-seq data in Seurat. These represent the selection and filtration of cells based on QC metrics, data normalization and scaling, and the detection of highly variable features.  
@@ -49,21 +51,29 @@ dh_organoid_ids <- list(ids[[1]], ids[[2]])
 
 ```
 
-```{r include = FALSE}
+```{r include = FALSE, message = FALSE}
 
-# extract some information 
-sce_raws <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'processed', id, 'sce.rds')))
-sce_qcs <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'qc', id, 'sce_qc.rds')))
+# snakemake passes paths to input files as one string where paths to individual objects are separated by spaces. now we account for that here and get the separate paths.  
+sce_raw_paths <- as.list(unlist(strsplit(params$path_to_sce_raw[[1]], ' '))) 
+sce_qc_paths <- as.list(unlist(strsplit(params$path_to_sce_qc[[1]], ' '))) 
 
-# combine the sces 
+# load objects 
+sce_raws <- lapply(sce_raw_paths, function(some_path) readRDS(some_path))
+sce_qcs <- lapply(sce_qc_paths, function(some_path) readRDS(some_path))
+
+# subset to common genes, sometimes combines sces function gives an error if we dont subset first 
+sce_raws <- intersect_all(sce_raws)
+sce_qcs <- intersect_all(sce_qcs)
+
+# combine the sces
 sce_raws_combined <- do.call(combine_sces, sce_raws)
 sce_qcs_combined <- do.call(combine_sces, sce_qcs)
 
 seurat_raws <- lapply(sce_raws, function(sce) CreateSeuratObject(counts = counts(sce), project = sce$id))
 seurat_qc <- lapply(sce_qcs, function(sce) CreateSeuratObject(counts = counts(sce), project = sce$id))
 
-df_raws <- lapply(sce_raws, function(sce) colData(sce)) # this one has metrics before removing low quality cells 
-df_qcs <- lapply(sce_qcs, function(sce) colData(sce)) # this one has metrics after removing loq quality cells 
+df_raws <- lapply(sce_raws, function(sce) colData(sce)) # this one has metrics before removing low quality cells
+df_qcs <- lapply(sce_qcs, function(sce) colData(sce)) # this one has metrics after removing loq quality cells
 
 ```
 

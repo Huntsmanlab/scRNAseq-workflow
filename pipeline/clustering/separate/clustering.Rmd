@@ -9,6 +9,7 @@ output:
 params:
   id: 'id'
   output_path: 'output_path' # where we save the sce with clustering data 
+  path_to_sce_norm: 'sce_norm'
 ---
   
 In this report, we perform clustering in isolated samples and show the results in dimensionality  
@@ -26,7 +27,8 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ```{r include = FALSE}
 # load the data - it has to be normalized sce with reduced dimensions 
-sce <- readRDS(here('..', 'data', 'normalized', params$id, 'sce_norm.rds'))
+sce <- readRDS(params$path_to_sce_norm)
+
 ```
 
 ### ALGORITHM: Shared neighbor
@@ -55,7 +57,6 @@ plotPCA <- plotPCA(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste(
 saveRDS(sce, file = params$output_path)
 
 ```
-
 
 ```{r echo= FALSE, message = FALSE}
 # now we make the table look nice for the report 
