@@ -1,0 +1,296 @@
+---
+title: 'DGE - Comparing DH25 to DH25_control'
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+author: 'asli munzur'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  ids: 'ids_dge' # write the control first to compare experimental to control 
+  sce_clus: 'sce_clus'
+  
+  seed: 123
+---
+
+```{r PREPARE, include = FALSE}
+
+# source some files
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+```
+
+```{r include = FALSE}
+
+# generate the id lists 
+ids_1_name <- strsplit(params$ids, "=")[[1]][[1]] # split by "=" 
+ids_1 <- ids_1_name
+
+ids_2_name <- strsplit(params$ids, "=")[[1]][[2]] # split by "=" 
+ids_2 <-ids_2_name
+
+```
+
+```{r PSEUDOBULKING, include = FALSE, message = FALSE}
+
+# extract individual paths from strings passed through snakemake 
+path <- params$sce_clus[1]
+  
+path_sample1 <- as.list(unlist(strsplit(path, ' ')))[[1]]
+path_sample2 <- as.list(unlist(strsplit(path, ' ')))[[2]]
+
+# load the integrated objects  
+integrated_pair1 <- readRDS(path_sample1[1])
+integrated_pair2 <- readRDS(path_sample2[1])
+
+# extract assay data 
+integrated_pair1_df <- as.data.frame(counts(integrated_pair1))
+integrated_pair2_df <- as.data.frame(counts(integrated_pair2))
+
+# find common genes, subset to that and cbind all the samples
+combined <- find_and_bind(list(integrated_pair1_df, integrated_pair2_df))
+
+# now make the group, we will use this to make the DGE object later on 
+group <- c(rep(1, ncol(integrated_pair1_df)), rep(2, ncol(integrated_pair2_df)))
+
+```
+
+```{r edgeR, include = FALSE}
+
+dgeObject <- DGEList(counts = combined, genes = rownames(combined), group = group)
+
+# filter the lowly expressed genes - have at least in 0.5 cpm in at least 2 samples 
+keep <- rowSums(cpm(dgeObject) > 0.5) >= 2 
+dgeObject <- dgeObject[keep, ]
+
+# normalize using edgeR's method 
+dgeObject <- calcNormFactors(dgeObject)
+
+designMatrix <- model.matrix(~group)
+
+# estimate the dispersion (variance) of genes 
+dgeObject <- estimateDisp(dgeObject, design = designMatrix)
+
+# fit negative binomial model to the data 
+fit <- glmQLFit(dgeObject, designMatrix, robust = TRUE)
+
+# compare group2 to 1  
+qlf <- glmQLFTest(fit, coef = 2)
+
+# now do the comparison with a threshold of 0.5 for the fold change 
+qlf_threshold <- glmTreat(fit, coef = 2, lfc = 0.5)
+
+```
+
+```{r gene_enrichment, include = FALSE}
+
+# Map gene names to entrez ids for goana and kegga. we have to convert from ensembl ids to entrez ids. 
+geneIDs <- ensembldb::select(EnsDb.Hsapiens.v75, keys = rownames(qlf), keytype = "SYMBOL", columns = c("SYMBOL","ENTREZID"))
+
+# sometimes we get duplicates, remove those 
+geneIDs <- geneIDs[!duplicated(geneIDs$SYMBOL), ]
+geneIDs <- geneIDs[!duplicated(geneIDs$ENTREZID), ]
+
+# lets make sure we have the same genes in both 
+idx <- is.na(geneIDs$ENTREZID)
+idx_keep <- which(idx == FALSE)
+qlf_modified <- qlf[idx_keep, ]
+
+# drop the NAs, these are the genes we couldn't find an entrez id for 
+geneIDs <- na.omit(geneIDs)
+
+rownames(qlf_modified) <- as.integer(geneIDs$ENTREZID)
+
+# do some gene enrichment 
+go <- goana(qlf_modified, species= "Hs") # entrez gene ids are in mapping 
+keg <- kegga(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs")
+
+```
+
+### Diagnostic Plots 
+These plots are intended to give an idea about the model and whether it is a good fit to represent the data we are interested in analyzing. 
+
+#### Plot biological coefficient of variation against gene abundance, in log2 counts per million.  
+Biological coefficient of variation is the true variation between genes, and it corresponds to the dispersion parameter of the negative binomial model. To learn more about dispersion, variation and how they relate to one another, you can check out the negative binomial model and its implementation in scRNA sequencing data.  
+Look for these to make sure the model is a good fit:  
+**1.** High dispersion (variance) for low counts is expected. Dispersion is expected to decrease smoothly as the abundance increases.  
+**2.** For humans, common dispersion (the red line) should be around 0.3 - 0.4, meaning replicates can differ by 30% or more. If the common dispersion is more, the results of this analysis may not be as reliable.  
+
+**This plot will give you a measure of the variation between the samples.**  
+```{r, echo = FALSE, message = FALSE, fig.height = 4, fig.width = 4}
+# plot biological coefficient of variation against gene abundance, in ln counts per million 
+plotBCV(dgeObject)
+
+```
+
+#### Plot the genewise quasi-likelihood dispersion against the gene abundance (in log2 counts per million).
+In this analysis, we squeeze the dispersion values from raw counts towards the trended dispersion. This helps transform the data in certain to make the model fit.  
+The plots gives an idea about how much the data was squeezed. The expected is too see squeezed dispersion values (shown in red) closer to the trended (blue) line.  
+
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 4}
+# Plot the genewise quasi-likelihood dispersion against the gene abundance (in ln counts per million).
+plotQLDisp(fit)
+
+```
+
+
+#### Upregulated genes 
+Now we take a closer look at the **upregulated** genes. To look for interesting genes, we do the following filtering:  
+We don't show genes with log fold change (LogFC) less than 0.5. 
+We also eliminate genes with p values more than 0.05.  
+
+To help interpret, we use the follwing ranking system: 
+Genes are ranked separately for log fold change (high to low) and p values (low to high). We then add these ranks together to get **summed_ranks.**  
+Genes with smaller summed_ranks have high fold changes and low p values.
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+
+# here we do some manipulation to show the upregulated genes in a meaningful way 
+upregulated_genes_table <- make_upreg_table(qlf)%>%
+  mutate_at(vars(logFC), funs(round(., 3)))
+
+DT::datatable(upregulated_genes_table,
+  extensions = 'Buttons',
+  options = list(dom = 'Bfrtip',
+                 buttons = list("copy", "excel", "csv", "pdf")))
+
+# save the table to be loaded later 
+# saveRDS(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR', paste(params$ids, 'up.rds')))
+
+```
+
+#### Downregulated genes  
+Filtering and ranking systems is the same as upregulated genes, as explained above. Genes with the highest fold changes and lowest p values have lower summed_ranks.
+  
+```{r echo = FALSE, message = FALSE}
+
+# here we do some manipulation to show the upregulated genes in a meaningful way 
+downregulated_genes_table <- make_downreg_table(qlf) %>% 
+  mutate_at(vars(logFC), funs(round(., 3)))
+
+DT::datatable(downregulated_genes_table, 
+  extensions = 'Buttons', 
+  options = list(dom = 'Bfrtip', 
+                 buttons = list("copy", "excel", "csv", "pdf")))
+
+# save the table to be loaded later 
+# saveRDS(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR', paste(params$ids, 'down.rds')))
+
+```
+
+#### Plot the differentially expressed genes  
+The blue lines indicate 1-fold up or down. The number of genes that are significantly up or down regulated are shown in the table, according to the plot. Here, we compare transduced sample to the control sample.  
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 5}
+# plot the differentially expressed genes 
+
+plotMD(qlf, main = 'DE genes', ylab = 'log2 fold change', cex = 0.40)
+abline(h=c(-1,1), col="blue")
+
+```
+
+Now we take a look at the DE genes in a volcano plot. Note that we label the first 40 significantly up and downregulated genes in the transduced sample compared to control samples.  
+Fold change cut off is 1, p value cut off is 10e-5.  
+```{r echo = FALSE, message = FALSE, fig.height = 9, fig.width = 11}
+# we need to work on qlf a little bit so that we can use the enhancedvolcano function 
+
+data <- qlf$table
+
+data <- data %>% 
+  dplyr::select(logFC, PValue) %>% 
+  rename(log2FoldChange = logFC, pvalue = PValue)
+
+cool_genes <- c(upregulated_genes_table[1][1: 15, ], downregulated_genes_table[1][1: 15, ])
+
+x_limits = max(max(upregulated_genes_table[, 2]), abs(min(downregulated_genes_table[, 2])))
+
+library(EnhancedVolcano)
+
+EnhancedVolcano(data,
+  lab = rownames(data),
+  x = 'log2FoldChange',
+  y = 'pvalue',
+  title = 'Differentially Expressed Genes',
+  subtitle = 'transduced vs control', 
+  selectLab = cool_genes, 
+  labCol = 'black',
+  labFace = 'bold',
+  drawConnectors = TRUE,
+  widthConnectors = 0.4,
+  colConnectors = 'black',
+  pointSize = 0.7, 
+  xlim = c(-x_limits, x_limits), 
+  FCcutoff = 1, 
+  pCutoff = 10e-5, 
+  legend=c('not significant','Log (base 2) fold-change','P value',
+      'P value & Log (base 2) fold-change'), 
+  legendPosition = 'right',
+  legendLabSize = 8,
+  legendIconSize = 5.0)
+
+
+```
+
+Number of DE genes in transduced sample compared to the control sample: 
+```{r, echo = FALSE, message = FALSE}
+
+summary <- summary(decideTests(qlf))
+
+summary %>% 
+    knitr::kable(caption = 'DE genes') %>% 
+    kable_styling(full_width = F)
+```
+
+Same table as above, but now we only show the genes with fold change above 1. 
+```{r echo = FALSE, message = FALSE}
+
+summary <- summary(decideTests(qlf_threshold))
+
+summary %>% 
+    knitr::kable(caption = paste('DE genes')) %>% 
+    kable_styling(full_width = F)
+
+```
+
+### Gene enrichment  
+#### GO Pathway analysis  
+Understanding the table:  
+**Ont:**  
+Note that GO shows three complementary biological concepts including Biological Process (BP), Molecular Function (MF) and Cellular Component (CC).  
+You can find these in the 'Ont' column.  
+**N:**  
+number of genes in the GO term  
+**Up:**  
+number of up-regulated differentially expressed genes.  
+**Down:**
+number of down-regulated differentially expressed genes.
+**P.Up**  
+p-value for the representation of GO pathway in up-regulated genes  
+**P.Down**  
+p-value for the representation of GO pathway in down-regulated genes  
+The above is also true for the KEGG table below. 
+
+```{r echo = FALSE, message = FALSE}
+# here we show the results of the go pathways 
+gotable <- topGO(go, sort="up")
+
+# do some cleaning up
+DT::datatable(gotable, 
+  extensions = 'Buttons', 
+  options = list(dom = 'Bfrtip', 
+                 buttons = list("copy", "excel", "csv", "pdf")))
+  
+```
+
+#### KEGG analysis 
+
+```{r echo = FALSE, message = FALSE}
+# here we show the results of the KEGG analysis 
+keggtable <- topKEGG(keg, sort="up")
+
+# do some cleaning up
+DT::datatable(keggtable, 
+  extensions = 'Buttons', 
+  options = list(dom = 'Bfrtip', 
+                 buttons = list("copy", "excel", "csv", "pdf")))
+
+```
