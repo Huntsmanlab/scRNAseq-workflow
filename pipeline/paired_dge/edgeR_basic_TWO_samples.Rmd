@@ -53,6 +53,7 @@ combined <- find_and_bind(list(integrated_pair1_df, integrated_pair2_df))
 # now make the group, we will use this to make the DGE object later on 
 group <- c(rep(1, ncol(integrated_pair1_df)), rep(2, ncol(integrated_pair2_df)))
 
+
 ```
 
 ```{r edgeR, include = FALSE}
