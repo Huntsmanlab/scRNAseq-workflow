@@ -9,7 +9,7 @@ ids = ['DH7'] # separate the ids with a comma
 pair_ids = ['DH7-DH8', 'DH8-DH24'] # separate the pairs with "-", no quotation marks 
 
 ids_integration = ['DH3-DH10', 'DH8-DH24']
-ids_dge = ['DH25=DH25_control'] # second id will be compared to first one 
+ids_dge = ['DH22-DH25=DH25_control-DH10'] # second id will be compared to first one 
 
 id_type = ['Ovary - Endometrioid']
 
@@ -22,15 +22,13 @@ sce_norm = '../data/normalized/{id}/sce_norm.rds'
 sce_clus = '../data/clustered/sce/{id}/sce_clus.rds'
 
 # SEURAT INTEGRATION
-sce_uncorrected = expand('../data/integrated/{ids_integration}/uncorrected.rds', ids_integration = ids_integration) # combined, but not integrated (has batch effects)
-seurat_integ = expand('../data/integrated/{ids_integration}/integrated.rds', ids_integration = ids_integration) # integration (batch effects removed)
+sce_uncorrected = '../data/integrated/{ids_integration}/uncorrected.rds' # combined, but not integrated (has batch effects)
+seurat_integ = '../data/integrated/{ids_integration}/integrated.rds' # integration (batch effects removed)
 
 # MARKDOWN REPORTS
 summary_stats_report = '../reports/summary_stats_new/{pair_ids}/summary_stats.html'
 
 sce_clus_report = '../reports/separate_clustering/{id}/separate_clustering.html'
-
-del_later_integration = expand('../reports/delete_later/{ids_integration}/delete_later.html', ids_integration = ids_integration)
 
 integration_report = expand('../reports/integration/{ids_integration}/integration_report.html', ids_integration = ids_integration) 
 
@@ -41,12 +39,9 @@ combined_clustering_integrated = '../data/clustered/combined/{pair_ids}/integrat
 # paired dge 
 paired_dge_output = '../data/dge/paired_dge_basic/{pair_ids}/outputsTEST.rds',
 paired_dge_basic_report = '../reports/paired_dge_basic/{pair_ids}/paired_dge_basic.html'
-edgeR_report = '../reports/dge_edgeR/{ids_dge}/dge_analysis.html'
+edgeR_report_TWO_samples = '../reports/dge_edgeR/{ids_dge}/dge_analysis_two_samples.html'
+edgeR_report_MULTIPLE_samples = '../reports/dge_edgeR/{ids_dge}/dge_analysis_multiple_samples.html'
 
-# compare scran and edgeR 
-edgeR_results_up = expand('../data/dge/edgeR_up/{pair_ids}', pair_ids = pair_ids) # upregulated genes in the transduced sample edgeR found 
-edgeR_results_down = expand('../data/dge/edgeR_down/{pair_ids}', pair_ids = pair_ids) # downregulated genes in the transduced sample edgeR found 
-compare_dge_report = expand('../reports/dge_comparison/{pair_ids}/dge_comparison.html', pair_ids = pair_ids)   # this is where we save the knitted html file that includes the comparison data 
 
 # CELL ASSIGN
 # single sample 
@@ -66,27 +61,27 @@ rule all:
     # expand(sce_norm, id = ids), 
     # expand(sce_clus, id = ids),
     # expand(sce_clus_report, id = ids),
-    # seurat_integration_output_files(ids)[0], # uncorrected sce before seurat integration
-    # seurat_integration_output_files(ids)[1], # corrected seurat object after seurat integration
+    # expand(sce_uncorrected, ids_integration = ids_integration), # uncorrected sce before seurat integration
+    # expand(seurat_integ, ids_integration = ids_integration) # corrected seurat object after seurat integration
     # integration_report # dim reduction plots before and after batch effect removal
     # expand(combined_clustering_report, pair_ids = pair_ids),
     # expand(combined_clustering_uncorrected, pair_ids = pair_ids),
     # expand(combined_clustering_integrated, pair_ids = pair_ids),
-    # del_later_integration,
     # batch_correction_output_files(ids)[0], # combined sce with batch effects
     # batch_correction_output_files(ids)[1], # combined sce without batch effects
     # batch_correction_output_files(ids)[2], # batch correction report
     # expand(summary_stats_report, pair_ids = pair_ids),
-    # expand(edgeR_report, ids_dge = ids_dge), 
+    # expand(edgeR_report_TWO_samples, ids_dge = ids_dge),
+    expand(edgeR_report_MULTIPLE_samples, ids_dge = ids_dge),
     # expand(paired_dge_basic_report, pair_ids = pair_ids),
     # expand(paired_dge_output, pair_ids = pair_ids),
-    expand(sce_cas, id = ids), 
-    expand(marker_mat_path, id = ids), 
-    expand(cellassignment_path, id = ids),
-    expand(cellassign_report, id = ids), 
-    expand(sce_cas_integrated, ids_integration = ids_integration), 
-    expand(cellassign_multiple_report, ids_integration = ids_integration) 
-
+    # expand(sce_cas, id = ids), 
+    # expand(marker_mat_path, id = ids), 
+    # expand(cellassignment_path, id = ids),
+    # expand(cellassign_report, id = ids), 
+    # expand(sce_cas_integrated, ids_integration = ids_integration), 
+    # expand(cellassign_multiple_report, ids_integration = ids_integration) 
+    
 # convert 10X counts to an sce 
 rule make_sce:
   input:
@@ -214,13 +209,13 @@ rule make_summary_stats:
     
 rule seurat_integration:
   params:
-    ids_integration = ids_integration, 
+    ids_integration = '{ids_integration}', 
   input:
-    sce_qc = seurat_integration_input_files(ids)[0],
-    sce_norm = seurat_integration_input_files(ids)[1]
+    sce_qc = lambda wildcards: seurat_integration_input_files(wildcards)[0],
+    sce_norm = lambda wildcards: seurat_integration_input_files(wildcards)[1]
   output:
-    output_file_name_uncorrected = seurat_integration_output_files(ids)[0],
-    output_file_name_integrated = seurat_integration_output_files(ids)[1]
+    output_file_name_uncorrected = sce_uncorrected,
+    output_file_name_integrated = seurat_integ
   shell:
     "Rscript pipeline/seurat_integration/integration.R \
      --path_to_sce_qc {input.sce_qc} \
@@ -248,24 +243,37 @@ rule integration_report:
      path_to_uncorrected = '{input.sce_uncorrected}', path_to_integrated = '{input.seurat_integ}'))\" "
      
 
-# compute dge analysis across multiple samples using edgeR 
-# to do: wildcard arrangementn wild lambda functions 
-# to do: add seurat integration as input, or maybe divide edgeR into two rules, one is for multiple sces, one is for only two 
-rule edgeR_basic:
+# compute dge analysis across TWO samples using edgeR 
+rule edgeR_basic_TWO_samples:
   params:
     curr_dir = os.getcwd(),
-    ids = ids_dge, 
-    seurat_integ = edgeR_input_files(ids_dge)[0]
+    ids = '{ids_dge}', 
   input:
     sce_clus = edgeR_input_files(ids_dge)[1]
   output:
-    report = edgeR_report
+    report = edgeR_report_TWO_samples
   shell:
-    "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic.Rmd',\
+    "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic_TWO_samples.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
-     params = list(ids ='{params.ids}', seurat_integ = '{params.seurat_integ}', sce_clus = '{input.sce_clus}'))\" "
-     
+     params = list(ids ='{params.ids}', sce_clus = '{input.sce_clus}'))\" "
+
+
+rule edgeR_basic_MULTIPLE_samples:
+  params:
+    curr_dir = os.getcwd(),
+    ids = '{ids_dge}', 
+  input:
+    seurat_integ = lambda wildcards: edgeR_input_files(ids_dge)[0]
+  output:
+    report = edgeR_report_MULTIPLE_samples
+  shell:
+    "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic_MULTIPLE_samples.Rmd',\
+     output_file='{params.curr_dir}/{output.report}', \
+     knit_root_dir='{params.curr_dir}',\
+     params = list(ids ='{params.ids}', seurat_integ = '{input.seurat_integ}'))\" "
+
+
 # compute dge analysis in two samples using scran      
 # to do: fix the error, script doesnt run 
 rule paired_dge_basic: 
