@@ -11,3 +11,8 @@ scRNAseq-workflow.Rproj
 .Rproj.user
 .gitignore
 .httr-oauth
+
+
+__pycache__
+.Rhistory
+snakemake_helper_functions.pyc
