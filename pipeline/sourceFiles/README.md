@@ -1,4 +1,4 @@
-FUNCTIONS IN THE UTILITIES FILE 
+#### FUNCTIONS IN THE UTILITIES FILE 
 
 1. visualize_cellassign()
 As an input, it takes a seurat object with cell_type information and generates a dim reduction plot showing different cell types. Function will always give the same colors for the cell types.
