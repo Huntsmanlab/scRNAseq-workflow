@@ -1,5 +1,5 @@
 ---
-title: 'DGE - Comparing DH25 to DH25_control'
+title: 'DGE - Comparing `r strsplit(params$ids, "=")[[1]][[2]]` to `r strsplit(params$ids, "=")[[1]][[1]]`'
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 author: 'asli munzur'
 output: 
@@ -7,10 +7,9 @@ output:
     code_folding: hide
 
 params:
-  ids: 'DH25_control=DH25' # write the control first
+  ids: 'ids_dge' # write the control first
   seurat_integ: 'seurat_integ'
-  sce_clus: 'sce_clus'
-  
+
   seed: 123
 ---
 
@@ -24,11 +23,12 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 ```{r include = FALSE}
 
 # generate the id lists 
-ids_1_name <- strsplit(params$ids, "=")[[1]][[1]] # split by "=" 
-ids_1 <- ids_1_name
+ids_1 <- strsplit(params$ids, "=")[[1]][[1]] # split by "=" 
+ids_1 <- strsplit(ids_1, "-")[[1]] # further split by "-" 
 
-ids_2_name <- strsplit(params$ids, "=")[[1]][[2]] # split by "=" 
-ids_2 <-ids_2_name
+ids_2 <- strsplit(params$ids, "=")[[1]][[2]] # split by "=" 
+ids_2 <- strsplit(ids_2, "-")[[1]] # further split by "-" 
+
 
 ```
 
@@ -37,9 +37,15 @@ ids_2 <-ids_2_name
 # extract individual paths from strings passed through snakemake 
 path_list <- as.list(unlist(strsplit(params$seurat_integ[[1]], ' '))) 
 
+message(path_list)
+message(length(path_list))
+message(path_list[[1]])
+message(path_list[[2]])
+
+
 # load the objects 
-integrated_pair1 <- readRDS(path_list[0])
-integrated_pair2 <- readRDS(path_list[1])
+integrated_pair1 <- readRDS(path_list[[1]])
+integrated_pair2 <- readRDS(path_list[[2]])
 
 # make pseudo counts for each sample
 integrated_pair1_df <- make_pseudo_counts_seurat(integrated_pair1)
@@ -54,7 +60,7 @@ group <- c(rep(1, length(ids_1)), rep(2, length(ids_2)))
 
 ```
 
-```{r edgeR, include = FALSE}
+```{r edgeR, include = FALSE, message = FALSE}
 
 dgeObject <- DGEList(counts = combined, genes = rownames(combined), group = group)
 
