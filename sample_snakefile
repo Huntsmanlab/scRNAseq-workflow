@@ -8,8 +8,8 @@ from snakemake_helper_functions import *
 ids = ['DH7'] # separate the ids with a comma 
 pair_ids = ['DH7-DH8', 'DH8-DH24'] # separate the pairs with "-", no quotation marks 
 
-ids_integration = ['DH3-DH10', 'DH8-DH24']
-ids_dge = ['DH22-DH25=DH25_control-DH10'] # second id will be compared to first one 
+ids_integration = ['DH3-DH10-DH8']
+ids_dge = ['DH25=DH25_control'] # second id will be compared to first one 
 
 id_type = ['Ovary - Endometrioid']
 
@@ -49,7 +49,8 @@ sce_cas = '../data/cellassign/{id}/sce_norm_cas.rds'
 sce_cas_integrated = '../data/integrated_cellassign/{ids_integration}/integrated_cas.rds'
 marker_mat_path = '../data/cellassign/{id}/marker.mat.rds',
 cellassignment_path = '../data/cellassign/{id}/cellassignment.rds',
-cellassign_report = '../reports/cellassign/{id}/cellassign_report.html'
+cellassign_report_single_sample = '../reports/cellassign/{id}/cellassign_report.html'
+sce_cas_uncorrected = '../data/integrated_cellassign/{ids_integration}/uncorrected_cas.rds'
 
 # multiple samples 
 cellassign_multiple_report = '../reports/cellassign_integrated/{ids_integration}/cellassign_integrated_report.html'
@@ -71,16 +72,17 @@ rule all:
     # batch_correction_output_files(ids)[1], # combined sce without batch effects
     # batch_correction_output_files(ids)[2], # batch correction report
     # expand(summary_stats_report, pair_ids = pair_ids),
-    # expand(edgeR_report_TWO_samples, ids_dge = ids_dge),
-    expand(edgeR_report_MULTIPLE_samples, ids_dge = ids_dge),
+    expand(edgeR_report_TWO_samples, ids_dge = ids_dge),
+    # expand(edgeR_report_MULTIPLE_samples, ids_dge = ids_dge),
     # expand(paired_dge_basic_report, pair_ids = pair_ids),
     # expand(paired_dge_output, pair_ids = pair_ids),
     # expand(sce_cas, id = ids), 
     # expand(marker_mat_path, id = ids), 
     # expand(cellassignment_path, id = ids),
-    # expand(cellassign_report, id = ids), 
+    # expand(cellassign_report_single_sample, id = ids), 
     # expand(sce_cas_integrated, ids_integration = ids_integration), 
-    # expand(cellassign_multiple_report, ids_integration = ids_integration) 
+    # expand(sce_cas_integrated, ids_integration = ids_integration), 
+    # expand(sce_cas_uncorrected, ids_integration = ids_integration)
     
 # convert 10X counts to an sce 
 rule make_sce:
@@ -320,7 +322,7 @@ rule cellassign_report:
     sce_norm = sce_norm, 
     sce_cas = sce_cas
   output:
-    report = cellassign_report
+    report = cellassign_report_single_sample
   shell:
     "Rscript -e \"rmarkdown::render('pipeline/cellassign/cellassign_report.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
@@ -335,11 +337,13 @@ rule integrate_cellassign:
   input:
     path_to_sce_cas = lambda wildcards: integrate_cell_assign_files(wildcards)[0]
   output:
-    integrated_object_name = sce_cas_integrated
+    integrated_object_name = sce_cas_integrated,
+    path_to_combined_sce = sce_cas_uncorrected
   shell:
     "Rscript pipeline/cellassign/integrate_cell_assign.R \
      --path_to_sce_cas {input.path_to_sce_cas} \
      --integrated_object_name {output.integrated_object_name} \
+     --path_to_combined_sce {output.path_to_combined_sce} \
      --ids_integration {params.ids} "
 
 
