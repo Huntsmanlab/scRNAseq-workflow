@@ -1,4 +1,4 @@
-This file has information about the functions used in the utilities file. 
+#### FUNCTIONS IN THE UTILITIES FILE 
 
 1. visualize_cellassign()
 As an input, it takes a seurat object with cell_type information and generates a dim reduction plot showing different cell types. Function will always give the same colors for the cell types.
@@ -57,7 +57,31 @@ Given a combined seurat object, make pseudo bulk counts for each separate sample
  - sobject: a merged seurat object that contains at least two different samples
  
 9. find_and_bind()
-Given TWO data frames, this function will find the common rows and subset both data frames to common rows. The output is a combined data frame where the rows are the common genes and columns are the samples.   
+Given TWO data frames, this function will find the common rows and subset both data frames to common rows. The output is a combined data frame where the rows are the common genes and columns are the samples. Negative counts will be removed. This is useful when trying to find the common genes in two samples where count information is given in separate data frames. 
+
+ - df_list: a list of TWO data frames where rows are genes and columns are cells 
+ 
+10. find_reporter_genes() 
+This function helps detect cells that took up a desired vector, thus genetically modified. It gives the number of cells that express the provided vector. 
+
+ - reporter_name: name of the reporter gene, supplied as a string 
+ - sce: an ace object where you'll look for that reporter gene 
+ 
+11. scran_batch_norm() 
+Perform batch normalization on given samples. First, differences in read depth will be accounted for, then sces will be subsetted to common genes. 
+
+ - sce_list: a list of sces that you want to correct for batch effects 
+ 
+12. gene_filter()
+Filter the genes in a sce based on supplied criteria. Criteria is explained below: 
+
+ - sce: an sce object that will be filtered
+ - gene_min_counts: min number of counts a gene must have to be retained 
+ - gene_min_detection_rate: min percentage of cells a gene must be detected in to be retained 
+ - reporters: if the sce doesn't contain any reporters, write NULL. if it does, write their names as strings given in a list. They will be filtered out as well. 
+ 
+13. combine_sces()
+Combine multiple sces together. Can combine any number of sces, they must be supplied in a list. 
 
 
 
