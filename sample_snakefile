@@ -5,11 +5,11 @@ from snakemake_helper_functions import *
 # 'bgi_175_001-ilm_175_001' 'bgi_176_001-ilm_176_001', 'bgi_176_002-ilm_176_002' 'DH13', 'DH18', 'VOA11229_CCOC', 'DH7', 'DH8'
 # 'DH24', 'DH7', 'DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16'
 
-ids = ['DH7'] # separate the ids with a comma 
-pair_ids = ['DH7-DH8', 'DH8-DH24'] # separate the pairs with "-", no quotation marks 
+ids = ['DH7', 'DH8', 'DH24'] #  separate the ids with a comma 
+pair_ids = ['DH17-DH24'] # separate the pairs with "-", no quotation marks 
 
-ids_integration = ['DH3-DH10-DH8']
-ids_dge = ['DH25=DH25_control'] # second id will be compared to first one 
+ids_integration = ['DH3-DH7-DH24']
+ids_dge = ['DH17=DH24'] # second id will be compared to first one 
 
 id_type = ['Ovary - Endometrioid']
 
@@ -55,34 +55,65 @@ sce_cas_uncorrected = '../data/integrated_cellassign/{ids_integration}/uncorrect
 # multiple samples 
 cellassign_multiple_report = '../reports/cellassign_integrated/{ids_integration}/cellassign_integrated_report.html'
 
+##########################################
+# user friendly naming 
+
+# make sce
+make_sce = expand(sce_raw, id = ids)
+
+# do qc 
+do_qc = expand(sce_qc, id = ids)
+
+# normalize an sce 
+normalize_sce =  expand(sce_norm, id = ids)
+
+# cluster an sce
+cluster_sce = [expand(sce_clus, id = ids), expand(sce_clus_report, id = ids)]
+
+# CELL ASSIGN
+run_cell_assign_ONE_sample = [expand(sce_cas, id = ids), expand(marker_mat_path, id = ids), expand(cellassignment_path, id = ids), expand(cellassign_report_single_sample, id = ids)]
+integrate_cell_assign_results = [expand(cellassign_multiple_report, ids_integration = ids_integration), expand(sce_cas_integrated, ids_integration = ids_integration), expand(sce_cas_uncorrected, ids_integration = ids_integration)]
+
+# PAIRED DGE BASIC 
+DGE_scran = [expand(paired_dge_basic_report, pair_ids = pair_ids), expand(paired_dge_output, pair_ids = pair_ids)]
+
+# edgeR
+DGE_edgeR_TWO_samples = expand(edgeR_report_TWO_samples, ids_dge = ids_dge)
+
+DGE_edgeR_MULTIPLE_samples = expand(edgeR_report_MULTIPLE_samples, ids_dge = ids_dge)
+
+# summary statistics
+run_summary_stats = summary_stats_report = expand(summary_stats_report, pair_ids = pair_ids)
+
+# batch correction 
+do_batch_correction = [batch_correction_output_files(ids)[0], batch_correction_output_files(ids)[1], batch_correction_output_files(ids)[2]] 
+
+# seurat integration 
+run_seurat_integration = [expand(sce_uncorrected, ids_integration = ids_integration), expand(seurat_integ, ids_integration = ids_integration), integration_report]
+
+# combined cluster
+cluster_two_samples = [expand(combined_clustering_report, pair_ids = pair_ids), expand(combined_clustering_uncorrected, pair_ids = pair_ids), expand(combined_clustering_integrated, pair_ids = pair_ids)]
+
+##########################################
+
 rule all:
   input:
-    # expand(sce_raw, id = ids),
-    # expand(sce_qc, id = ids),
-    # expand(sce_norm, id = ids), 
-    # expand(sce_clus, id = ids),
-    # expand(sce_clus_report, id = ids),
-    # expand(sce_uncorrected, ids_integration = ids_integration), # uncorrected sce before seurat integration
-    # expand(seurat_integ, ids_integration = ids_integration) # corrected seurat object after seurat integration
-    # integration_report # dim reduction plots before and after batch effect removal
-    # expand(combined_clustering_report, pair_ids = pair_ids),
-    # expand(combined_clustering_uncorrected, pair_ids = pair_ids),
-    # expand(combined_clustering_integrated, pair_ids = pair_ids),
-    # batch_correction_output_files(ids)[0], # combined sce with batch effects
-    # batch_correction_output_files(ids)[1], # combined sce without batch effects
-    # batch_correction_output_files(ids)[2], # batch correction report
-    # expand(summary_stats_report, pair_ids = pair_ids),
-    expand(edgeR_report_TWO_samples, ids_dge = ids_dge),
-    # expand(edgeR_report_MULTIPLE_samples, ids_dge = ids_dge),
-    # expand(paired_dge_basic_report, pair_ids = pair_ids),
-    # expand(paired_dge_output, pair_ids = pair_ids),
-    # expand(sce_cas, id = ids), 
-    # expand(marker_mat_path, id = ids), 
-    # expand(cellassignment_path, id = ids),
-    # expand(cellassign_report_single_sample, id = ids), 
-    # expand(sce_cas_integrated, ids_integration = ids_integration), 
-    # expand(sce_cas_integrated, ids_integration = ids_integration), 
-    # expand(sce_cas_uncorrected, ids_integration = ids_integration)
+    # make_sce,
+    # do_qc,
+    # normalize_sce,
+    # cluster_sce,
+    # cluster_two_samples,
+    # run_cell_assign_ONE_sample,
+    # integrate_cell_assign_results,
+    # DGE_scran,
+    # DGE_edgeR_TWO_samples,
+    # DGE_edgeR_MULTIPLE_samples,
+    # run_summary_stats,
+    # do_batch_correction,
+    run_seurat_integration,
+    # expand(sce_uncorrected, ids_integration = ids_integration),
+    # expand(seurat_integ, ids_integration = ids_integration),
+    # expand(integration_report, ids_integration = ids_integration)
     
 # convert 10X counts to an sce 
 rule make_sce:
