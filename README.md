@@ -17,23 +17,23 @@ For workflow management, we use Snakemake. For details on how to install and use
 
 #### Design of the Snakefile  
 Lists that we use as wildcards are given at the top of the Snakefile. When you have new samples to analyze, you need to add the samples you want to investigate. Details of each list will be explained below. Next, paths where the computed objects will be saved are given. You can leave them as they are, or if you would like to save your data elsewhere, you can change them as well. The last thing the user needs to pay attention to is the "rule all" section of the Snakefile, as shown here:  
-`rule all:
-  input:
-    # make_sce,
-    # do_qc,
-    # normalize_sce,
-    # cluster_sce,
-    # cluster_two_samples,
-    # run_cell_assign_ONE_sample,
-    # integrate_cell_assign_results,
-    DGE_scran,
-    # DGE_edgeR_TWO_samples,
-    # DGE_edgeR_MULTIPLE_samples,
-    # run_summary_stats,
-    # do_batch_correction,
+`rule all:  
+  input:  
+    # make_sce,  
+    # do_qc,  
+    # normalize_sce,  
+    # cluster_sce,  
+    # cluster_two_samples,  
+    # run_cell_assign_ONE_sample,  
+    # integrate_cell_assign_results,  
+    DGE_scran,  
+    # DGE_edgeR_TWO_samples,  
+    # DGE_edgeR_MULTIPLE_samples,  
+    run_summary_stats,
+    # do_batch_correction,  
     # run_seurat_integration`  
 
-User should uncomment the name of the analyses they wish to do to, there is not a limit on the number of analyses that can be done. Once the above steps are completed, pipeline can be run with the `snakemake` command.  
+User should uncomment the name of the analyses they wish to do to, there is not a limit on the number of analyses that can be done. In the given example above, Snakemake would do DGE analysis with scran and run summary stats. Once the above steps are completed, pipeline can be run with the `snakemake` command.  
 
 #### Running the pipeline through Snakemake 
 The following steps of the scRNA workflow use the same wildcards:  
