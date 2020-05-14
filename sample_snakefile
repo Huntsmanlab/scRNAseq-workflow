@@ -5,11 +5,11 @@ from snakemake_helper_functions import *
 # 'bgi_175_001-ilm_175_001' 'bgi_176_001-ilm_176_001', 'bgi_176_002-ilm_176_002' 'DH13', 'DH18', 'VOA11229_CCOC', 'DH7', 'DH8'
 # 'DH24', 'DH7', 'DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16'
 
-ids = ['DH7', 'DH8', 'DH24'] #  separate the ids with a comma 
-pair_ids = ['DH17-DH24'] # separate the pairs with "-", no quotation marks 
+ids = ['DH15', 'DH9_control', 'DH9_DBZ', 'DH1_DBZ', 'DH1_control', 'DH2_DBZ', 'DH2_control', 'DH5_DBZ', 'DH5_control'] #  separate the ids with a comma
+pair_ids = ['DH17-DH24', 'DH3-DH24'] # separate the pairs with "-", no quotation marks 
 
-ids_integration = ['DH3-DH7-DH24']
-ids_dge = ['DH17=DH24'] # second id will be compared to first one 
+ids_integration = ['DH3-DH10']
+ids_dge = ['DH25=DH25_control'] # second id will be compared to first one
 
 id_type = ['Ovary - Endometrioid']
 
@@ -25,12 +25,17 @@ sce_clus = '../data/clustered/sce/{id}/sce_clus.rds'
 sce_uncorrected = '../data/integrated/{ids_integration}/uncorrected.rds' # combined, but not integrated (has batch effects)
 seurat_integ = '../data/integrated/{ids_integration}/integrated.rds' # integration (batch effects removed)
 
+# BATCH CORRECTION 
+sce_with_batch = '../data/batch_corrected/{ids_integration}/uncorrected.rds'
+sce_without_batch = '../data/batch_corrected/{ids_integration}/corrected.rds'
+path_to_batch_report = '../reports/batch_normalization/{ids_integration}/batch_correction.html'
+
 # MARKDOWN REPORTS
 summary_stats_report = '../reports/summary_stats_new/{pair_ids}/summary_stats.html'
 
 sce_clus_report = '../reports/separate_clustering/{id}/separate_clustering.html'
 
-integration_report = expand('../reports/integration/{ids_integration}/integration_report.html', ids_integration = ids_integration) 
+integration_report = '../reports/integration/{ids_integration}/integration_report.html'
 
 combined_clustering_report = '../reports/combined_clustering/{pair_ids}/combined_clustering.html'
 combined_clustering_uncorrected = '../data/clustered/combined/{pair_ids}/uncorrected_seurat_object.rds'
@@ -83,13 +88,13 @@ DGE_edgeR_TWO_samples = expand(edgeR_report_TWO_samples, ids_dge = ids_dge)
 DGE_edgeR_MULTIPLE_samples = expand(edgeR_report_MULTIPLE_samples, ids_dge = ids_dge)
 
 # summary statistics
-run_summary_stats = summary_stats_report = expand(summary_stats_report, pair_ids = pair_ids)
+run_summary_stats = expand(summary_stats_report, pair_ids = pair_ids)
 
 # batch correction 
-do_batch_correction = [batch_correction_output_files(ids)[0], batch_correction_output_files(ids)[1], batch_correction_output_files(ids)[2]] 
+do_batch_correction = [expand(sce_with_batch, ids_integration = ids_integration), expand(sce_without_batch, ids_integration = ids_integration), expand(path_to_batch_report, ids_integration = ids_integration)]
 
 # seurat integration 
-run_seurat_integration = [expand(sce_uncorrected, ids_integration = ids_integration), expand(seurat_integ, ids_integration = ids_integration), integration_report]
+run_seurat_integration = [expand(sce_uncorrected, ids_integration = ids_integration), expand(seurat_integ, ids_integration = ids_integration), expand(integration_report, ids_integration = ids_integration)]
 
 # combined cluster
 cluster_two_samples = [expand(combined_clustering_report, pair_ids = pair_ids), expand(combined_clustering_uncorrected, pair_ids = pair_ids), expand(combined_clustering_integrated, pair_ids = pair_ids)]
@@ -110,11 +115,8 @@ rule all:
     # DGE_edgeR_MULTIPLE_samples,
     # run_summary_stats,
     # do_batch_correction,
-    run_seurat_integration,
-    # expand(sce_uncorrected, ids_integration = ids_integration),
-    # expand(seurat_integ, ids_integration = ids_integration),
-    # expand(integration_report, ids_integration = ids_integration)
-    
+    # run_seurat_integration,
+
 # convert 10X counts to an sce 
 rule make_sce:
   input:
@@ -211,13 +213,13 @@ rule batch_correction:
   params:
     curr_dir = os.getcwd(), 
     ids = ids, 
-    id_type = '{id_type}'
+    id_type = id_type
   input:
-    batch_correction_input_files(ids)
+    lambda wildcards: batch_correction_input_files(wildcards, sce_clus)
   output:
-    output_uncorrected = batch_correction_output_files(ids)[0],
-    output_corrected = batch_correction_output_files(ids)[1],
-    report = batch_correction_output_files(ids)[2]
+    output_uncorrected = sce_with_batch,
+    output_corrected = sce_without_batch,
+    report = path_to_batch_report
   shell:
     "Rscript -e \"rmarkdown::render('pipeline/batch_normalization/batch_normalization.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
@@ -228,10 +230,10 @@ rule batch_correction:
 rule make_summary_stats:
   params:
     curr_dir = os.getcwd(),
-    pair_ids = pair_ids
+    pair_ids = lambda wildcards: wildcards
   input:
-    sce_raw = lambda wildcards: summary_stats_files(wildcards)[0], # automatically assigns pair ids as wildcards 
-    sce_qc = lambda wildcards: summary_stats_files(wildcards)[1]
+    sce_raw = lambda wildcards: summary_stats_files(pair_ids, sce_raw, sce_qc)[0], # automatically assigns pair ids as wildcards 
+    sce_qc = lambda wildcards: summary_stats_files(pair_ids, sce_raw, sce_qc)[1]
   output:
     report = summary_stats_report
   shell:
@@ -244,8 +246,8 @@ rule seurat_integration:
   params:
     ids_integration = '{ids_integration}', 
   input:
-    sce_qc = lambda wildcards: seurat_integration_input_files(wildcards)[0],
-    sce_norm = lambda wildcards: seurat_integration_input_files(wildcards)[1]
+    sce_qc = lambda wildcards: seurat_integration_input_files(wildcards, sce_qc, sce_norm)[0],
+    sce_norm = lambda wildcards: seurat_integration_input_files(wildcards, sce_qc, sce_norm)[1]
   output:
     output_file_name_uncorrected = sce_uncorrected,
     output_file_name_integrated = seurat_integ
@@ -264,10 +266,10 @@ rule integration_report:
     ids = ids_integration, 
     id_type = id_type 
   input:
-    sce_uncorrected = seurat_integration_output_files(ids)[0], # these objects will be computed by the multiple integration rule, just above  
-    seurat_integ = seurat_integration_output_files(ids)[1]
+    sce_uncorrected = seurat_integration_output_files(ids_integration, sce_uncorrected, seurat_integ)[0], # these objects will be computed by the multiple integration rule, just above  
+    seurat_integ = seurat_integration_output_files(ids_integration, sce_uncorrected, seurat_integ)[1]
   output:
-    report = seurat_integration_report_path(ids)
+    report = integration_report
   shell:
     "Rscript -e \"rmarkdown::render('pipeline/seurat_integration/integration_report.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
@@ -280,24 +282,23 @@ rule integration_report:
 rule edgeR_basic_TWO_samples:
   params:
     curr_dir = os.getcwd(),
-    ids = '{ids_dge}', 
+    ids = '{ids_dge}' #'{ids_dge}', 
   input:
-    sce_clus = edgeR_input_files(ids_dge)[1]
+    sce_clus = edgeR_input_files_TWO_samples(ids_dge, sce_clus)
   output:
     report = edgeR_report_TWO_samples
   shell:
     "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic_TWO_samples.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
-     params = list(ids ='{params.ids}', sce_clus = '{input.sce_clus}'))\" "
-
-
+     params = list(ids ='{params.ids}', sce_clus = '{input}'))\" "
+     
 rule edgeR_basic_MULTIPLE_samples:
   params:
     curr_dir = os.getcwd(),
     ids = '{ids_dge}', 
   input:
-    seurat_integ = lambda wildcards: edgeR_input_files(ids_dge)[0]
+    seurat_integ = lambda wildcards: edgeR_input_files(wildcards, seurat_integ, sce_clus)[0]
   output:
     report = edgeR_report_MULTIPLE_samples
   shell:
@@ -306,7 +307,6 @@ rule edgeR_basic_MULTIPLE_samples:
      knit_root_dir='{params.curr_dir}',\
      params = list(ids ='{params.ids}', seurat_integ = '{input.seurat_integ}'))\" "
 
-
 # compute dge analysis in two samples using scran      
 # to do: fix the error, script doesnt run 
 rule paired_dge_basic: 
@@ -314,7 +314,7 @@ rule paired_dge_basic:
     curr_dir = os.getcwd(),
     ids = '{pair_ids}'
   input:
-    sce_clus = lambda wildcards: paired_dge_input_files(wildcards)
+    sce_clus = lambda wildcards: paired_dge_input_files(wildcards, sce_clus)
   output:
     output_path_paired = paired_dge_output,
     report = paired_dge_basic_report
@@ -366,7 +366,7 @@ rule integrate_cellassign:
     curr_dir = os.getcwd(),
     ids = '{ids_integration}'  # you can integrate more than two samples even though it says 'pair'
   input:
-    path_to_sce_cas = lambda wildcards: integrate_cell_assign_files(wildcards)[0]
+    path_to_sce_cas = lambda wildcards: integrate_cell_assign_files(wildcards, sce_cas, sce_cas_integrated)[0]
   output:
     integrated_object_name = sce_cas_integrated,
     path_to_combined_sce = sce_cas_uncorrected
@@ -385,9 +385,9 @@ rule cellassign_report_multiple_samples:
     ids_integration = '{ids_integration}', # you can have more than one cell sample here even though it says 'pair'
     id_type = id_type
   input:
-    sce_cas_list = lambda wildcards: cell_assign_multiple_report_files(wildcards)[0], 
-    uncorrected_object = lambda wildcards: cell_assign_multiple_report_files(wildcards)[1], 
-    integrated_object = lambda wildcards: cell_assign_multiple_report_files(wildcards)[2]
+    sce_cas_list = lambda wildcards: cell_assign_multiple_report_files(wildcards, sce_cas, sce_uncorrected, sce_cas_integrated)[0], 
+    uncorrected_object = lambda wildcards: cell_assign_multiple_report_files(wildcards, sce_cas, sce_uncorrected, sce_cas_integrated)[1], 
+    integrated_object = lambda wildcards: cell_assign_multiple_report_files(wildcards, sce_cas, sce_uncorrected, sce_cas_integrated)[2]
   output:
     report = cellassign_multiple_report
   shell:
@@ -396,5 +396,5 @@ rule cellassign_report_multiple_samples:
      knit_root_dir='{params.curr_dir}',\
      params = list(ids_integration = '{params.ids_integration}', id_type = '{params.id_type}', sce_cas_list = '{input.sce_cas_list}', uncorrected_object = '{input.uncorrected_object}', integrated_object = '{input.integrated_object}'))\" "
 
-
+    
   

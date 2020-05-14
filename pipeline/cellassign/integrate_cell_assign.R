@@ -12,15 +12,17 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 parser <- ArgumentParser(description = "integrate multiple datasets to remove batch effects")
 
-parser$add_argument('--path_to_sce_cas', nargs='+', metavar='DIRECTORY', type='character',
-                    help="Path to sce cell assign analysis")
+parser$add_argument('--path_to_sce_cas', nargs = '+', metavar = 'DIRECTORY', type = 'character',
+                    help = "Path to sce cell assign analysis")
 
-parser$add_argument('--integrated_object_name', nargs = 1, metavar='FILE', type='character',
-                    help="Path to integrated samples, doesnt have batch effects")
+parser$add_argument('--path_to_combined_sce', metavar = 'DIRECTORY', type = 'character',
+                    help= "Path to sce cell assign analysis")
 
-parser$add_argument('--ids_integration', metavar='FILE', type='character',
-                    help="the name of the samples you want to integrate")
+parser$add_argument('--integrated_object_name', nargs = 1, metavar = 'FILE', type = 'character',
+                    help = "Path to integrated samples, doesnt have batch effects")
 
+parser$add_argument('--ids_integration', metavar = 'FILE', type = 'character',
+                    help = "the name of the samples you want to integrate")
 
 args <- parser$parse_args()
 
@@ -29,8 +31,9 @@ args <- parser$parse_args()
 
 
 whatagreatfunction <- function(path_to_sce_cas, 
-                      integrated_object_name, 
-                      ids_integration) {
+                               path_to_combined_sce, 
+                               integrated_object_name, 
+                               ids_integration) {
   
   id.list <-ids_integration
   
@@ -118,11 +121,28 @@ whatagreatfunction <- function(path_to_sce_cas,
   # save the data
   saveRDS(integrated, file = integrated_object_name) # corrected data 
   
+  # compute the combined but uncorrected object 
+  # load the normalized data 
+  sces <- lapply(path_to_sce_cas, function(path) readRDS(path))
+    
+  sces <- intersect_all(sces) # subset to common genes 
+  combined <- do.call(combine_sces, sces) # combine the objects 
+    
+  # some dim reduction 
+  set.seed(1564)
+  combined <- runPCA(combined)
+  combined <- runTSNE(combined)
+  combined <- runUMAP(combined)
+    
+  # now save the object 
+  saveRDS(combined, file = path_to_combined_sce) # uncorrected data 
+    
 } # end of function 
 
 whatagreatfunction(path_to_sce_cas = args$path_to_sce_cas, 
-          integrated_object_name = args$integrated_object_name, 
-          ids_integration = args$ids_integration)
+                   path_to_combined_sce = args$path_to_combined_sce, 
+                   integrated_object_name = args$integrated_object_name, 
+                   ids_integration = args$ids_integration)
 
 
 

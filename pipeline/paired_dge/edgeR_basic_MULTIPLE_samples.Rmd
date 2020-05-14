@@ -20,7 +20,7 @@ library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 ```
 
-```{r include = FALSE}
+```{r include = FALSE, message = FALSE}
 
 # generate the id lists 
 ids_1 <- strsplit(params$ids, "=")[[1]][[1]] # split by "=" 
@@ -29,19 +29,12 @@ ids_1 <- strsplit(ids_1, "-")[[1]] # further split by "-"
 ids_2 <- strsplit(params$ids, "=")[[1]][[2]] # split by "=" 
 ids_2 <- strsplit(ids_2, "-")[[1]] # further split by "-" 
 
-
 ```
 
 ```{r PSEUDOBULKING, include = FALSE, message = FALSE}
 
 # extract individual paths from strings passed through snakemake 
 path_list <- as.list(unlist(strsplit(params$seurat_integ[[1]], ' '))) 
-
-message(path_list)
-message(length(path_list))
-message(path_list[[1]])
-message(path_list[[2]])
-
 
 # load the objects 
 integrated_pair1 <- readRDS(path_list[[1]])
