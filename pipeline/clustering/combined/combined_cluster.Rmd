@@ -43,12 +43,10 @@ ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
 dh_organoid_ids <- list(ids[[1]], ids[[2]])
 ```
 
-```{r include = FALSE, message = FALSE}
+```{r include = FALSE}
 
 # snakemake passes the paths as one long string separated by spaces. take care of that here: 
 sce_clus_paths <- as.list(unlist(strsplit(params$path_to_sce_clus_list, ' '))) 
-message(length(sce_clus_paths))
-
 # load the sce objects we will be working on 
 sce_list <- lapply(sce_clus_paths, function(some_path) readRDS(some_path))
 
