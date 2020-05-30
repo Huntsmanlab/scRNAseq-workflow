@@ -1,22 +1,30 @@
-# This script is for integrating multiple data sets. integrating allows us to combine data sets and remove batch effects at the same time 
-# we may need to integrate data in various situations, so this script can be used in multiple types of analysis, such as: 
-# running a clustering analysis on the combined sample 
-# run dim reduction plots on combined plots 
-# run DGE analysis across samples, we will need to remove batch effects for that. we can integrate data sets first here, then split if needed. 
-# data here is saved into the data/integrated folder/<name of integrated samples>
-# this is the one off script, we also have a version integrated into snakemake 
+---
+title: 'Seurat integration for cell assign'
+subtitle: '`r params$pair_ids`'
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+author: 'asli munzur'
+output: 
+  html_document:
+    code_folding: hide
 
+params:
+  pair_ids: 'DH8-DH24' # samples will be integrated in this order 
+  output_path: 'output_path'
+---
+
+```{r include = FALSE}
 # load a few necessary things 
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
-# update here when you have a new list. update the same update the 
-id.list <-list('DH4', 'DH17')
+id.list <- strsplit(params$pair_ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+id.list <- as.list(c(unlist(list(id.list))))
+id.list <- do.call(list, id.list)
+  
 id.orig <- id.list
-
 # lets start! 
-# load the data, note that we aren't using the normalized data since we will use seurat's normalization method 
-sces <- lapply(id.list, function(id) readRDS(here('..', 'data', 'qc', id, 'sce_qc.rds')))
+# load the normalized data with cell type assignments 
+sces <- lapply(id.list, function(id) readRDS(here('..', 'data', 'cellassign', id, 'sce_norm_cas.rds')))
 
 # subset to common genes across a group of sces 
 sces <- intersect_all(sces)
@@ -34,8 +42,8 @@ for (i in 1:length(sces)) {
 # convert them all to seurat objects 
 seurats <- lapply(sces, function(sce) CreateSeuratObject(counts = counts(sce), min.cells = 3, min.features = 200)) 
 
-# normalize each sample using seurat's methods
-seurats <- lapply(seurats, function(seurat) NormalizeData(seurat, verbose = FALSE))
+# we dont normalize because the data is already normalized 
+# seurats <- lapply(seurats, function(seurat) NormalizeData(seurat, verbose = FALSE))
 
 # find variable features for each of our seurat objects 
 seurats <- lapply(seurats, function(seurat) FindVariableFeatures(seurat, selection.method = "vst", nfeatures = 2000))
@@ -64,6 +72,15 @@ rownames(sample_names) <- colnames(integrated)
 # add this to the metadata 
 integrated <- AddMetaData(integrated, sample_names, col.name = 'id')
 
+# now we add the cell type info from cell assigh to the metadata, we start by extracting this info from the sces 
+cell_types <- lapply(sces, function(sce) sce$cell_type)
+cell_types <- as.list(c(unlist(list(cell_types))))  # prepare for rbind by putting data in a good format
+cell_types <- do.call(rbind, cell_types)
+
+# add cell types to metadata 
+# integrated <- AddMetaData(integrated, cell_types, col.name = 'cell_types') # this one doesnt work for some reason, but code below does
+integrated$cell_types <- cell_types
+
 # the default assay is the new one 
 DefaultAssay(integrated) <- "integrated"
 
@@ -76,40 +93,11 @@ integrated <- RunTSNE(integrated, dims = 1:30)
 
 
 # save the data, assuming you made the folder where the data would be saved 
-saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'integrated.rds' )) # corrected data 
+saveRDS(integrated, file = params$output_path) # corrected data
 
-# UNCORRECTED DATA
-# here we do the combined but uncorrected sample, with the batch effects
-# load the normalized data 
-sces_norm <- lapply(id.orig, function(id) readRDS(here('..', 'data', 'normalized', id, 'sce_norm.rds')))
-sces_norm <- intersect_all(sces_norm) # subset to common genes 
+# saveRDS(integrated, file = here('..', 'data', 'integrated_cellassign', params$pair_ids, 'integrated_cas.rds')) # corrected data 
 
-# combine the normalized sces 
-uncorrected <- do.call(combine_sces, sces_norm)
-
-# some dim reduction 
-set.seed(1564)
-uncorrected <- runPCA(uncorrected)
-uncorrected <- runTSNE(uncorrected)
-uncorrected <- runUMAP(uncorrected)
-
-# now save the object 
-saveRDS(uncorrected, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'uncorrected.rds' )) # uncorrected data 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```
 
 
 

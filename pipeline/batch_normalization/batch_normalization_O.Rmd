@@ -8,7 +8,7 @@ output:
     code_folding: hide
 
 params:
-  ids: 'VOA11068_ENOC-DH13-DH18'
+  ids: 'DH13-DH18'
 ---
 
 #### Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots before and after batch normalization in these samples:  

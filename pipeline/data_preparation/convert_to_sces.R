@@ -72,8 +72,6 @@ convert_to_sces <- function(path_to_10X, id, output_file_name) {
   
   saveRDS(sce, file = output_file_name) #save the sce object we made in this function 
   
-  print('test')
-  
 } # end of function 
 
 convert_to_sces(path_to_10X = args$path_to_10X, 

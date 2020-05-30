@@ -33,21 +33,17 @@ create_marker_mat <- function(output_file_name,
   marker_list <- example_TME_markers$ensembl
   marker_list <- lapply(marker_list, function(list) list[! names(list) %in% c('VIM')]) # remove VIM
   
-  B_gene_symbols = c('MS4A1', 'CD79A', 'PTPRC', 'CD19', 'BANK1', 'CD24', 'IGKC')
-  Plasma_gene_symbols = c('CD79A', 'PTPRC', 'SDC1', 'IGKC', 'IGHG1', 'IGHG2', 'CAV1')
-  HGS_cancer <- c('PAX8', 'WT1', 'STMN1 ')
+  B_gene_symbols <- c('MS4A1', 'CD79A', 'PTPRC', 'CD19', 'BANK1', 'CD24', 'IGKC')
+  Plasma_gene_symbols <- c('CD79A', 'PTPRC', 'SDC1', 'IGKC', 'IGHG1', 'IGHG2', 'CAV1')
+  ovarian_cancer <- c('PAX8', 'WT1', 'STMN1', 'MUC16', 'KL6', 'KL7', 'KL8')
   
-  # Allen's list
-  # Epithelial_gene_symbols = c('EPCAM' , 'CDH1', 'CLDN3', 'CLDN4', 'KRT8', 'KRT18', 'KRT19')
-  # Epithelial_ciliated_gene_symbols = c('EPCAM' , 'CDH1', 'CLDN3', 'CLDN4', 'KRT8', 'KRT18', 'KRT19', 'FOXJ1', 'DYDC2', 'SNTN', 'WDR16', 'FAM92B')
-  # Maxwell's Additions: SSEA-1 or 'CD15' (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6214006/)
-  # CSVs assembled from the Cell Marker DB: http://biocc.hrbmu.edu.cn/CellMarker/browse.jsp
-  
-  # Allen + James + Maxwell lists
   Epithelial_gene_symbols = c("FUT4","EPCAM", "CDH1", "CLDN3", "CLDN4", "KRT8", "KRT18", "KRT19", 
-                              "RPS3", "KRT7", "HMGA1", "TUBB", "TPM4", "S100A16", "MMP7", "MARCKSL1", "MDK", "LCN2")
+                              "RPS3", "KRT7", "HMGA1", "TUBB", "TPM4", "S100A16", "MMP7", "MARCKSL1", "MDK", "LCN2", 
+                              'CD24', 'OCLN', 'KRT19', 'DSP', 'CLDN4')
   
-  Epithelial_ciliated_gene_symbols = c("FUT4","EPCAM", "CDH1", "CLDN3", "CLDN4", "KRT8", "KRT18", "KRT19", "FOXJ1", "DYDC2", "SNTN", "WDR16", "FAM92B", 
+  Mesenchymal_gene_symbols <- c('CD44', 'CDH2', 'ITGA5', 'VIM', 'FN1', 'S100A4', 'TNC', 'MMP2', 'ACTA2', 'TWIST1', 'WNT5A', 'SNAI2', 'ZEB1', 'ZEB2')
+  
+  Epithelial_ciliated_gene_symbols <- c("FUT4","EPCAM", "CDH1", "CLDN3", "CLDN4", "KRT8", "KRT18", "KRT19", "FOXJ1", "DYDC2", "SNTN", "WDR16", "FAM92B", 
                                        "C20orf85", "TPPP3", "C9orf24", "OMG", "IGFBP7", "FAM183A", "RSPH1", "C1orf194", "C5orf49", "RP11-356K23.1")
   
   endo_stem_cell <- read.csv('/huntsman/mdouglas/dh_organoid/data/cellassign/endometrialStemCell.csv', header = FALSE)
@@ -64,7 +60,8 @@ create_marker_mat <- function(output_file_name,
                                       Epithelial_ciliated_gene_symbols, 
                                       endo_stem_cell, 
                                       mes_stem_cell, 
-                                      HGS_cancer))
+                                      ovarian_cancer, 
+                                      Mesenchymal_gene_symbols))
     
     id_map <- select(org.Hs.eg.db, keys = gene_symbols, columns = c("ENSEMBL"), keytype = "SYMBOL")
     colnames(id_map) <- c("hgnc_symbol", "ensembl_gene_id")
@@ -77,7 +74,8 @@ create_marker_mat <- function(output_file_name,
                     'Epithelial ciliated cells', 
                     'Endometrial stem cells', 
                     'Mesenchymal stem cells', 
-                    'High grade serous tumor cells')
+                    'High grade serous tumor cells', 
+                    'Mesenchymal cells')
     
     cell_markers <- list(B_gene_symbols, 
                          Plasma_gene_symbols, 
@@ -85,7 +83,8 @@ create_marker_mat <- function(output_file_name,
                          Epithelial_ciliated_gene_symbols, 
                          endo_stem_cell, 
                          mes_stem_cell, 
-                         HGS_cancer)
+                         ovarian_cancer, 
+                         Mesenchymal_gene_symbols)
     
     
   } else if(mode == 'nosplit_epithelial'){
@@ -95,7 +94,8 @@ create_marker_mat <- function(output_file_name,
                                       Epithelial_gene_symbols, 
                                       endo_stem_cell, 
                                       mes_stem_cell, 
-                                      HGS_cancer))
+                                      ovarian_cancer, 
+                                      Mesenchymal_gene_symbols))
     
     id_map <- select(org.Hs.eg.db, keys = gene_symbols, columns = c("ENSEMBL"), keytype = "SYMBOL")
     colnames(id_map) <- c("hgnc_symbol", "ensembl_gene_id")
@@ -107,14 +107,16 @@ create_marker_mat <- function(output_file_name,
                     'Epithelial cells', 
                     'Endometrial stem cells', 
                     'Mesenchymal stem cells', 
-                    'High grade serous tumor cells')
+                    'High grade serous tumor cells', 
+                    'Mesenchymal cells')
     
     cell_markers <- list(B_gene_symbols, 
                          Plasma_gene_symbols, 
                          Epithelial_gene_symbols, 
                          endo_stem_cell, 
                          mes_stem_cell, 
-                         HGS_cancer)
+                         ovarian_cancer, 
+                         Mesenchymal_gene_symbols)
   }
   
   modify_marker_list <- function(cell_types, cell_markers, marker_list, id_map){

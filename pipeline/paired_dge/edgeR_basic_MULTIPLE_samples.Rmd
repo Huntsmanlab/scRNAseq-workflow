@@ -1,5 +1,5 @@
 ---
-title: 'DGE - Comparing DH25 to DH25_control'
+title: 'DGE - Comparing `r strsplit(params$ids, "=")[[1]][[2]]` to `r strsplit(params$ids, "=")[[1]][[1]]`'
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 author: 'asli munzur'
 output: 
@@ -7,10 +7,9 @@ output:
     code_folding: hide
 
 params:
-  ids: 'DH25_control=DH25' # write the control first
+  ids: 'ids_dge' # write the control first
   seurat_integ: 'seurat_integ'
-  sce_clus: 'sce_clus'
-  
+
   seed: 123
 ---
 
@@ -21,71 +20,40 @@ library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 ```
 
-```{r include = FALSE}
+```{r include = FALSE, message = FALSE}
 
 # generate the id lists 
-ids_1_name <- strsplit(params$ids, "=")[[1]][[1]] # split by "=" 
-ids_1 <- ids_1_name
+ids_1 <- strsplit(params$ids, "=")[[1]][[1]] # split by "=" 
+ids_1 <- strsplit(ids_1, "-")[[1]] # further split by "-" 
 
-ids_2_name <- strsplit(params$ids, "=")[[1]][[2]] # split by "=" 
-ids_2 <-ids_2_name
+ids_2 <- strsplit(params$ids, "=")[[1]][[2]] # split by "=" 
+ids_2 <- strsplit(ids_2, "-")[[1]] # further split by "-" 
 
 ```
 
 ```{r PSEUDOBULKING, include = FALSE, message = FALSE}
 
-# now check how many samples we are given 
-# if we have at least two replicates for each sample, follow this path: 
+# extract individual paths from strings passed through snakemake 
+path_list <- as.list(unlist(strsplit(params$seurat_integ[[1]], ' '))) 
 
-if (length(ids_2) + length(ids_1) >= 4) {
-  
-  # extract individual paths from strings passed through snakemake 
-  path_list <- as.list(unlist(strsplit(params$seurat_integ[[1]], ' '))) 
-  
-  # load the objects 
-  integrated_pair1 <- readRDS(path_list[0])
-  integrated_pair2 <- readRDS(path_list[1])
+# load the objects 
+integrated_pair1 <- readRDS(path_list[[1]])
+integrated_pair2 <- readRDS(path_list[[2]])
 
-  # make pseudo counts for each sample
-  integrated_pair1_df <- make_pseudo_counts_seurat(integrated_pair1)
-  integrated_pair2_df <- make_pseudo_counts_seurat(integrated_pair2)
-  
-  # find common genes, subset to that and cbind all the samples
-  combined <- find_and_bind(list(integrated_pair1_df, integrated_pair2_df))
-  
-  # now make the group, we will use this to make the DGE object later on 
-  group <- c(rep(1, length(ids_1)), rep(2, length(ids_2)))
+# make pseudo counts for each sample
+integrated_pair1_df <- make_pseudo_counts_seurat(integrated_pair1)
+integrated_pair2_df <- make_pseudo_counts_seurat(integrated_pair2)
 
-} else { # this is what we do if we dont have at least two replicates for each sample 
-  
-  # extract individual paths from strings passed through snakemake 
-  path <- params$sce_clus[1]
-  
-  path_sample1 <- as.list(unlist(strsplit(path, ' ')))[[1]]
-  path_sample2 <- as.list(unlist(strsplit(path, ' ')))[[2]]
-  
-  message(print(path_sample1))
-  message(print(path_sample2))
+# find common genes, subset to that and cbind all the samples
+combined <- find_and_bind(list(integrated_pair1_df, integrated_pair2_df))
 
-  # load the integrated objects  
-  integrated_pair1 <- readRDS(path_sample1[1])
-  integrated_pair2 <- readRDS(path_sample2[1])
-  
-  # extract assay data 
-  integrated_pair1_df <- as.data.frame(counts(integrated_pair1))
-  integrated_pair2_df <- as.data.frame(counts(integrated_pair2))
-  
-  # find common genes, subset to that and cbind all the samples
-  combined <- find_and_bind(list(integrated_pair1_df, integrated_pair2_df))
-  
-  # now make the group, we will use this to make the DGE object later on 
-  group <- c(rep(1, ncol(integrated_pair1_df)), rep(2, ncol(integrated_pair2_df)))
+# now make the group, we will use this to make the DGE object later on 
+group <- c(rep(1, length(ids_1)), rep(2, length(ids_2)))
 
-} # end of else 
 
 ```
 
-```{r edgeR, include = FALSE}
+```{r edgeR, include = FALSE, message = FALSE}
 
 dgeObject <- DGEList(counts = combined, genes = rownames(combined), group = group)
 

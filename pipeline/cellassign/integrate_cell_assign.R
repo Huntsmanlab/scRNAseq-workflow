@@ -12,21 +12,17 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 parser <- ArgumentParser(description = "integrate multiple datasets to remove batch effects")
 
-parser$add_argument('--path_to_sce_qc', metavar='DIRECTORY', type='character',
-                    help="Path to sce after quality control")
+parser$add_argument('--path_to_sce_cas', nargs = '+', metavar = 'DIRECTORY', type = 'character',
+                    help = "Path to sce cell assign analysis")
 
-parser$add_argument('--path_to_sce_norm', metavar='DIRECTORY', type='character',
-                    help="Path to sce after normalization")
+parser$add_argument('--path_to_combined_sce', metavar = 'DIRECTORY', type = 'character',
+                    help= "Path to sce cell assign analysis")
 
-parser$add_argument('--output_file_name_uncorrected', metavar='FILE', type='character',
-                    help="path to the uncorrected but combined samples, has batch effects")
+parser$add_argument('--integrated_object_name', nargs = 1, metavar = 'FILE', type = 'character',
+                    help = "Path to integrated samples, doesnt have batch effects")
 
-parser$add_argument('--output_file_name_integrated', metavar='FILE', type='character',
-                    help="Path to integrated samples, doesnt have batch effects")
-
-parser$add_argument('--ids_integrated', metavar='FILE', type='character',
-                    help="the name of the samples you want to integrate")
-
+parser$add_argument('--ids_integration', metavar = 'FILE', type = 'character',
+                    help = "the name of the samples you want to integrate")
 
 args <- parser$parse_args()
 
@@ -34,22 +30,22 @@ args <- parser$parse_args()
 ############################################################################################################################
 
 
-integrate <- function(path_to_sce_qc, 
-                      path_to_sce_norm, 
-                      output_file_name_uncorrected, 
-                      output_file_name_integrated, 
-                      ids_integrated) {
-
-  id.list <-ids_integrated
+whatagreatfunction <- function(path_to_sce_cas, 
+                               path_to_combined_sce, 
+                               integrated_object_name, 
+                               ids_integration) {
+  
+  id.list <-ids_integration
   
   id.list <- strsplit(id.list, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
-  id.list <- list(id.list[[1]], id.list[[2]], id.list[[3]])
+  id.list <- as.list(c(unlist(list(id.list))))
+  id.list <- do.call(list, id.list)  
   
   id.orig <- id.list
   
   # lets start! 
   # load the data, note that we aren't using the normalized data since we will use seurat's normalization method 
-  sces <- readRDS(path_to_sce_qc)
+  sces <- lapply(path_to_sce_cas, function(path) readRDS(path))
   
   # subset to common genes across a group of sces 
   intersect_all <- function(sces){
@@ -103,6 +99,15 @@ integrate <- function(path_to_sce_qc,
   # add this to the metadata 
   integrated <- AddMetaData(integrated, sample_names, col.name = 'id')
   
+  # now we add the cell type info from cell assigh to the metadata, we start by extracting this info from the sces 
+  cell_types <- lapply(sces, function(sce) sce$cell_type)
+  cell_types <- as.list(c(unlist(list(cell_types))))  # prepare for rbind by putting data in a good format
+  cell_types <- do.call(rbind, cell_types)
+  
+  # add cell types to metadata 
+  # integrated <- AddMetaData(integrated, cell_types, col.name = 'cell_types') # this one doesnt work for some reason, but code below does
+  integrated$cell_types <- cell_types
+  
   # the default assay is the new one 
   DefaultAssay(integrated) <- "integrated"
   
@@ -114,32 +119,30 @@ integrate <- function(path_to_sce_qc,
   integrated <- RunTSNE(integrated, dims = 1:30)
   
   # save the data
-  saveRDS(integrated, file = output_file_name_integrated) # corrected data 
+  saveRDS(integrated, file = integrated_object_name) # corrected data 
   
-  # UNCORRECTED DATA
-  # here we do the combined but uncorrected sample, with the batch effects
+  # compute the combined but uncorrected object 
   # load the normalized data 
-  sces_norm <- readRDS(path_to_sce_norm)
-  
-  sces_norm <- intersect_all(sces_norm) # subset to common genes 
-  combined <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]]) # combine the objects by doing a simple r bind 
-  
+  sces <- lapply(path_to_sce_cas, function(path) readRDS(path))
+    
+  sces <- intersect_all(sces) # subset to common genes 
+  combined <- do.call(combine_sces, sces) # combine the objects 
+    
   # some dim reduction 
   set.seed(1564)
   combined <- runPCA(combined)
   combined <- runTSNE(combined)
   combined <- runUMAP(combined)
-  
+    
   # now save the object 
-  saveRDS(combined, file = output_file_name_uncorrected) # uncorrected data 
-  
+  saveRDS(combined, file = path_to_combined_sce) # uncorrected data 
+    
 } # end of function 
 
-integrate(path_to_sce_qc = args$path_to_sce_qc, 
-          path_to_sce_norm = args$path_to_sce_norm, 
-          output_file_name_uncorrected = args$output_file_name_uncorrected, 
-          output_file_name_integrated, args$output_file_name_integrated, 
-          ids_integrated = args$ids_integrated)
+whatagreatfunction(path_to_sce_cas = args$path_to_sce_cas, 
+                   path_to_combined_sce = args$path_to_combined_sce, 
+                   integrated_object_name = args$integrated_object_name, 
+                   ids_integration = args$ids_integration)
 
 
 

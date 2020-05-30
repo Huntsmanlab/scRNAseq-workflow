@@ -6,7 +6,8 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 
 params:
   ids: 'pair_ids'
-  output_path_paired: '../data/dge/paired_dge_basic/{pair_ids}/outputsTEST.rds'
+  sce_clus: 'sce_clus'
+  output_path_paired: 'output_path_paired'
   pathwayHmark: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/h.all.v6.2.symbols.gmt'
   pathwayGO: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/c5.all.v6.2.symbols.gmt'
   pathwayReact: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/c2.cp.reactome.v7.0.symbols.gmt'
@@ -39,23 +40,22 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ```
 
-```{r}
-# extract this from passed in parameters
-
-ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
-names(ids) <- c('transduced_id', 'control_id')
-```
-
 ## DGEs
 
-```{r}
+```{r message = FALSE, warning = FALSE}
 
-plot_markers <- function(ids, ntop = 50, negative_control){
+plot_markers <- function(paths, ntop = 50, negative_control){
+
+  sce_list <- lapply(paths, function(some_path) readRDS(some_path))
   
-  sce_list <- lapply(ids, function(id) readRDS(here('..', 'data', 'clustered', 'sce', id, 'sce_clus.rds')))
-  names(sce_list) <- ids
-
-  sce_list2 <- scran_batch_norm(sce_list)
+  ids <- lapply(sce_list, function(sce) unique(sce$id))
+  
+  # sce_list <- scran_batch_norm(sce_list)
+  sce_list <- intersect_all(sce_list)
+  # sce_list <- do.call(batchelor::multiBatchNorm, c(sce_list, assay.type="counts", min.mean = 0.1))
+  
+  # before combining make sure we have the same row numbers in our sces 
+  # intersect_all
   
   sce <- combine_sces(sce_list = sce_list, prefix_col_name = 'id', prefix_cell_name = TRUE)
   
@@ -64,7 +64,7 @@ plot_markers <- function(ids, ntop = 50, negative_control){
   sce <- runTSNE(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3)
   sce <- runUMAP(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3,
                     min_dist = 0.01, n_neighbors = 15, metric = "euclidean")
-  
+
  # remove genes whose total counts < 100 and detected in < 5% of cells, remove mito, ribo genes
   sce <- gene_filter(sce, gene_min_counts = 100, gene_min_detection_rate = 5, reporters = NULL)
   
@@ -75,7 +75,7 @@ plot_markers <- function(ids, ntop = 50, negative_control){
     markers <- findMarkers(sce[rowData(sce)$qc_pass, ], groups = sce$id)
   }
   
-  markers <- markers[[ids[1]]] # pos logFC = up-regulated in tranduced cells
+  markers <- markers[[1]] # pos logFC = up-regulated in tranduced cells
   markers_all <- as.data.frame(markers) %>% rownames_to_column('gene_symbol')
   colnames(markers_all) <- c('gene_symbol', 'Top', 'p.value ', 'FDR', 'logFC')
   markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(FDR <= 0.05)
@@ -95,7 +95,8 @@ plot_markers <- function(ids, ntop = 50, negative_control){
   
 }
 
-outputs <- plot_markers(ids, ntop = 50, negative_control = FALSE)
+paths <- as.list(unlist(strsplit(params$sce_clus[[1]], ' '))) 
+outputs <- plot_markers(paths, ntop = 50, negative_control = FALSE)
 saveRDS(outputs, file = params$output_path_paired)
 ```
 
@@ -207,8 +208,8 @@ fgseaReslist$sig_pathways %>%
 
 **Should return no DEG or very few DEGs**
 
-```{r}
-outputs <- plot_markers(ids, ntop = 50, negative_control = TRUE)
+```{r warning = FALSE, message = FALSE}
+outputs <- plot_markers(paths, ntop = 50, negative_control = TRUE)
 ```
 
 ```{r}

@@ -5,7 +5,7 @@ author: "Asli Munzur"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 
 params:
-  ids: 'DH22_control-DH25_control'
+  ids: 'DH8-DH24'
   output_path_paired: '../data/dge/paired_dge_basic/DH22_control-DH25_control/outputsTEST.rds'
   pathwayHmark: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/h.all.v6.2.symbols.gmt'
   pathwayGO: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/c5.all.v6.2.symbols.gmt'

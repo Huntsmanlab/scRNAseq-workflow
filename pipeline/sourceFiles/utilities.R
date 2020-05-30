@@ -43,8 +43,85 @@ suppressPackageStartupMessages({
   library(glue)
   library(fgsea)
   library(viridis)
+  library(scales)
+  library(RColorBrewer)
   
 })
+
+# CELL ASSIGN COLORS
+library(RColorBrewer)
+n <- 20
+qual_col_pals <-  brewer.pal.info[brewer.pal.info$category == 'qual',]
+most_distinct_color_palette <- unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+# 14 colors, one color for each cell type. cell types given in alphabetical order 
+master_cell_types <- c("B cells",
+                       "Cytotoxic T cells",
+                       "Endometrial stem cells",
+                       "Endothelial cells",            
+                       "Epithelial cells",
+                       "Epithelial ciliated cells",    
+                       "High grade serous tumor cells",
+                       "Mesenchymal cells",            
+                       "Mesenchymal stem cells",
+                       "Monocyte/Macrophage",
+                       "Myofibroblast",
+                       "other",                        
+                       "Plasma cells",
+                       "T cells",
+                       "Vascular smooth muscle cells")
+
+master_color_palette <- c(
+  "cyan2", # red
+  "firebrick1",
+  "green3", # purple
+  "indianred1",
+  "lightskyblue", 
+  "gold1", # lt pink
+  "lightsalmon1",
+  "plum2", 
+  "springgreen", 
+  "darkslateblue", 
+  'royalblue1',
+  'chartreuse1',
+  'mediumorchid2',
+  'khaki1', 
+  'thistle4')
+
+# to visualize these colors 
+# pie(rep(1, 15), col = master_color_palette)
+
+# this function plots cell assign results in a dim reduction plot. 
+visualize_cellassign <- function(seurat_object, reduction_type, group_by, master_color_palette, master_cell_types){
+  
+  # find cell types present in the seurat object, sort them alphabetically
+  unique_cell_types <- as.vector(sort(unique(seurat_object$cell_types)))
+  
+  # find common cell types between our lists and the master cell type list 
+  common <- intersect(unique_cell_types, master_cell_types)
+  
+  # find the indices where we have common these cell types in the master cell type list 
+  idx <- match(common, master_cell_types)
+  
+  # pick colors that correspond to the indices
+  colors_chosen <- master_color_palette[idx]
+  
+  # make cell assign plot
+  plot <- DimPlot(object = seurat_object,
+                  dims = c(1, 2),
+                  reduction = reduction_type,
+                  group.by = group_by,
+                  pt.size = 1.5) +
+    scale_color_manual(values = colors_chosen)
+
+  return(plot)
+  
+} # end of function
+
+
+
+
+
 
 #ADD THEME #### 
 theme_amunzur <- theme(

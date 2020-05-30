@@ -8,7 +8,10 @@ output:
     code_folding: hide
 
 params:
-  sample: 'DH18'
+  sample: 'ids'
+  sce_norm: 'sce_norm'
+  sce_cas: 'sce_cas'
+  
 ---
 
 ```{r include=FALSE}
@@ -23,8 +26,10 @@ source(here('pipeline', 'cellassign', 'assign_cell_type.R'))
 
 ```{r echo = FALSE, message = FALSE}
 
+message(params$sce_norm)
+
 # load sce qc
-sce_norm <- readRDS(here('..', 'data', 'normalized', params$sample, 'sce_norm.rds'))
+sce_norm <- readRDS(params$sce_norm)
 
 # clustering 
 # Do clustering on scRNAseq data
@@ -56,7 +61,7 @@ p_heat <- plotHeatmap(sce_norm, features=top.markers, center = TRUE, order_colum
 ```{r include = FALSE}
 
 # load cell assign result
-sce_norm_cas <- readRDS(here('..', 'data', 'cellassign', params$sample, 'sce_norm_cas.rds'))
+sce_norm_cas <- readRDS(params$sce_cas)
 
 seur_sce <- as.Seurat(sce_norm_cas)
 Idents(seur_sce) <- "cluster"
