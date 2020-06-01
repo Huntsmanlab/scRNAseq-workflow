@@ -49,11 +49,11 @@ table(sce_norm$cluster) %>%
 
 p1 <- plotReducedDim(sce_norm, dimred = 'TSNE', colour_by = 'cluster') + labs(title = paste(params$sample, 'Clustering - TSNE', sep = '-'))
 
-markers <- findMarkers(sce_norm, sce_norm$cluster, direction = "up")
-marker.set <- markers[["1"]]
-head(marker.set[,1:8], 10) # only first 8 columns, for brevity
-top.markers <- rownames(marker.set)[marker.set$Top <= 10]
-p_heat <- plotHeatmap(sce_norm, features=top.markers, center = TRUE, order_columns_by="cluster")
+# markers <- findMarkers(sce_norm, sce_norm$cluster, direction = "up")
+# marker.set <- markers[["1"]]
+# head(marker.set[,1:8], 10) # only first 8 columns, for brevity
+# top.markers <- rownames(marker.set)[marker.set$Top <= 10]
+# p_heat <- plotHeatmap(sce_norm, features=top.markers, center = TRUE, order_columns_by="cluster")
 
 
 ```
@@ -83,37 +83,6 @@ grid.arrange(p1, p2, nrow = 1)
 
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
