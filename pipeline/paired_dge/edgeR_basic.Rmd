@@ -7,7 +7,7 @@ output:
     code_folding: hide
 
 params:
-  ids: 'DH25_control=DH25' # write the control first
+  ids: 'ids_dge' # write the control first
   seurat_integ: 'seurat_integ'
   sce_clus: 'sce_clus'
   
@@ -64,10 +64,7 @@ if (length(ids_2) + length(ids_1) >= 4) {
   path_sample1 <- as.list(unlist(strsplit(path, ' ')))[[1]]
   path_sample2 <- as.list(unlist(strsplit(path, ' ')))[[2]]
   
-  message(print(path_sample1))
-  message(print(path_sample2))
-
-  # load the integrated objects  
+  # load the objects  
   integrated_pair1 <- readRDS(path_sample1[1])
   integrated_pair2 <- readRDS(path_sample2[1])
   
