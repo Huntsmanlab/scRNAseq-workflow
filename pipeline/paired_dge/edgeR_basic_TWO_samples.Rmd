@@ -18,6 +18,7 @@ params:
 # source some files
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
+
 ```
 
 ```{r include = FALSE}
@@ -37,9 +38,14 @@ path <- params$sce_clus[1]
 path_sample1 <- as.list(unlist(strsplit(path, ' ')))[[1]]
 path_sample2 <- as.list(unlist(strsplit(path, ' ')))[[2]]
 
-# load the integrated objects  
+# load the clustered objects  
 sample1 <- readRDS(path_sample1[1])
 sample2 <- readRDS(path_sample2[1])
+
+# some quick batch correction 
+sce_list <- scran_batch_norm(list(sample1, sample2))
+sample1 <- sce_list[[1]]
+sample2 <- sce_list[[2]]
 
 # extract assay data 
 sample1_df <- as.data.frame(counts(sample1))
