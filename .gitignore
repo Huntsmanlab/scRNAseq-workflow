@@ -27,3 +27,6 @@ edgeR_cluster_O.html
 edgeR_basic.Rmd
 edgeR_basic_batch.Rmd
 edgeR_pseudo.Rmd        
+
+# this my own version, has some extra stuff that shouldnt be on the pipeline 
+Snakefile_asli.py
