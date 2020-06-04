@@ -1,11 +1,8 @@
----
-title: 'Snakemake Help'
-subtitle: "How do I run samples through Huntsman Lab's scRNA pipeline? "
-author: 'Aslı Munzur'
-date: April 2nd, 2020
-output: 
-  html_document
----
+# Snakemake help 
+
+> This document contains useful instructions for bioinformaticians to better understand snakemake and how we make use of it in the Huntsman Lab.
+
+#### Asli Munzur, April 2nd, 2020
 
 This README is intended to help colleagues who haven't used snakemake before. We walk you through how it is designed, and give a few eaxmples of how we can various types of files through it.  
 
