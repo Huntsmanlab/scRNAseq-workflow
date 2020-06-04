@@ -27,3 +27,11 @@ edgeR_cluster_O.html
 edgeR_basic.Rmd
 edgeR_basic_batch.Rmd
 edgeR_pseudo.Rmd        
+
+# this my own version, has some extra stuff that shouldnt be on the pipeline 
+Snakefile_asli.py
+
+# files we dont need in the pipeline for the cell assign portion of our analysis: 
+integration_seurat_cellassign.Rmd 
+integration_seurat_cellassign_O.Rmd 
+run_cellassign_on_raw_data.R 
