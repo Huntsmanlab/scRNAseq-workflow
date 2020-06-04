@@ -195,33 +195,14 @@ grid.arrange(clustering_plot, cell_type_plot, nrow = 1)
 #### Clustering  
 Running a clustering algorithm on individual samples can help better understand possible sub cell populations in these samples. 0.5 was chosen for resolution. We show cell type and clustering results side by side. Clustering plots (tsne) are given on the left side and cell assign results are given on the right side for each separate sample given.  
 
-```{r echo = FALSE, message = FALSE, fig.height = 6 * length(plots_list), fig.width = 15, fig.show = 'hold'}
+```{r echo = FALSE, fig.height = 3 * length(plots_list), fig.width = 15, fig.show = 'hold'}
 
 # now we visualize the results based on the number of samples analyzed
 
-if (length(clustering_plots_tsne) == 1) {
-  grid.arrange(clustering_plots_tsne[[1]], plots_list[[1]], nrow = 1)
+for (i in 1:length(clustering_plots_tsne)) {
   
-} else if (length(clustering_plots_tsne) == 2) {
-  grid.arrange(clustering_plots_tsne[[1]], plots_list[[1]], 
-               clustering_plots_tsne[[2]], plots_list[[2]], nrow = 2)
+  grid.arrange(clustering_plots_tsne[[i]], plots_list[[i]], nrow = 1)
   
-} else if (length(clustering_plots_tsne) == 3) {
-  grid.arrange(clustering_plots_tsne[[1]], plots_list[[1]], 
-               clustering_plots_tsne[[2]], plots_list[[2]], 
-               clustering_plots_tsne[[3]], plots_list[[3]], nrow = 3)
-  
-} else if (length(clustering_plots_tsne) == 4) {
-  grid.arrange(clustering_plots_tsne[[1]], plots_list[[1]], 
-               clustering_plots_tsne[[2]], plots_list[[2]], 
-               clustering_plots_tsne[[3]], plots_list[[3]],
-               clustering_plots_tsne[[4]], plots_list[[4]], nrow = 4)
-
-} else if (length(clustering_plots_tsne) == 5) {
-  grid.arrange(clustering_plots_tsne[[1]], plots_list[[1]], 
-               clustering_plots_tsne[[2]], plots_list[[2]], 
-               clustering_plots_tsne[[3]], plots_list[[3]],
-               clustering_plots_tsne[[4]], plots_list[[4]],
-               clustering_plots_tsne[[5]], plots_list[[5]], nrow = 5) } # end of if loop 
+}
 
 ```
