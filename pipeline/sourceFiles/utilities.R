@@ -42,11 +42,52 @@ suppressPackageStartupMessages({
   library(ggrepel)
   library(glue)
   library(fgsea)
-  library(viridis)
-  library(scales)
-  library(RColorBrewer)
+  library(splatter)
   
 })
+
+#ADD THEME #### 
+theme_amunzur <- theme(
+  
+  aspect.ratio = 1.0,
+  panel.background = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_blank(),
+  axis.line = element_line(size = 1),
+  axis.line.x = element_line(color = "black", size = 1),
+  axis.line.y = element_line(color = "black", size = 1),
+  axis.ticks = element_line(color = "black"),
+  axis.text = element_text(color = "black"),
+  axis.title = element_text(color = "black"),
+  axis.title.y = element_text(vjust = 0.2, size = 12),
+  axis.title.x = element_text(vjust = 0.1, size = 12),
+  axis.text.x = element_text(size = 10),
+  axis.text.y = element_text(size = 10),
+  legend.position = "none"
+)
+
+####################################################################################################
+# list of functions
+####################################################################################################
+# seuratClustering()
+# combine_sces2()
+# make_upreg_table()
+# make_downreg_table()
+# make_pseudo_counts()
+# make_pseudo_counts_seurat()
+# find_and_bind() ----- find common rows in two or more data frames, subset and cbind the common rows 
+# find_reporter_genes()
+# intersect_all()
+
+# # from max's utilities folder: 
+# combine_sces()
+# gene_filter()
+# plotDEG_scran()
+# scran_batch_norm()
+####################################################################################################
+
+
 
 # CELL ASSIGN COLORS
 library(RColorBrewer)
@@ -113,56 +154,10 @@ visualize_cellassign <- function(seurat_object, reduction_type, group_by, master
                   group.by = group_by,
                   pt.size = 1.5) +
     scale_color_manual(values = colors_chosen)
-
+  
   return(plot)
   
 } # end of function
-
-
-
-
-
-
-#ADD THEME #### 
-theme_amunzur <- theme(
-  
-  aspect.ratio = 1.0,
-  panel.background = element_blank(),
-  panel.grid.major = element_blank(),
-  panel.grid.minor = element_blank(),
-  panel.border = element_blank(),
-  axis.line = element_line(size = 1),
-  axis.line.x = element_line(color = "black", size = 1),
-  axis.line.y = element_line(color = "black", size = 1),
-  axis.ticks = element_line(color = "black"),
-  axis.text = element_text(color = "black"),
-  axis.title = element_text(color = "black"),
-  axis.title.y = element_text(vjust = 0.2, size = 12),
-  axis.title.x = element_text(vjust = 0.1, size = 12),
-  axis.text.x = element_text(size = 10),
-  axis.text.y = element_text(size = 10),
-  legend.position = "none"
-)
-
-####################################################################################################
-# list of functions
-####################################################################################################
-# seuratClustering()
-# combine_sces2()
-# make_upreg_table()
-# make_downreg_table()
-# make_pseudo_counts()
-# make_pseudo_counts_seurat()
-# find_and_bind() ----- find common rows in two or more data frames, subset and cbind the common rows 
-# find_reporter_genes()
-# intersect_all()
-
-# # from max's utilities folder: 
-# combine_sces()
-# gene_filter()
-# plotDEG_scran()
-# scran_batch_norm()
-####################################################################################################
 
 # this fucntion finds common genes in a given list of sces and subsets them to the common genes 
 intersect_all <- function(sces){
@@ -378,6 +373,49 @@ make_pseudo_counts_seurat <- function(sobject) {
   sobject_df <- as.data.frame(sobject_df)
   
   return(sobject_df)
+}
+
+####################################################################################################
+
+make_pseudo_counts_sce <- function(sce_list) {
+  
+  # subset all sces to common genes 
+  
+  df_list <- do.call(counts, sce_list)
+  df_sum <- rowSums(df)
+  
+  return(df_sum)
+  
+}
+
+
+####################################################################################################
+
+# assuming that we already subsetted sces to common genes before, so make sure to run intersect_all
+find_and_bind_multiple <- function(sce_list) {
+  
+  # extract counts - make a df 
+  df_list <- lapply(sce_list, function(sce) as.data.frame(as.matrix(counts(sce))))
+  
+  # now sum the rows 
+  df_list <- lapply(df_list, function(df) as.data.frame(rowSums(df)))
+  
+  # turn rownames to columns for all data frames
+  df_list <- lapply(df_list, function(df) df %>% rownames_to_column())
+  
+  # do an inner join by rowname
+  combined <- Reduce(function(x, y) inner_join(x, y, by = "rowname"), df_list)
+  
+  # col back to rowname 
+  combined <- combined %>% column_to_rownames()
+  
+  # rename the columns 
+  combined_sce <- do.call(combine_sces, sce_list)
+  names <- unique(combined_sce$id)
+  colnames(combined) <- names
+  
+  return(combined)
+  
 }
 
 ####################################################################################################

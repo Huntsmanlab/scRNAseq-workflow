@@ -60,11 +60,6 @@ sce_cas_uncorrected = '../data/integrated_cellassign/{ids_integration}/uncorrect
 # multiple samples 
 cellassign_multiple_report = '../reports/cellassign_integrated/{ids_integration}/cellassign_integrated_report.html'
 
-# preparing for velocity analysis 
-sce_raw_with_sum_factors = '../data/processed/{id}/sce_with_sum_factors.rds'
-sce_raw_cas = '../data/cellassign/{id}/sce_pro_cas.rds'
-loom_cas = '../data/loom_cas/{id}/seurat_cas.loom'
-
 ##########################################
 # user friendly naming 
 
@@ -121,9 +116,6 @@ rule all:
     # run_summary_stats,
     # do_batch_correction,
     # run_seurat_integration,
-    expand(sce_raw_with_sum_factors, id = ids),
-    expand(sce_raw_cas, id = ids), 
-    expand(loom_cas, id = ids)
 
 # convert 10X counts to an sce 
 rule make_sce:
@@ -403,58 +395,3 @@ rule cellassign_report_multiple_samples:
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
      params = list(ids_integration = '{params.ids_integration}', id_type = '{params.id_type}', sce_cas_list = '{input.sce_cas_list}', uncorrected_object = '{input.uncorrected_object}', integrated_object = '{input.integrated_object}'))\" "
-
-# compute sum factors on raw data, before qc
-rule compute_sum_factors:
-  input:
-    sce_raw
-  output:
-    sce_raw_with_sum_factors
-  shell:
-    "Rscript pipeline/velocity/prep_for_velo.R \
-     --path_to_sce_raw {input} \
-     --path_to_sce_raw_with_sum_factors {output} "
-     
-# here we run cell assign on raw data, before qc  
-# make sure to activate the venv 
-rule run_cell_assign_on_raw_data:
-  params: 
-    mode = 'split_epithelial' # or nosplit epithelial 
-  input:
-    sce_raw_with_sum_factors
-  output:
-    sce_raw_cas = sce_raw_cas, 
-    marker_mat_path = marker_mat_path, 
-    cellassignment_path = cellassignment_path
-  shell:
-    "Rscript pipeline/cellassign/run_cellassign_on_raw_data.R \
-     --sce_raw_with_sum_factors {input} \
-     --mode {params.mode} \
-     --sce_raw_cas {output.sce_raw_cas} \
-     --marker_mat_path {output.marker_mat_path}\
-     --cellassignment_path {output.cellassignment_path}"
-
-# this one is makes a seurat object and converts it to a loom file with cell type information to be used in velocity analysis later on
-rule make_seurat_object_cas:
-  input:
-    sce_raw_cas
-  output:
-    loom_cas
-  shell:
-    "Rscript pipeline/velocity/seurat_cas.R \
-     --path_to_sce_raw {input} \
-     --path_to_loom_file {output}"
-
-
-                               
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-  

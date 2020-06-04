@@ -16,3 +16,14 @@ scRNAseq-workflow.Rproj
 __pycache__
 .Rhistory
 snakemake_helper_functions.pyc
+
+# ignore a bunch of edgeR files 
+edgeR_basic_integration.Rmd
+edgeR_pseudo_O.Rmd
+edgeR_cluster_O.Rmd
+edger_basic_O.Rmd
+edgeR_HKG_O.Rmd
+edgeR_cluster_O.html
+edgeR_basic.Rmd
+edgeR_basic_batch.Rmd
+edgeR_pseudo.Rmd        
