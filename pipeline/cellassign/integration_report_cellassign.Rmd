@@ -13,6 +13,7 @@ params:
   sce_cas_list: 'sce_cas_list'
   uncorrected_object: 'uncorrected_object'
   integrated_object: 'integrated_object'
+
 ---
 
 #### In this report we show the results of cell assign runs on the samples. We include some dim reduction plots with cell types and clustering information. We first show results of cell assign run on integrated sample, then we give the plots for individual tumours.   
@@ -33,7 +34,10 @@ params:
 * Tumor cells: PAX8, WT1, STMN1 (my addition)  
 * Mesenchymal cells  
 
-```{r include = FALSE}
+```{r include = FALSE, message = FALSE}
+
+paths <- params$sce_cas_list
+paths_list <- as.list(unlist(strsplit(paths, ' '))) # separate the long string into individual paths 
 
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
@@ -93,7 +97,7 @@ gridExtra::grid.arrange(p1, p2, nrow = 1)
 ```{r include = FALSE}
 
 # load cell assign result
-sce_norm_cas_list <- lapply(id.list, function(id) readRDS(here('..', 'data', 'cellassign', id, 'sce_norm_cas.rds')))
+sce_norm_cas_list <- lapply(paths_list, function(some_path) readRDS(some_path))
 
 # make seurat objects 
 seur_sce_list <- lapply(sce_norm_cas_list, function(sce) as.Seurat(sce)) # make a seurat object 
@@ -192,7 +196,6 @@ grid.arrange(clustering_plot, cell_type_plot, nrow = 1)
 Running a clustering algorithm on individual samples can help better understand possible sub cell populations in these samples. 0.5 was chosen for resolution. We show cell type and clustering results side by side. Clustering plots (tsne) are given on the left side and cell assign results are given on the right side for each separate sample given.  
 
 ```{r echo = FALSE, message = FALSE, fig.height = 6 * length(plots_list), fig.width = 15, fig.show = 'hold'}
-
 
 # now we visualize the results based on the number of samples analyzed
 
