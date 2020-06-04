@@ -197,8 +197,8 @@ def edgeR_input_files_TWO_samples(wildcards, sce_clus):
     sample2 = groups[1]
     
     # load sce clus, separate groups into individual samples
-    sample1_individual = groups[0].split('-')
-    sample2_individual = groups[1].split('-')
+    sample1_individual = sample1.split('-')
+    sample2_individual = sample2.split('-')
     
     # sample 1
     i = 0 
