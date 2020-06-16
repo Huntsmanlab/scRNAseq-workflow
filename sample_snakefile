@@ -136,11 +136,12 @@ rule make_sce_qc:
   params:
     whichMethod = 'default', # to use different parameters here, just update them.
     min_features = 1000,
-    mito_thresh_max = 25,
+    mito_thresh_max = 60,
     mito_thresh_min = 1,
     ribo_thresh_max = 60, 
     nmads = 3,
-    seed = 1756
+    seed = 1756, 
+    remove_mito_and_ribo = "yes" # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
   input:
     sce_raw
   output:
@@ -155,13 +156,16 @@ rule make_sce_qc:
      --ribo_thresh_max {params.ribo_thresh_max} \
      --nmads {params.nmads} \
      --seed {params.seed} \
-     --min_features {params.min_features}"
+     --min_features {params.min_features} \
+     --remove_mito_and_ribo {params.remove_mito_and_ribo}"
 
 
 # normalize the sce by taking log counts and perform dim reduction at the same time
 rule normalize_sce:
   params:
-    seed = 1756
+    seed = 1756, 
+    HVG = "yes", 
+    top_HVG = 20 # percentage of genes with the highest biological components
   input:
     sce_qc
   output:
@@ -170,7 +174,9 @@ rule normalize_sce:
     "Rscript pipeline/normalization/normalize_sce.R \
      --path_to_QCed_sce {input} \
      --output_file_name {output} \
-     --seed {params.seed} "
+     --seed {params.seed} \
+     --HVG {params.HVG} \
+     --top_HVG {params.top_HVG}"
 
 # cluster the sce alone 
 rule cluster_sce:
