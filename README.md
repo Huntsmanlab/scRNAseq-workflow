@@ -37,6 +37,17 @@ rule all:
 
 User should uncomment the name of the analyses they wish to do to, there is not a limit on the number of analyses that can be done. In the given example above, Snakemake would do DGE analysis with scran and run summary stats. Once the above steps are completed, pipeline can be run with the `snakemake` command.  
 
+**Removing mitochondrial and ribosomal genes**  
+When doing quality control, you have the option to remove mitochondrial and ribosomal genes. If you wish to remove them, navigate to the "make_sce_qc" rule in the Snakefile and set the "remove_mito_and_ribo" parameter to "yes". If you write "no", mitochondrial and ribosomal genes will be retained.  
+
+**Subsetting the SCE object to HVG**  
+In the normalization step, you also have the option to subset the sces to highly variable genes (HVG). If you set the "HVG" parameter in the "normalize_sce" rule, you also need to need to indicate a percentage in the "top_HVG" parameter. The percentage you write here will be used to determine the percentage of genes with highest biological components. Note that pipeline will give an error if you write a fraction here, you must supply an integer. Default number provided is 20. SCE object will subsetted to HVG, but original count matrix will be retained as well as an alternate expression named "original". You can execute the following code to get the original counts with all the genes present:  
+
+```
+# to recover original counts 
+sce_qc_original <- altExp(sce_qc_hvg, "original", withColData=TRUE)
+```
+
 #### Running the pipeline through Snakemake 
 The following steps of the scRNA workflow use the same wildcards:  
 - make a SingleCellExperiment object  
@@ -52,18 +63,24 @@ You can write as many as you need to; analysis steps mentioned above will be com
 To run the pipeline using snakemake, change the name of the snakefile from 'sample_snakefile' to 'Snakefile' on your local machine after pulling from master.  
 
 #### Analyses including multiple data sets  
+
  - **Seurat integration**  
 Integrate two or more data sets and show findings in a report.  
 At the moment, we use Seurat's integration techniques to remove batch effects between replicates. It's possible that integration causes subpopulation diversity to be eliminated as well. Run the pipeline with caution. If any of your samples have less than 200 cells, Seurat integration techniques won't work. In that case, you can try using batch correction, explained in more detail in the next step. Indicate ids you wish to integrate in `ids_integration` list. 
+
  - **Batch correction**  
 Remove batch effects in two or more datasets, save the corrected samples and show findings in a report.  
 To run this analysis, write down the sample names to ids_integration list shown at the beginning of the Snakefile. Separate the samples with a dash (-). Do one group of ids at a time. You also have the option to write a short explanatory message to be shown in the title of the integration report. This was designed to help readers to get a quick idea about what the report is about. You have the option to leave it blank. Write your message as a string to 'id_type' list in the Snakefile. These batch corrected data hasn't been implemented for downstream analysis.  
+
  - **Summary statistics**  
 Show summary statistics for two datasets in a report. To run this, write the ids you wish to compare in the pair_ids list in the Snakefile. You can supply more than one pair of ids; summary stats will be computed for each pair separately.   
+
  - **DE analysis with edgeR**  
 Perform DE analysis in two groups, groups can have as many replicates as you wish. Write the groups you wish to compare to 'ids_dge' list in the Snakefile. Separate replicates that belong to the same group with a '-'; separate different groups with '='. Depending on the number of samples you have, you will need to follow different paths. If you have only two or three  samples, edgeR needs to run on two samples only. You can do that by uncommenting `DGE_edgeR_TWO_samples` from the `rule all` section. If you have at least two replicates for each treatment (4 samples at least in total), uncomment `DGE_edgeR_MULTIPLE_samples` from `rule all`. Remember that second if you supply wilk compared to the first id. For example, if you supply `ids_dge = [DH1-DH2=DH3-DH4]`, DH3 and DH4 will be compared to DH1 and DH2.     
+
  - **DE analysis with scran**  
 Perform DE analysis between two ids using t tests. Write the ids to the 'pair_ids' list in the Snakefile and separate the samples with a '-'. First sample should be transduced, and second sample should be the control. Note that this DE analysis will compare the first sample to the second sample. If you have more than two samples for each to compare, it is recommended that you use the edgeR DGE method, explained below.  
+
  - **Cell type assignment**  
 For information about how to install cell assign, refer to <a href="https://shahlab.ca/projects/cellassign/" target="_blank">shahlab.ca/projects/cellassign</a>. We recommend that you use a virtual environment to install Tensorflow. Once the installation is complete, prior to using cell assign, activate the virtual environment by running `source ~/venv/bin/activate` in the Rstudio terminal. Snakemake rule for running cell assign doesnt use any wildcards other than ids, so writing the cell ids you wish to annotate is sufficient. Cell assign run will output a few files that can be used in downstream analysis. Note that cell types will be computed individually for all the ids you supply.  
 
@@ -79,7 +96,10 @@ Moreover, each of these steps have two types of files: one off scripts and scrip
 
 Packages you need to run the pipeline are listed in the sourceFiles/utilities.R folder.  
 
-
+#### A few Snakemake tips  
+`snakemake -n` will execute a dry run.  
+`snakemake -j 5` will allocate 5 cores.  
+`snakemake -F` will force already computed objects to be computed again. 
 
 
 
