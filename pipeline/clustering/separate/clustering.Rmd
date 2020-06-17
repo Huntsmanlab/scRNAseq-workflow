@@ -34,7 +34,7 @@ sce <- readRDS(params$path_to_sce_norm)
 ### ALGORITHM: Shared neighbor
 ```{r include = FALSE}
 # Build a shared neighbor graph for cells based on their expression profiles.
-g <- buildSNNGraph(sce, use.dimred="UMAP") # shared neighbor weighting
+g <- buildSNNGraph(sce, use.dimred="PCA") # shared neighbor weighting
 
 # extract clustering info from the graph that we just made 
 cluster <- igraph::cluster_walktrap(g)$membership
