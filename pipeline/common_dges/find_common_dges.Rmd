@@ -1,0 +1,97 @@
+---
+title: 'Top common DGEs'
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+author: 'Asli Munzur'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  pair_ids: 'pair_ids'
+  ntop: 'ntop'
+  paired_dge_output: 'paired_dge_output'
+  common_dge_outfile_name: 'common_dge_outfile_name'
+  common_dge_plot_file_name: 'common_dge_plot_file_name'
+  
+---
+
+### Introduction 
+
+This report includes the common differentially expressed genes that came up in the following DGE analyses:  
+`r params$pair_ids`
+
+```{css, echo=FALSE}
+    body .main-container {
+      max-width: 90% !important;
+      width: 90% !important;
+    }
+
+    body {
+      max-width: 90% !important;
+    }
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+# Packages, Libraries, and Functions to import
+
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+
+```
+
+```{r, message = FALSE}
+
+# 1. FIND TOP COMMON DGES
+#### Parameters
+ntop <- params$ntop
+
+#### Read in Files
+paired_dge_output <- as.list(params$paired_dge_output)
+paired_dge_output <- as.list(unlist(strsplit(params$paired_dge_output, ' '))) 
+
+degs_list <- lapply(paired_dge_output, function(some_file) readRDS(some_file))
+
+# Intersect names to find common top genes
+top_names <- lapply(degs_list, function(o) head(o$markers_sig, ntop)$gene_symbol)
+top_names <- data.frame(common_genes = Reduce(intersect, top_names))
+
+tables <- lapply(degs_list, function(o) head(o$markers_sig, ntop))
+names(tables) <- params$pair_ids
+
+# Format
+format_topgenes <- function(o, u) {
+  nms <- colnames(o)[2:dim(o)[2]]
+  nms <- nms[ nms != 'Top']
+  o$Top <- rownames(o)
+  rownames(o) <- o$gene_symbol
+  o$gene_symbol <- NULL
+  indices <- match(top_names$common_genes, rownames(o))
+  o <- o[, c('Top', nms)]
+  colnames(o) <- c(paste(u, '.Rank', sep = ''), nms) 
+  return(o[indices,])
+}
+
+ids_list <- as.list(unlist(strsplit(params$pair_ids, ' '))) 
+tables <- mapply(format_topgenes, tables, ids_list, SIMPLIFY = FALSE)
+
+# Aggregate
+output <- data.frame(row.names = top_names$common_genes)
+for (i in 1:length(tables)) { output <- cbind(output, tables[[i]]) }
+
+write.csv(output, file = params$common_dge_outfile_name, quote = FALSE, row.names = TRUE)
+
+# 2. EXTRACT THE PLOTS 
+plots <- lapply(degs_list, function(o) o$plot)
+p <- plot_grid(plotlist = plots, ncol = 2)
+ggsave(filename = params$common_dge_plot_file_name, p , width = 20, height = 30)
+
+DT::datatable(output,
+  extensions = 'Buttons',
+  options = list(dom = 'Bfrtip',
+                 buttons = list("copy", "excel", "csv", "pdf")))
+
+```
