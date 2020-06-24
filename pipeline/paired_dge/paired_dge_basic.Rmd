@@ -1,5 +1,5 @@
 ---
-title: "DGE_Experimental_vs_Control"
+title: "Differential gene expression"
 subtitle: '`r params$pair_ids`'
 author: "Asli Munzur"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
@@ -32,7 +32,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r, include = FALSE}
 # Packages, Libraries, and Functions to import
 
 library(here)
@@ -40,7 +40,7 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ```
 
-## DGEs
+## Differentially expressed genes 
 
 ```{r message = FALSE, warning = FALSE}
 
@@ -75,7 +75,7 @@ plot_markers <- function(paths, ntop = 50, negative_control){
     markers <- findMarkers(sce[rowData(sce)$qc_pass, ], groups = sce$id)
   }
   
-  markers <- markers[[1]] # pos logFC = up-regulated in tranduced cells
+  markers <- markers[[ids[[1]]]] # pos logFC = up-regulated in tranduced cells
   markers_all <- as.data.frame(markers) %>% rownames_to_column('gene_symbol')
   colnames(markers_all) <- c('gene_symbol', 'Top', 'p.value ', 'FDR', 'logFC')
   markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(FDR <= 0.05)

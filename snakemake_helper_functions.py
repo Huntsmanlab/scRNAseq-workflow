@@ -238,6 +238,20 @@ def paired_dge_input_files(wildcards, sce_clus):
     inputFile_sample2 = path + separate_samples[1] + '/sce_clus.rds'
     
     return [inputFile_sample1, inputFile_sample2]
+    
+    
+def common_dges_input_files(pair_ids): 
+  
+  i = 0
+  input_path_list = []
+  
+  while i < len(pair_ids): 
+    
+    path = '../data/dge/paired_dge_basic/' + pair_ids[i] + '/outputsTEST.rds'
+    input_path_list.append(path)
+    i += 1
+    
+  return input_path_list
 
 
 # INTEGRATE CELL ASSIGN 
