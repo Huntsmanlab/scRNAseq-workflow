@@ -1,17 +1,17 @@
 import os.path
 from snakemake_helper_functions import *
 
-# To make it easy to copy, I added the samples here: 
-# 'bgi_175_001-ilm_175_001' 'bgi_176_001-ilm_176_001', 'bgi_176_002-ilm_176_002' 'DH13', 'DH18', 'VOA11229_CCOC', 'DH7', 'DH8'
-# 'DH24', 'DH7', 'DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16'
+ids = ['DH25']
+pair_ids = ['VOA11229_CCOC-DH21_NEW', 'VOA11229_CCOC-DH22_NEW', 'DH7-DH21_NEW', 'DH7-DH22_NEW'] # separate the pairs with "-", no quotation marks. 
 
-ids = ['DH15', 'DH9_control', 'DH9_DBZ', 'DH1_DBZ', 'DH1_control', 'DH2_DBZ', 'DH2_control', 'DH5_DBZ', 'DH5_control'] #  separate the ids with a comma
-pair_ids = ['DH17-DH24', 'DH3-DH24'] # separate the pairs with "-", no quotation marks 
+ids_integration = ['VOA10286UT_DBZ-VOA10286UT_ctr']
+ids_dge = ['DH24=DH8'] # second id will be compared to first one
 
-ids_integration = ['DH3-DH10']
-ids_dge = ['DH25=DH25_control'] # second id will be compared to first one
+id_type = []
 
-id_type = ['Ovary - Endometrioid']
+# This function generates a wildcard for the common dges rule. No need to change anything here. 
+make_wildcard = lambda some_list: "=".join(some_list)
+common_dge_wildcard = make_wildcard(pair_ids)
 
 # FILE NAMES FOR RULE ALL 
 path_to_10X = '../data/raw/{id}'
@@ -20,6 +20,7 @@ sce_raw = '../data/processed/{id}/sce.rds'
 sce_qc = '../data/qc/{id}/sce_qc.rds'
 sce_norm = '../data/normalized/{id}/sce_norm.rds'
 sce_clus = '../data/clustered/sce/{id}/sce_clus.rds'
+sce_epith = '../data/epithelial_cells_only/{id}/sce.rds'
 
 # SEURAT INTEGRATION
 sce_uncorrected = '../data/integrated/{ids_integration}/uncorrected.rds' # combined, but not integrated (has batch effects)
@@ -47,6 +48,10 @@ paired_dge_basic_report = '../reports/paired_dge_basic/{pair_ids}/paired_dge_bas
 edgeR_report_TWO_samples = '../reports/dge_edgeR/{ids_dge}/dge_analysis_two_samples.html'
 edgeR_report_MULTIPLE_samples = '../reports/dge_edgeR/{ids_dge}/dge_analysis_multiple_samples.html'
 
+# common dges 
+common_dge_report = '../reports/common_dges/' + common_dge_wildcard + '/common_dges.html'
+common_dge_outfile_name = '/huntsman/amunzur/data/dge/common/' + common_dge_wildcard + '/common_top_genes.csv'
+common_dge_plot_file_name = '/huntsman/amunzur/data/dge/common/' + common_dge_wildcard + '/plots.png'
 
 # CELL ASSIGN
 # single sample 
@@ -59,6 +64,11 @@ sce_cas_uncorrected = '../data/integrated_cellassign/{ids_integration}/uncorrect
 
 # multiple samples 
 cellassign_multiple_report = '../reports/cellassign_integrated/{ids_integration}/cellassign_integrated_report.html'
+
+# preparing for velocity analysis 
+sce_raw_with_sum_factors = '../data/processed/{id}/sce_with_sum_factors.rds'
+sce_raw_cas = '../data/cellassign/{id}/sce_pro_cas.rds'
+loom_cas = '../data/loom_cas/{id}/seurat_cas.loom'
 
 ##########################################
 # user friendly naming 
@@ -76,11 +86,14 @@ normalize_sce =  expand(sce_norm, id = ids)
 cluster_sce = [expand(sce_clus, id = ids), expand(sce_clus_report, id = ids)]
 
 # CELL ASSIGN
-run_cell_assign_ONE_sample = [expand(sce_cas, id = ids), expand(marker_mat_path, id = ids), expand(cellassignment_path, id = ids), expand(cellassign_report_single_sample, id = ids)]
+run_cell_assign_on_INDIVIDUAL_samples = [expand(sce_cas, id = ids), expand(marker_mat_path, id = ids), expand(cellassignment_path, id = ids), expand(cellassign_report_single_sample, id = ids)]
 integrate_cell_assign_results = [expand(cellassign_multiple_report, ids_integration = ids_integration), expand(sce_cas_integrated, ids_integration = ids_integration), expand(sce_cas_uncorrected, ids_integration = ids_integration)]
 
 # PAIRED DGE BASIC 
 DGE_scran = [expand(paired_dge_basic_report, pair_ids = pair_ids), expand(paired_dge_output, pair_ids = pair_ids)]
+
+# common dges 
+find_common_dges = [common_dge_report, common_dge_outfile_name, common_dge_plot_file_name]
 
 # edgeR
 DGE_edgeR_TWO_samples = expand(edgeR_report_TWO_samples, ids_dge = ids_dge)
@@ -108,16 +121,20 @@ rule all:
     # normalize_sce,
     # cluster_sce,
     # cluster_two_samples,
-    # run_cell_assign_ONE_sample,
+    # run_cell_assign_on_INDIVIDUAL_samples,
     # integrate_cell_assign_results,
     # DGE_scran,
+    # find_common_dges,
     # DGE_edgeR_TWO_samples,
     # DGE_edgeR_MULTIPLE_samples,
     # run_summary_stats,
     # do_batch_correction,
     # run_seurat_integration,
+    # expand(sce_raw_with_sum_factors, id = ids),
+    # expand(sce_raw_cas, id = ids),
+    # expand(loom_cas, id = ids)
 
-# convert 10X counts to an sce 
+# convert 10X counts to an sce
 rule make_sce:
   input:
     path_to_10X
@@ -159,7 +176,6 @@ rule make_sce_qc:
      --min_features {params.min_features} \
      --remove_mito_and_ribo {params.remove_mito_and_ribo}"
 
-
 # normalize the sce by taking log counts and perform dim reduction at the same time
 rule normalize_sce:
   params:
@@ -184,7 +200,7 @@ rule cluster_sce:
     curr_dir = os.getcwd(),
     sample = '{id}'
   input:
-    path_to_sce_norm = sce_norm
+    path_to_sce_norm = sce_cas
   output:
     output_path = sce_clus, 
     report = sce_clus_report
@@ -304,17 +320,16 @@ rule edgeR_basic_MULTIPLE_samples:
     curr_dir = os.getcwd(),
     ids = '{ids_dge}', 
   input:
-    seurat_integ = lambda wildcards: edgeR_input_files(wildcards, seurat_integ, sce_clus)[0]
+    sce_clus = edgeR_input_files_TWO_samples(ids_dge, sce_clus)
   output:
     report = edgeR_report_MULTIPLE_samples
   shell:
     "Rscript -e \"rmarkdown::render('pipeline/paired_dge/edgeR_basic_MULTIPLE_samples.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
-     params = list(ids ='{params.ids}', seurat_integ = '{input.seurat_integ}'))\" "
+     params = list(ids ='{params.ids}', sce_clus = '{input.sce_clus}'))\" "
 
 # compute dge analysis in two samples using scran      
-# to do: fix the error, script doesnt run 
 rule paired_dge_basic: 
   params: 
     curr_dir = os.getcwd(),
@@ -329,6 +344,24 @@ rule paired_dge_basic:
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}', \
      params = list(ids ='{params.ids}', sce_clus = '{input.sce_clus}', output_path_paired = '{output.output_path_paired}'))\" "
+     
+# find common dges between two paired dge comparisons 
+rule find_common_dges:
+  params:
+    curr_dir = os.getcwd(),
+    pair_ids = pair_ids,
+    ntop = 2000 # number of top common genes 
+  input:
+    paired_dge_output = common_dges_input_files(pair_ids)
+  output:
+    report = common_dge_report,
+    common_dge_outfile_name = common_dge_outfile_name,
+    common_dge_plot_file_name = common_dge_plot_file_name
+  shell:
+    "Rscript -e \"rmarkdown::render('pipeline/common_dges/find_common_dges.Rmd',\
+     output_file='{params.curr_dir}/{output.report}', \
+     knit_root_dir='{params.curr_dir}', \
+     params = list(pair_ids ='{params.pair_ids}', paired_dge_output = '{input.paired_dge_output}', ntop = '{params.ntop}', common_dge_outfile_name = '{output.common_dge_outfile_name}', common_dge_plot_file_name = '{output.common_dge_plot_file_name}'))\" "
 
 # run cell assign in a single sample 
 rule run_cellassign: 
