@@ -41,14 +41,14 @@ User should uncomment the name of the analyses they wish to do to, there is not 
 When doing quality control, you have the option to remove mitochondrial and ribosomal genes. If you wish to remove them, navigate to the "make_sce_qc" rule in the Snakefile and set the "remove_mito_and_ribo" parameter to "yes". If you write "no", mitochondrial and ribosomal genes will be retained.  
 
 **Subsetting the SCE object to HVG**  
-In the normalization step, you also have the option to subset the sces to highly variable genes (HVG). If you set the "HVG" parameter in the "normalize_sce" rule, you also need to need to indicate a percentage in the "top_HVG" parameter. The percentage you write here will be used to determine the percentage of genes with highest biological components. Note that pipeline will give an error if you write a fraction here, you must supply an integer. Default number provided is 20. SCE object will subsetted to HVG, but original count matrix will be retained as well as an alternate expression named "original". You can execute the following code to get the original counts with all the genes present:  
+In the dim  step, you also have the option to subset the sces to highly variable genes (HVG). If you set the "HVG" parameter in the "normalize_sce" rule, you also need to need to indicate a percentage in the "top_HVG" parameter. The percentage you write here will be used to determine the percentage of genes with highest biological components. Note that pipeline will give an error if you write a fraction here, you must supply an integer. Default number provided is 20. SCE object will subsetted to HVG, but original count matrix will be retained as well as an alternate expression named "original". You can execute the following code to get the original counts with all the genes present:  
 
 ```
 # to recover original counts 
 sce_qc_original <- altExp(sce_qc_hvg, "original", withColData=TRUE)
 ```
 
-#### Running the pipeline through Snakemake 
+### Running the pipeline through Snakemake 
 The following steps of the scRNA workflow use the same wildcards:  
 - make a SingleCellExperiment object  
 - perform quality control  
@@ -60,9 +60,41 @@ To perform these analyses, fill in the ids in the Snakefile as shown:
 `ids = ['DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16']`  
 You can write as many as you need to; analysis steps mentioned above will be computed for each of the ids; however, some analyses may treat the ids differently. For example, quality control will be performed on each id individually, but combined clustering analysis will combine all the samples given. Note that you can only do combined clustering analysis on two samples. Individual clustering and combined clustering will generate reports, which can be found in `/reports/separate_clustering` and `/reports/combined_clustering`. Once you are done with these steps, you may move on to the next analyses which require more than one id to perfom.  
 
+Some of the analyses mentioned above requires user to pass some parameters, mentioned below:  
+
+#### QUALITY CONTROL  
+Performs quality control of the processed SCE based on parameters passed:  
+**whichMethod:** pass "default" or "quantile".  
+"default" will filter cells using threshold for mitochondrial and ribosomal content. To filter cell sizes based on library size and gene content, outlier cells are detected based on median-absolute-deviation (MAD).  
+**min_features:** pass a numeric value  
+Cells that have less genes detected than this number will be removed. Default value is 1000.  
+**mito_thresh_max:**  pass a whole number between 1 and 100  
+Cells with mitochonrial percentage that is a higher than this number will be removed. Default value is 25.  
+**mito_thresh_min:** pass a whole number between 1 and 100  
+Cells with mitochonrial percentage that is lower than this number will be removed. Default value is 2.  
+**ribo_thresh_max:**  pass a whole number between 1 and 100  
+Cells with ribosomal percentage that is higher than this number will be removed. Default value is 60.  
+**nmads:** pass a whole number  
+This number if used to find outlier cells based on median-absolute-deviation (MAD). Default value is 3.  
+**seed:** pass any number  
+Seed is used for reproducibility.  
+**remove_mito_and_ribo:** pass "yes" or "no", with quotation marks.  
+"yes" will remove all mitochondrial and ribosomal genes, "no" will retain them. Default is set to "yes".  
+
+#### DIMENSIONALITY REDUCTION  
+Performs PCA, t-SNE and UMAP approximations on the SCE object.  
+**seed1:** pass any number  
+**seed2:** pass any number, different from seed1  
+**HVG:** pass "yes" or "no", with quotation marks.  
+"yes" will subset the sce to highly variable genes (HVG), "no" will retain all genes.  
+**top_HVG:** pass a number between 1 and 100  
+This number is used to calculate the top percentage of genes that contribute most to variation.  
+**top_PCs:** pass "computed" or any number  
+User can pass "computed" (with quotation marks) to let the pipeline calculate the most optimal value for number of PCs to be used in PCA calculation later on. Optimal number of PCs are calculated based on the number of PCs in the denoised PCA. Note that this number will be between 5 and 50, but the user has the option to supply a specific number instead.  
+
 To run the pipeline using snakemake, change the name of the snakefile from 'sample_snakefile' to 'Snakefile' on your local machine after pulling from master.  
 
-#### Analyses including multiple data sets  
+### Analyses including multiple data sets  
 
  - **Seurat integration**  
 Integrate two or more data sets and show findings in a report.  
@@ -96,7 +128,7 @@ Moreover, each of these steps have two types of files: one off scripts and scrip
 
 Packages you need to run the pipeline are listed in the sourceFiles/utilities.R folder.  
 
-#### A few Snakemake tips  
+### A few Snakemake tips  
 `snakemake -n` will execute a dry run.  
 `snakemake -j 5` will allocate 5 cores.  
 `snakemake -F` will force already computed objects to be computed again. 
