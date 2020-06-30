@@ -5,9 +5,9 @@
 **The steps of the pipeline are as follows:**  
 1. Make a SingleCellExperiment object from filtered counts  
 2. Perform quality control to further filter cells with low reads and/or high mitochondrial content  
-3. Visualize the results of quality control in summary stats 
-4. Log normalize
-5. Do dimensionality reduction (tSNE and UMAP) 
+3. Visualize the results of quality control in summary stats  
+4. Log normalize  
+5. Do dimensionality reduction (PCA, tSNE and UMAP)  
 6. Perform unsupervised clustering  
 7. Do batch correction and integration, if needed  
 8. Calculate the differentially expressed genes and visualize the analysis  
@@ -23,6 +23,7 @@ rule all:
     # make_sce,  
     # do_qc,  
     # normalize_sce,  
+    # perform_dim_reduction,  
     # cluster_sce,  
     # cluster_two_samples,  
     # run_cell_assign_ONE_sample,  
@@ -62,37 +63,64 @@ You can write as many as you need to; analysis steps mentioned above will be com
 
 Some of the analyses mentioned above requires user to pass some parameters, mentioned below:  
 
-#### QUALITY CONTROL  
+#### QUALITY CONTROL (make_sce_qc)  
 Performs quality control of the processed SCE based on parameters passed:  
+  
 **whichMethod:** pass "default" or "quantile".  
 "default" will filter cells using threshold for mitochondrial and ribosomal content. To filter cell sizes based on library size and gene content, outlier cells are detected based on median-absolute-deviation (MAD).  
+  
 **min_features:** pass a numeric value  
 Cells that have less genes detected than this number will be removed. Default value is 1000.  
+  
 **mito_thresh_max:**  pass a whole number between 1 and 100  
 Cells with mitochonrial percentage that is a higher than this number will be removed. Default value is 25.  
+  
 **mito_thresh_min:** pass a whole number between 1 and 100  
 Cells with mitochonrial percentage that is lower than this number will be removed. Default value is 2.  
+  
 **ribo_thresh_max:**  pass a whole number between 1 and 100  
 Cells with ribosomal percentage that is higher than this number will be removed. Default value is 60.  
+  
 **nmads:** pass a whole number  
 This number if used to find outlier cells based on median-absolute-deviation (MAD). Default value is 3.  
+  
 **seed:** pass any number  
 Seed is used for reproducibility.  
+  
 **remove_mito_and_ribo:** pass "yes" or "no", with quotation marks.  
 "yes" will remove all mitochondrial and ribosomal genes, "no" will retain them. Default is set to "yes".  
 
-#### DIMENSIONALITY REDUCTION  
+#### DIMENSIONALITY REDUCTION (dim_reduction)  
 Performs PCA, t-SNE and UMAP approximations on the SCE object.  
+  
 **seed1:** pass any number  
 **seed2:** pass any number, different from seed1  
+  
 **HVG:** pass "yes" or "no", with quotation marks.  
 "yes" will subset the sce to highly variable genes (HVG), "no" will retain all genes.  
+  
 **top_HVG:** pass a number between 1 and 100  
 This number is used to calculate the top percentage of genes that contribute most to variation.  
+  
 **top_PCs:** pass "computed" or any number  
 User can pass "computed" (with quotation marks) to let the pipeline calculate the most optimal value for number of PCs to be used in PCA calculation later on. Optimal number of PCs are calculated based on the number of PCs in the denoised PCA. Note that this number will be between 5 and 50, but the user has the option to supply a specific number instead.  
 
-To run the pipeline using snakemake, change the name of the snakefile from 'sample_snakefile' to 'Snakefile' on your local machine after pulling from master.  
+#### CLUSTERING INDIVIDUAL SCES (cluster_sce)  
+Clusters a given sce object and projects results in various t-SNE plots.  
+  
+**perplexity_list:** a list of any length, including numbers between 1 and 100  
+These values are used to generate t-SNE plots with various perplexities. Default values are `perplexity_list = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100]`. Note that t-SNE is robust to changes in perplexity between 5 and 50.    
+  
+**chosen_perp:** one single number, taken from the perplexity list given above  
+After viewing t-SNE plots with various perplexities, user is expected to pick a perplexity value and save t-SNE coordinates for that value for more downstream analysis. After running the clustering script once and inspecting the t-SNE plots, you can pick one of the perplexities and run the clustering script again. The default value is set to 30.  
+  
+**k_list:** a list of any length, including only positive integers  
+This list will be used during clustering to vary number of nearest neighbors.  You can supply any numbers, but the suggested values range between 5 and 30. Default values supplied in the pipeline are `k_list = [5, 9, 10, 12, 15, 18]`.  
+  
+**chosen_k:**one single number, taken from the k_list given above  
+After viewing the clustering plots with various k values, the user is expected to choose a k value to continue downstream analysis. After inspecting the report once, you can pick a certain k value to store in the sce object for further downstream analysis. Default value is 15.  
+  
+> To run the pipeline using snakemake, change the name of the snakefile from 'sample_snakefile' to 'Snakefile' on your local machine after pulling from master.  
 
 ### Analyses including multiple data sets  
 
