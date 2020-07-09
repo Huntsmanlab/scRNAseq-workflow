@@ -44,7 +44,9 @@ suppressPackageStartupMessages({
   library(fgsea)
   library(splatter)
   library(viridis)
-  
+  library(ggthemes)
+  library(destiny)
+  library(ggbeeswarm)
 })
 
 #ADD THEME #### 
@@ -656,4 +658,44 @@ combine_sces <- function(..., sce_list = NULL, prefix_col_name = NULL, suffix_co
   
   return(sce_list[[1]])
   
+}
+
+fMarkersSampling <- function(sce, pivot_cluster, target_group, randomSubsets) {
+  
+  ### Calculate the top DEGs for each random sample comparison
+  idxs_list <- vector("list", randomSubsets)
+  X <- 1:randomSubsets
+  s_names <- sce$id
+  idx_p <- which(s_names %in% c(pivot_cluster))
+  idx_t <- which(s_names %in% c(target_group))
+  
+  U <-  list()
+  for (i in X) { idxs_list[[i]] <- c(idx_p, sample(idx_t, size = length(idx_p))) }# grab random sample indices and pivot indices for loop
+  
+  cnt <- 1
+  repeat {                                                                        # Do randomSubset iterations to find DEGs
+    if(cnt > randomSubsets) {
+      break
+    }
+    
+    idxs <- c(idx_p, sample(idx_t, size = length(idx_p)))
+    x <- sce[rowData(sce)[[3]], idxs]                                             # Grab just the genes passing qc and cells of interest
+    markers <- findMarkers(x, groups = x$id, log.p = TRUE)                        # Do pairwise differential expression (ANY)
+    markers <- markers[[pivot_cluster]]
+    markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(log.FDR < -1.6)
+    markers_sig <- dplyr::arrange(markers_sig, dplyr::desc(abs(markers_sig[,4]))) # order
+    tt_top <- head(markers_sig, 2000)                                             # Identify top '2000' genes
+    
+    U[[cnt]] <- tt_top
+    cnt <- cnt+1
+  }
+  
+  ############### WHHHHHYYYYYYYY DOOOOESSSNNNTTTTTTT this WOOOOOOOOORRRRRKKKKKK????????
+  # L <- lapply(ls, function(l){
+  #   x <- sce[rowData(sce)$qc_pass, l[[1]]]
+  #   marks <- findMarkers(x, groups = x$id, log.p = TRUE)
+  # })
+  ############### 
+  
+  return(U)                                                                       # Return a matrix of gene ranks in order of p-value by sample
 }
