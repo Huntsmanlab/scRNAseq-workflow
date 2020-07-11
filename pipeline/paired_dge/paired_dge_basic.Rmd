@@ -6,7 +6,7 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 
 params:
   ids: 'pair_ids'
-  sce_clus: 'sce_clus'
+  sce_norm: 'sce_norm'
   output_path_paired: 'output_path_paired'
   pathwayHmark: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/h.all.v6.2.symbols.gmt'
   pathwayGO: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/c5.all.v6.2.symbols.gmt'
@@ -42,65 +42,82 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ## Differentially expressed genes 
 
-```{r message = FALSE, warning = FALSE}
+```{r, message = FALSE, warning = FALSE}
 
-plot_markers <- function(paths, ntop = 50, negative_control){
 
+plot_markers <- function(ids, ntop = 100, negative_control, randomSubsets = 100){
+  
   sce_list <- lapply(paths, function(some_path) readRDS(some_path))
   
-  ids <- lapply(sce_list, function(sce) unique(sce$id))
+  ids <- lapply(sce_list, function(sce) unique(sce$id)) # extract ids 
+  sce_list <- intersect_all(sce_list) # subset to common genes 
+  sce_list <- scran_batch_norm(sce_list) # batch norm with scran 
+  sce <- combine_sces(sce_list = sce_list, prefix_col_name = 'id', prefix_cell_name = TRUE) # combine sces 
   
-  # sce_list <- scran_batch_norm(sce_list)
-  sce_list <- intersect_all(sce_list)
-  # sce_list <- do.call(batchelor::multiBatchNorm, c(sce_list, assay.type="counts", min.mean = 0.1))
-  
-  # before combining make sure we have the same row numbers in our sces 
-  # intersect_all
-  
-  sce <- combine_sces(sce_list = sce_list, prefix_col_name = 'id', prefix_cell_name = TRUE)
-  
-  # Run UMAP, TSNE, PCA for visualization downstream steps: clustering, cellassign, ect.
-  sce <- runPCA(sce, exprs_values = "logcounts", ncomponents = 200)
-  sce <- runTSNE(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3)
-  sce <- runUMAP(sce, exprs_values = "logcounts", ntop = 500, ncomponents = 3,
-                    min_dist = 0.01, n_neighbors = 15, metric = "euclidean")
-
- # remove genes whose total counts < 100 and detected in < 5% of cells, remove mito, ribo genes
+  # gene filtering 
   sce <- gene_filter(sce, gene_min_counts = 100, gene_min_detection_rate = 5, reporters = NULL)
   
   if(negative_control){
-    markers <- findMarkers(sce[rowData(sce)$qc_pass, ], groups = sample(sce$id))
+    markers <- findMarkers(sce[rowData(sce)$qc_pass, ], groups = sample(sce$id), log.p = TRUE)
   }
   else{
-    markers <- findMarkers(sce[rowData(sce)$qc_pass, ], groups = sce$id)
+    markers <- findMarkers(sce[rowData(sce)$qc_pass, ], groups = sce$id, log.p = TRUE)
   }
   
   markers <- markers[[ids[[1]]]] # pos logFC = up-regulated in tranduced cells
   markers_all <- as.data.frame(markers) %>% rownames_to_column('gene_symbol')
-  colnames(markers_all) <- c('gene_symbol', 'Top', 'p.value ', 'FDR', 'logFC')
-  markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(FDR <= 0.05)
-  colnames(markers_sig) <- c('gene_symbol', 'Top', 'p.value ', 'FDR', 'logFC')
-  markers_sig <- markers_sig %>% dplyr::arrange(desc(abs(logFC))) #%>% dplyr::arrange(desc(abs(logFC))) dplyr::arrange(desc(logFC))
-  #tt_top <- top_n(markers_sig, n = ntop, wt = abs(logFC))
-  tt_top <- head(markers_sig, ntop)
   
-  p <- ggplot(markers_sig, aes(x = logFC, y = -log10(FDR))) +
+  if ("FDR" %in% colnames(markers_all)) {                                             # Case when p = p.value
+    markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(FDR <= 0.05)
+    tooLow <- function(x) (ifelse(x < 1e-315, 1e-315, x))
+    markers_sig <- markers_sig %>% mutate_at(c("p.value", "FDR"), tooLow)
+    # Order the genes for plotting
+    markers_sig <- dplyr::arrange(markers_sig, dplyr::desc(abs(markers_sig[,5])))     # order
+    t_mark <- markers_sig                                                             # make copy
+    t_mark$FDR <- -log10(t_mark[,4])                                                  # log transform
+    tt_top <- head(t_mark, ntop)                                                      # Identify top 'n' genes
+    
+  } else {                                                                            # Case when p = log.p.value
+    markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(log.FDR < -1.6)
+    # Order the genes for plotting
+    markers_sig <- dplyr::arrange(markers_sig, dplyr::desc(abs(markers_sig[,5])))     # order
+    t_mark <- markers_sig                                                             # make copy
+    t_mark$log.FDR <- -(t_mark[,4])
+    tt_top <- head(t_mark, ntop)                                                      # Identify top 'n' genes
+  }
+
+  p <- ggplot(t_mark, aes_string(x = names(t_mark)[5], y = names(t_mark)[4])) +
     geom_point(colour = 'gray') +
-    geom_text_repel(data = tt_top, aes(label = gene_symbol), colour = 'red', size = 5) + 
-    geom_point(data = tt_top, aes(x = logFC, y = -log10(FDR)), colour = "blue") +
-    labs(title = glue::glue('{infected}  vs. {control} top {ntop} DEGs', infected = ids[[1]], control = ids[[2]], ntop = ntop), 
-         subtitle = 'positive logFC means up-regulated in transduced sample') + theme(plot.subtitle = element_text(hjust = 0.5))
+    geom_text_repel(data = tt_top, aes(label = gene_symbol), colour = 'red', size = 5) +
+    geom_point(data = tt_top, aes_string(x = names(t_mark)[5], y = names(t_mark)[4]), colour = "blue") +
+    theme_minimal() + 
+    xlab('logFC') + 
+    labs(title = glue('{infected}  vs. {control} top {ntop} DEGs', infected = ids[[1]], 
+                      control = ids[[2]], ntop = ntop),
+         subtitle = 'positive logFC means up-regulated in experimental sample') + theme(plot.subtitle = element_text(hjust = 0.5))
+  p
   
+  # Cluster/Subset DGE Analysis by repeated sampling 
+  # degs <- fMarkersSampling(sce, ids[1], ids[2], randomSubsets)
+  # commonDEGs <- assembleMarkersByP(degs)
+  # samplingPlot <- plotDEGs(commonDEGs, ids, ntop, params$reporter)
+  
+  # outputs <- list(markers_all = markers_all, markers_sig = markers_sig, tt_top = tt_top, plot = p, smarkers_sig = commonDEGs, splot = samplingPlot)
   outputs <- list(markers_all = markers_all, markers_sig = markers_sig, tt_top = tt_top, plot = p)
-  
 }
 
-paths <- as.list(unlist(strsplit(params$sce_clus[[1]], ' '))) 
+paths <- as.list(unlist(strsplit(params$sce_norm[[1]], ' '))) 
 outputs <- plot_markers(paths, ntop = 50, negative_control = FALSE)
+
+colnames(outputs$markers_all)[5] <- "logFC"
+
 saveRDS(outputs, file = params$output_path_paired)
+
 ```
 
-```{r fig.height= 10, fig.width= 10}
+```{r fig.height= 10, fig.width= 20}
+# p <- plot_grid(outputs$plot, outputs$splot, labels = "AUTO")
+# p
 outputs$plot
 ```
 
@@ -125,6 +142,7 @@ run_gene_enrichment <- function(markers, pathways_input, nperm){
   pathways <- fgsea::gmtPathways(pathways_input)
   # IF NON-HUMAN GENE, NEED TO MAP TO HUMAN GENOME FISRT, WE USE HUMAN GENOME SO OK
   marker <- markers$markers_all %>% dplyr::select(gene_symbol, logFC) %>% na.omit() %>% distinct()
+
   ranks <- deframe(marker)
   fgseaRes <- fgsea::fgsea(pathways = pathways, stats = ranks, nperm = nperm) %>% as_tibble() %>% dplyr::arrange(desc(NES))
   sig_pathways <- fgseaRes[fgseaRes$padj < 0.05 , c('pathway', 'pval', 'padj', 'NES')]
@@ -163,7 +181,9 @@ make_ge_plots <- function(fgseaRes, pathway_name, pthresh = 0.05, ntop = 10, y_t
 ```
 
 ```{r fig.height=5, fig.width=20, message=FALSE, warning=FALSE}
+
 set.seed(123458)
+message(print(colnames(outputs$markers_all)))
 fgseaReslist <- run_gene_enrichment(markers = outputs, pathways_input = params$pathwayHmark, nperm = 10000)
 make_ge_plots(fgseaRes = fgseaReslist$fgseaRes, pathway_name = "HALLMARK", pthresh = 0.05, ntop = 10)
 ```
