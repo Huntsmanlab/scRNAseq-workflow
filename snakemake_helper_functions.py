@@ -229,13 +229,13 @@ def edgeR_input_files_TWO_samples(wildcards, sce_clus):
         
 # PAIRED DGE BASIC 
 # wildcards are given in a list like this: ['DH1-DH2', 'DH3-DH4']
-def paired_dge_input_files(wildcards, sce_norm): 
+def paired_dge_input_files(wildcards, sce_clus): 
     
-    path = remove_last_two_dirs(sce_norm)
+    path = remove_last_two_dirs(sce_clus)
     
     separate_samples = wildcards[0].split('-')
-    inputFile_sample1 = path + separate_samples[0] + '/sce_norm.rds'
-    inputFile_sample2 = path + separate_samples[1] + '/sce_norm.rds'
+    inputFile_sample1 = path + separate_samples[0] + '/sce_clus.rds'
+    inputFile_sample2 = path + separate_samples[1] + '/sce_clus.rds'
     
     return [inputFile_sample1, inputFile_sample2]
     
