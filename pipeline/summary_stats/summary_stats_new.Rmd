@@ -120,6 +120,7 @@ makeTable <- function(df, index) {
   
 } # end of function 
 
+# function makes a table with the median values
 makeTableMedian <- function(df, index) {
   
   # first we must go from S4 to data frame to be able to use dplyr

@@ -47,6 +47,15 @@ sces <- lapply(sces, function(sce) sce[universe, ])
 # make the sces comparable by removing sequencing depth 
 sces <- do.call(multiBatchNorm, sces)
 
+# add a prefix to colnames of each sce 
+i = 1 
+while (i <= length(sces)) {
+  colnames(sces[[i]]) <- paste(unique(sces[[i]]$id), colnames(sces[[i]]), sep = ".")
+
+  i = i + 1
+  
+}
+
 # find highly variable genes  
 vars <- lapply(sces, function(sce) modelGeneVar(sce))
 combined.var <- do.call(combineVar, vars)
