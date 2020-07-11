@@ -46,13 +46,11 @@ create_marker_mat <- function(output_file_name,
   Epithelial_ciliated_gene_symbols <- c("FUT4","EPCAM", "CDH1", "CLDN3", "CLDN4", "KRT8", "KRT18", "KRT19", "FOXJ1", "DYDC2", "SNTN", "WDR16", "FAM92B", 
                                        "C20orf85", "TPPP3", "C9orf24", "OMG", "IGFBP7", "FAM183A", "RSPH1", "C1orf194", "C5orf49", "RP11-356K23.1")
   
-  # endo_stem_cell <- read.csv('/huntsman/mdouglas/dh_organoid/data/cellassign/endometrialStemCell.csv', header = FALSE)
-  # mes_stem_cell <- read.csv('/huntsman/mdouglas/dh_organoid/data/cellassign/mesenchymalStemCell.csv', header = FALSE)
+  endo_stem_cell <- read.csv('/huntsman/mdouglas/dh_organoid/data/cellassign/endometrialStemCell.csv', header = FALSE)
+  mes_stem_cell <- read.csv('/huntsman/mdouglas/dh_organoid/data/cellassign/mesenchymalStemCell.csv', header = FALSE)
   
-  # endo_stem_cell <- data.frame(lapply(endo_stem_cell ,as.character), stringsAsFactors=FALSE) %>% unlist(use.names = FALSE)
-  # mes_stem_cell <- data.frame(lapply(mes_stem_cell ,as.character), stringsAsFactors=FALSE) %>% unlist(use.names = FALSE)
-  endo_stem_cell <- c('CD34', 'CD44', 'SOX2')
-  mes_stem_cell <- c('ENG', 'THY1', 'ALCAM')
+  endo_stem_cell <- data.frame(lapply(endo_stem_cell ,as.character), stringsAsFactors=FALSE) %>% unlist(use.names = FALSE)
+  mes_stem_cell <- data.frame(lapply(mes_stem_cell ,as.character), stringsAsFactors=FALSE) %>% unlist(use.names = FALSE)
 
   if(mode == "split_epithelial"){
     
