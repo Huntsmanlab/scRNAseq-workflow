@@ -17,6 +17,7 @@ params:
 ```{r include=FALSE}
 
 library(here)
+library(plotly)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 source(here('pipeline', 'cellassign', 'create_marker_matrix.R'))
 source(here('pipeline', 'cellassign', 'assign_cell_type.R'))
@@ -26,18 +27,18 @@ source(here('pipeline', 'cellassign', 'assign_cell_type.R'))
 
 ```{r echo = FALSE, message = FALSE}
 
-message(params$sce_norm)
-
 # load sce qc
-sce_norm <- readRDS(params$sce_norm)
+sce_cas <- readRDS(params$sce_cas)
 
-# clustering 
-# Do clustering on scRNAseq data
-g <- buildSNNGraph(sce_norm, k = 8, use.dimred = 'PCA')
-clust <- igraph::cluster_walktrap(g)$membership
-sce_norm$cluster <- factor(clust)
+if (length(sce_cas$cluster) == 0 ) {
+  
+  g <- buildSNNGraph(sce_cas, k = 25, use.dimred = 'PCA')
+  clust <- igraph::cluster_walktrap(g)$membership
+  sce_cas$cluster <- factor(clust)
+  
+}
 
-table(sce_norm$cluster) %>% 
+table(sce_cas$cluster) %>% 
   knitr::kable(caption = 'Table 1: number of cells in each cluster', 
                col.names = c('cluster', 'number of cells')) %>% 
   kable_styling(full_width = F)
@@ -45,44 +46,126 @@ table(sce_norm$cluster) %>%
 
 ```
 
-```{r include = FALSE}
+```{r test-rgl, webgl=TRUE, message = FALSE, warning = FALSE}
 
-p1 <- plotReducedDim(sce_norm, dimred = 'TSNE', colour_by = 'cluster') + labs(title = paste(params$sample, 'Clustering - TSNE', sep = '-'))
+# if dim reduction hasnt been computed, do it now: 
+if (length(sce_cas@int_colData@listData[["reducedDims"]]$TSNE) == 0 ) {
+  
+  sce_cas <- runPCA(sce_cas, exprs_values = "logcounts", ncomponents = 50)
+  sce_cas <- runTSNE(sce_cas, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, perplexity = 20)
+  sce_cas <- runUMAP(sce_cas, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, min_dist = 0.5, n_neighbors = 15, metric = "euclidean") 
+  
+} 
 
-# markers <- findMarkers(sce_norm, sce_norm$cluster, direction = "up")
-# marker.set <- markers[["1"]]
-# head(marker.set[,1:8], 10) # only first 8 columns, for brevity
-# top.markers <- rownames(marker.set)[marker.set$Top <= 10]
-# p_heat <- plotHeatmap(sce_norm, features=top.markers, center = TRUE, order_columns_by="cluster")
+# get tsne coordinates 
+tsne_1 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$TSNE[, 1])
+tsne_2 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$TSNE[, 2])
+tsne_3 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$TSNE[, 3])
 
+# get pca coordinates 
+pca_1 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$PCA[, 1])
+pca_2 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$PCA[, 2])
+pca_3 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$PCA[, 3])
+
+df <- data.frame(tsne_1, tsne_2, tsne_3)
+df$cell_type <- as.factor(sce_cas$cell_type)
+df$cluster <- as.factor(sce_cas$cluster)
+
+#############################################################################################################################
+# o <- length(unique(sce_cas$cluster))
+# if (o > 8) {
+#   
+#   mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(o)
+#   
+# } 
+
+# 2d tsne plot showing cell types 
+cell_type_plot <- plot_ly(data = df,
+        x = ~tsne_1, y = ~tsne_2,
+        opacity = 1,
+        color = ~cell_type,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5)) %>% 
+
+    add_markers()
+
+cell_type_plot <- cell_type_plot %>% 
+  layout(title = 'cell types in the sample shown in t-SNE plot')
+
+#############################################################################################################################
+# work on the palette 
+# o <- length(unique(sce_cas$cell_type))
+# if (o > 8) {
+#   
+#   mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(o)
+#   
+# } else {}
+
+# 2d plot showing clusters
+cluster_plot <- plot_ly(data = df,
+        x = ~tsne_1, y = ~tsne_2,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5)) %>% 
+
+    add_markers()
+
+cluster_plot <- cluster_plot %>% 
+  layout(title = 'clusters in the sample shown in t-SNE plot')
 
 ```
 
-```{r include = FALSE}
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 7}
 
-# load cell assign result
-sce_norm_cas <- readRDS(params$sce_cas)
-
-seur_sce <- as.Seurat(sce_norm_cas)
-Idents(seur_sce) <- "cluster"
-
-p2 <- DimPlot(object = seur_sce, 
-              dims = c(1, 2), 
-              reduction = 'TSNE', 
-              group.by = 'cell_type', 
-              pt.size = 1.5) +
-  scale_color_viridis(discrete = TRUE, option = "D") +
-  scale_fill_viridis(discrete = TRUE) +
-  labs(title = paste(params$sample, 'Cell Assign for scRNAseq Cells', sep = '-'))
+cell_type_plot
+cluster_plot
 
 ```
 
-```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 14}
 
-grid.arrange(p1, p2, nrow = 1)
+Cell types are given in the interactive 3D plot below. You can zoom in and drag the plot to see the cells from different angles. Double click on the legend to isolate a certain cell type. 
+```{r, message = FALSE, warning = FALSE}
 
+library(plotly)
+p1 <- plot_ly(data = df,
+        x = ~tsne_1, y = ~tsne_2, z = ~tsne_3,
+        opacity = 1,
+        color = ~cell_type,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3))  %>%    #choose the colors  to color the groups (make sure number of colors specified equal the number of categories)
+
+    add_markers()
+
+p1 <- p1 %>% 
+  layout(title = '3d t-SNE plot showing cell types')
+
+p1
+
+library(plotly)
+p2 <- plot_ly(data = df,
+        x = ~tsne_1, y = ~tsne_2, z = ~tsne_3,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3))  %>%    #choose the colors  to color the groups (make sure number of colors specified equal the number of categories)
+
+    add_markers()
+
+p2 <- p2 %>% 
+  layout(title = '3d t-SNE plot showing clusters')
+
+p2
 
 ```
+
+
+
+
 
 
 
