@@ -10,13 +10,18 @@ params:
   id: 'id'
   output_path: 'output_path' # where we save the sce with clustering data 
   path_to_sce_norm: 'sce_norm'
+  chosen_perp: 'chosen_perp'
+  perplexity_list: 'perplexity_list'
+  k_list: 'k_list'
+  chosen_k: 'chosen_k'
+  n_PCs: 'n_PCs'
 ---
   
 In this report, we perform clustering in isolated samples and show the results in dimensionality  
 reduction plots. We also perform modularity analysis and bootstrap to test the quality of our clusters.  
 More info about these two methods are given below, at the top of the respective plots.  
 We use **scran** package for clustering. The algorithm we chose is **nearest neighbors** since it is  
-widely adopted. Scran picks the best number of clusters and uses graph based clustering methods.  
+widely adopted.  
 
 
 ```{r include = FALSE}
@@ -25,34 +30,304 @@ library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 ```
 
-```{r include = FALSE}
+```{r echo = FALSE, message = FALSE}
+
 # load the data - it has to be normalized sce with reduced dimensions 
 sce <- readRDS(params$path_to_sce_norm)
 
+perplexity_list <- params$perplexity_list
+perplexity_list <- strsplit(perplexity_list, " ") # perplexity_list is passed a string with space, get rid of spaces
+perplexity_list <- as.list(c(unlist(list(perplexity_list)))) # save each element separately 
+perplexity_list <- lapply(perplexity_list, function(element) as.numeric(element)) # make them numeric 
+
+k_list <- params$k_list
+k_list <- strsplit(k_list, " ") # perplexity_list is passed a string with space, get rid of spaces
+k_list <- as.list(c(unlist(list(k_list)))) # save each element separately 
+k_list <- lapply(k_list, function(element) as.numeric(element)) # make them numeric 
+
+chosen_perp <- params$chosen_perp
+chosen_perp <- as.numeric(chosen_perp)
+
+chosen_k <- params$chosen_k
+chosen_k <- as.numeric(chosen_k)
+
 ```
 
-### ALGORITHM: Shared neighbor
 ```{r include = FALSE}
-# Build a shared neighbor graph for cells based on their expression profiles.
-g <- buildSNNGraph(sce, use.dimred="PCA") # shared neighbor weighting
 
-# extract clustering info from the graph that we just made 
-cluster <- igraph::cluster_walktrap(g)$membership
-
-# add that info to the sce 
-sce$cluster <- factor(cluster)
-
-# this table shows how many cells in each cluster 
-cluster_table <- table(sce$cluster)
+g <- buildSNNGraph(sce, use.dimred = "PCA", k = 15) # shared neighbor weighting
+cluster <- igraph::cluster_walktrap(g)$membership # extract clustering info from the graph that we just made 
+sce$cluster <- factor(cluster) # add that info to the sce 
+cluster_table <- table(sce$cluster) # this table shows how many cells in each cluster 
 
 # we can redo the reduced dim plots with the clustering info in mind 
 plotTSNE <- plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', params$id, sep = '_'))
-plotUMAP <- plotUMAP(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', params$id, sep = '_'))
-plotPCA <- plotPCA(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', params$id, sep = '_'))
 
 ```
 
+### t-SNE plots with various perplexities  
+Perplexity is an important parameter that determines the granularity of the visualization. Low perplexities will favor resolution of finer structure where local variations dominate, possibly to the point that the visualization is compromised by random noise. Larger perplexity values favor the global geometry of the dataset. Thus, it is advisable to test different perplexity values to ensure that the choice of perplexity does not drive the interpretation of the plot. The performance of SNE is fairly robust to changes in the perplexity, and typical values are between 5 and 50. Below t-SNE plots with various perplexity values are shown. t-SNE with a perplexity of `r params$chosen_perp` is chosen for further downstream analysis.  
+  
+Note that in the plots below, shared neighbor algorithm was used with 15 neighbors. 
+
+```{r, message = FALSE, echo = FALSE}
+
+# perplexity_list <- list(5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100)
+# we will use this to dynamically change the figure height in the next chunk
+dim <- length(perplexity_list) / 3 * 4
+
+```
+
+```{r fig.width = 12, fig.height = dim, message = FALSE}
+
+# define a function to make tsne plots 
+make_tsne_plot <- function(sce, perplexity_value) {
+  
+  sce <- runTSNE(sce, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, perplexity = perplexity_value)
+  p <- list(plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste("perplexity = ", perplexity_value, sep = "")))
+  
+  return(p)
+}
+
+# make copies of the sce object, as many times as the number of different perplexities supplied 
+sce_list <- list()
+i = 1 
+while (i <= length(perplexity_list)) {
+  
+  new_sce <- sce # make a copy of the sce 
+  sce_list[[i]] <- new_sce
+  
+  i = i + 1 
+}
+
+# list of tsne plots with various perplexity values 
+plotlist <- mapply(make_tsne_plot, sce = sce_list, perplexity_value = perplexity_list)
+
+# based on the user passed chosen_perp parameter, pick an sce computed with a certain perplexity value 
+index <- match(chosen_perp, perplexity_list) # find the index of the chosen perp in the perp list 
+sce <- sce_list[[index]]
+
+# visualize all the plots in 3 columns
+do.call(gridExtra::grid.arrange, c(plotlist, ncol = 3))
+
+```
+
+### t-SNE plots with various numbers of clusters 
+After picking a t-SNE plot with a certain perplexity (`r params$chosen_perp`), next we try various numbers for nearest neighbor to see how this changes the number of clusters we have. 
+
+```{r, include = FALSE}
+
+# k_list = list(5, 9, 10, 12, 15, 18)
+
+# we will use this to dynamically change the figure height in the next chunk
+dim <- length(k_list) / 3 * 4
+
+```
+
+
+```{r fig.width = 12, fig.height = dim}
+
+# make copies of the sce object, as many times as the number of different perplexities supplied 
+sce_list <- list()
+i = 1 
+while (i <= length(k_list)) {
+  
+  new_sce <- sce # make a copy of the sce 
+  sce_list[[i]] <- new_sce
+  
+  i = i + 1 
+}
+
+# function to cluster sce with various k values
+cluster_sce <- function(sce, k_value) {
+  
+  g <- buildSNNGraph(sce, use.dimred = "PCA", k = k_value, type = "number") # shared neighbor weighting
+  cluster <- igraph::cluster_louvain(g)$membership # extract clustering info from the graph that we just made 
+  sce$cluster <- factor(cluster) # add that info to the sce 
+
+  return(sce)
+  
+}
+
+# function to make tsne plots for various sces 
+make_tsne_plots <- function(sce, k_value) {
+  
+  p <- list(plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste("k = ", k_value, sep = "")))
+
+  return(p)
+}
+
+sce_list_cluster <- mapply(cluster_sce, sce = sce_list, k_value = k_list) # generate list of sces with various numbers of clusters 
+tsne_plots <- mapply(make_tsne_plots, sce = sce_list_cluster, k_value = k_list) # generate tsne plots using the sce_list and various k values
+
+# based on the user passed chosen_k parameter, pick an sce computed with a certain k value 
+index <- match(chosen_k, k_list) # find the index of the chosen k in the k list 
+sce <- sce_list_cluster[[index]]
+
+do.call(gridExtra::grid.arrange, c(tsne_plots, ncol = 3))
+
+```
+### PCA  
+By inspecting the contribution of each PC to overall variance, we can get a better sense of the heterogeneity of the data.  
+```{r fig.width = 12, fig.height = 4}
+
+percent.var <- attr(reducedDim(sce), "percentVar")
+
+# visualize first 100 PCs
+if (is.null(percent.var)){
+  
+  message(print("Can't produce the plot for this sample. Refer to other methods below to decide how many PCs to include."))
+  
+} else {plot(percent.var[1:100], xlab = "PC", ylab = "Variance explained (%)", type = "p", pch = 16, main = "contribution of top 100 PCs to variance") 
+
+}
+
+```
+We can also plot the top 4 PCs together as shown below to visualize multiple PCs at the same time. Cells grouped according to the cluster they belong to. The diagonal boxes in the scatter plot matrix below show the cell density for each component.  
+
+```{r fig.width = 12, fig.height = 8}
+
+plotReducedDim(sce, dimred="PCA", ncomponents = 4, colour_by="cluster") + ggtitle("4 top PCs")
+
+```
+
+Final dimensionality reduction plots shown below with clustering information: 
+```{r fig.width = 12, fig.height = 8}
+
+p1 <- plotPCA(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', params$id, sep = '_'))
+p2 <- plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('t-SNE', params$id, sep = '_'))
+p3 <- plotUMAP(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', params$id, sep = '_'))
+
+gridExtra::grid.arrange(p1, p2, p3, ncol = 2)
+
+```
+
+### Diffusion maps  
+Diffusion maps are a non-linear dimensionality technique. It achieves dimensionality reduction by re-organising data according to parameters of its underlying geometry. This method can help us a lot when dealing with data that includes some sort of differentiation or transformation process because diffusion maps are really good at picking up brancing in the data. This is a computationally expensive calculation, so to speed things up, it's best to limit the computation to most significant PCs. In this report, top `r params$n_PCs` were used. 
+
+```{r fig.width = 12, fig.height = 8, message = FALSE}
+
+message(print("Computing the diffusion map"))
+
+topPCs <- as.numeric(params$n_PCs)
+
+sce_logcounts <- logcounts(sce)  # access log-transformed counts matrix
+colnames(sce_logcounts) <- sce$cluster
+sce_logcounts <- as.matrix(sce_logcounts)
+
+# Make a diffusion map, this step can take a while depending on how large the sce object is, up to 10 minutes. 
+dm <- DiffusionMap(t(sce_logcounts), n_pcs = 30)
+
+tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
+                  DC2 = eigenvectors(dm)[, 2],
+                  Timepoint = sce$cluster)
+
+dm_plot <- ggplot(tmp, aes(x = DC1, y = DC2, colour = Timepoint)) +
+  geom_point() + 
+  xlab("Diffusion component 1") + 
+  ylab("Diffusion component 2") +
+  theme_classic() + 
+  ggtitle("Diffusion map")
+
+sce$pseudotime_diffusionmap <- rank(eigenvectors(dm)[,1])    # rank cells by their dpt
+
+ggplot(as.data.frame(colData(sce)), 
+       aes(x = pseudotime_diffusionmap, 
+           y = cluster, colour = cluster)) +
+    geom_quasirandom(groupOnX = FALSE) +
+    theme_classic() +
+    xlab("Diffusion component 1 (DC1)") + ylab("Timepoint") +
+    ggtitle("Cells ordered by DC1")
+
+plot(eigenvalues(dm), ylim = 0:1, pch = 20, xlab = 'Diffusion component (DC)', ylab = 'Eigenvalue')
+
+
+plot(dim, pch = 20, col.by = "cluster")
+
+sigmas <- find_sigmas(sce_logcounts, verbose = FALSE)
+optimal.sigma(sigmas)
+
+
+```
+
+
+
+
+
+### Dimensionality reduction using Seurat  
+Plots shown above were generated using Scater and Scran R packages. We can also check out Seurat and compare the results across various packages. The main challenge is to decide how many PCs to include in further analysis. Seurat gives a couple of tools that we will explore further. These tools are:  
+ - Heatmaps  
+ - Making use of p values   
+ - Finding the elbow point  
+
+Below the distribution of cells in top 6 PCs is visualized where cells are colored according to the cluster they belong to.
+
 ```{r include = FALSE}
+
+# convert sce to seurat object
+sobject <- as.Seurat(sce, counts = "counts", data = "logcounts")
+Idents(sobject) <- paste(unique(sce$id))
+
+sobject <- ScaleData(sobject)
+sobject <- FindVariableFeatures(sobject)
+
+sobject@reductions$pca <- sobject@reductions$PCA
+sobject@reductions$tsne <- sobject@reductions$TSNE
+sobject@reductions$umap <- sobject@reductions$UMAP
+
+sobject <- RunPCA(sobject, features = VariableFeatures(object = sobject))
+
+```
+
+
+```{r echo = FALSE, message = FALSE, fig.width = 12, fig.height = 4}
+
+# Visualize top 6 PCs 
+gridExtra::grid.arrange(DimPlot(sobject, reduction = "pca", group.by = "cluster",dims = 1:2),
+                        DimPlot(sobject, reduction = "pca", group.by = "cluster",dims = 3:4),
+                        DimPlot(sobject, reduction = "pca", group.by = "cluster",dims = 5:6), ncol = 3, top = 'top 6 PCs visualized')
+
+```
+
+#### Visualize top genes associated with reduction components, in top 6 PCs
+```{r, fig.width = 14, fig.height = 10}
+
+VizDimLoadings(sobject, dims = 1:6, reduction = "pca", ncol = 3)
+
+```
+
+#### Deciding how many PCs to include in further analysis  
+In the following heatmaps top genes contributing to each PC are visualized. Both cells and genes are ordered by their PC scores, and the 15 genes with the highest and 15 genes with the lowest PC scores are displayed for each PC. Note that the cells are given in the columns and genes are show in the rows. Here the goal is to pick the PCs that can divide the cell population into distinct groups. If all of the cells are the same color (pink), then that PC isn't as significant. 
+
+```{r fig.width = 16, fig.height = 25}
+
+DimHeatmap(sobject, dims = 1:15, cells = 500, balanced = TRUE)
+
+```
+
+#### Finding significant PCs
+‘Significant’ PCs will show a strong enrichment of genes with low p-values (solid curve above the dashed line) in the plot below.  
+
+```{r fig.width = 10, fig.height = 7, warning = FALSE, message=FALSE}
+
+sobject <- JackStraw(object = sobject, reduction = "pca", dims = 20, num.replicate = 100,  prop.freq = 0.1, verbose = FALSE)
+
+sobject <- ScoreJackStraw(object = sobject, dims = 1:20, reduction = "pca")
+JackStrawPlot(object = sobject, dims = 1:20, reduction = "pca")
+
+
+```
+
+To further validate the results of the plot above, we can also check out contribution of each PC to total standard deviation and find the elbow point.  
+```{r fig.width = 10, fig.height = 4}
+
+ElbowPlot(object = sobject)
+
+```
+
+
+```{r include = FALSE}
+
 # here we save the sce object with the clustering data - we only save the shared neighbor clusters 
 saveRDS(sce, file = params$output_path)
 
@@ -65,16 +340,9 @@ cluster_table <- as.data.frame(cluster_table) %>%
   rename(cluster = Var1, number_of_cells = Freq)
 
 cluster_table %>% 
-  knitr::kable(caption = 'Table 1: number of cells in each cluster - shared neighbor ') %>% 
+  knitr::kable(caption = 'Table 1: number of cells in each cluster - shared neighbor') %>% 
   kable_styling(full_width = F)
 
-```
-
-```{r echo = FALSE, message = FALSE}
-# visualize these graphs 
-plotTSNE
-plotUMAP
-plotPCA
 ```
 
 ```{r include = FALSE}
@@ -143,9 +411,6 @@ plotPCA <- plotPCA(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste(
 
 ```
 
-
-
-
 ```{r echo= FALSE, message = FALSE}
 # now we make the table look nice for the report 
 
@@ -186,13 +451,11 @@ boot_results <- bootstrapCluster(sce, FUN=function(x) {
 heatMap_bootstrap <- pheatmap(boot_results, cluster_cols=FALSE, cluster_rows=FALSE, col=colorRampPalette(c("white", "blue"))(100), main = 'bootstrap')
 ```
 
-
 #### Modularity scores 
 
 ```{r echo = FALSE, message = FALSE}
 heatMap_modularity
 ```
-
 
 #### Bootstrap results 
 
