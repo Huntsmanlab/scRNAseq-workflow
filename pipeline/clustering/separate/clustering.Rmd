@@ -333,37 +333,125 @@ saveRDS(sce, file = params$output_path)
 
 ```
 
-```{r echo= FALSE, message = FALSE}
-# now we make the table look nice for the report 
+#### Final clustering plots  
+Below, the final clustering reports are given in interactive plots. When you hover over the plot, you'll notice that a panel comes up in the upper right corner of the plots where a variety of options are given, like zoom in, zoom out etc.  
 
-cluster_table <- as.data.frame(cluster_table) %>% 
-  rename(cluster = Var1, number_of_cells = Freq)
+One of the useful tools is to select the area you wish to zoom in, then the plots will automatically take you there.  
 
-cluster_table %>% 
-  knitr::kable(caption = 'Table 1: number of cells in each cluster - shared neighbor') %>% 
-  kable_styling(full_width = F)
-
-```
 
 ```{r include = FALSE}
-# CHECK THE ACCURACY OF OUR CLUSTERING: 
-# here we calculate the modularity scores for our clusters. this helps understand the relationships between clusters. 
-# we want the clusters to be distinct, so we dont want different clusters to interact closely. 
-ratio <- clusterModularity(g, cluster, as.ratio=TRUE)
 
-# here, we want the diagonal squares to be dark but the other ones to be as light as possible. 
-# darker colors mean higher modularity - higher interaction 
-# this will be helpful to diagnose low quality clustering 
-heatMap_modularity <- pheatmap(log10(ratio+1), cluster_cols=FALSE, cluster_rows=FALSE, col=rev(heat.colors(100)), main = 'modularity')
+# get tsne coordinates
+tsne_1 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$TSNE[, 1])
+tsne_2 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$TSNE[, 2])
+tsne_3 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$TSNE[, 3])
 
-# now we do bootstrapping on our clusters. ideally, a cell in a cluster should always remain there. 
-boot_results <- bootstrapCluster(sce, FUN=function(x) {
-  g <- buildSNNGraph(x, use.dimred="UMAP")
-  igraph::cluster_walktrap(g)$membership}, clusters=sce$cluster)
+df_tsne <- data.frame(tsne_1, tsne_2, tsne_3)
+df_tsne$cluster <- as.factor(sce$cluster)
 
-# same thing, you only want the diagonal squares to have a dark color. 
-heatMap_bootstrap <- pheatmap(boot_results, cluster_cols=FALSE, cluster_rows=FALSE, col=colorRampPalette(c("white", "blue"))(100), main = 'bootstrap')
+# get umap coordinates 
+umap_1 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$UMAP[, 1])
+umap_2 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$UMAP[, 2])
+umap_3 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$UMAP[, 3])
+
+df_umap <- data.frame(umap_1, umap_2, umap_3)
+df_umap$cluster <- as.factor(sce$cluster)
+
 ```
+
+
+```{r include = FALSE}
+
+# make 2d plots according to dims we calculate before 
+tsne <- plot_ly(data = df_tsne,
+        x = ~tsne_1, y = ~tsne_2,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5))
+
+tsne <- tsne %>% 
+  layout(title = 'clusters shown in t-SNE plot')
+
+umap <- plot_ly(data = df_umap,
+        x = ~umap_1, y = ~umap_2,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5))
+
+umap <- umap %>% 
+  layout(title = 'clusters shown in UMAP plot')
+
+```
+
+```{r}
+
+# make 3d plots below 
+tsne_3d <- plot_ly(data = df_tsne,
+        x = ~tsne_1, y = ~tsne_2, z = ~tsne_3,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 4))
+
+tsne_3d <- tsne_3d %>% 
+  layout(title = 'clusters shown in t-SNE plot - 3D')
+
+umap_3d <- plot_ly(data = df_umap,
+        x = ~umap_1, y = ~umap_2, z = ~umap_3,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 4))
+
+umap_3d <- umap_3d %>% 
+  layout(title = 'clusters shown in UMAP plot - 3D')
+
+```
+
+
+```{r}
+
+tsne_3d
+umap_3d
+
+```
+
+### Ways to interact with the 3d plots below  
+Same information in the plots above is also presented in interactive 3d plots below. Some of the things you can do with the interactive plots below are:  
+
+ - Zoom in and zoom out using the mouse wheel  
+ - Click on a region in the plot and drag to see different angles  
+ - Double click on a cell type (or cluster number) to hide everyhing else in the plots and show that cell type only. To go back to how the plot was before, double click on the same place in the legend. If you wish to highlight more than one cell type, double click to one of them in the legend, then single click the other one. You can also do this in the 2d plots above as well. 
+ - If you bring your mouse pointer over the 3d plots, you'll notice that a faint panel on the right upper corner of the plot appears. That panel gives more options to interact with the plot. To reset everything in the plot, click "reset camera to last save".  
+
+```{r}
+
+tsne_3d
+umap_3d
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
