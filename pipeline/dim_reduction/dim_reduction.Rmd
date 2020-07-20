@@ -18,6 +18,7 @@ params:
   
 ---
 
+This report includes a few figures below that can help you decide better how many PCs to include in further downstream analysis. 
 
 ```{r include = FALSE}
 
@@ -107,7 +108,9 @@ sobject <- RunPCA(sobject, features = VariableFeatures(object = sobject))
 
 ```
 
-#### Visualize top genes associated with reduction components, in top 6 PCs
+#### Visualize top genes associated with reduction components, in top 6 PCs  
+This figure below breaks down the variation in each of the top 6 PCs and shows which genes contribute most to overall variation in each PC. This could be helpful to decide on interesting genes for further downstream analysis. If you chose to retain ribosomal and mitochondrial genes in the previous steps of the pipeline, it's highly likely that they will contain a significant portion of the variance. 
+
 ```{r, fig.width = 14, fig.height = 10}
 
 VizDimLoadings(sobject, dims = 1:6, reduction = "pca", ncol = 3)
@@ -124,7 +127,7 @@ DimHeatmap(sobject, dims = 1:15, cells = 500, balanced = TRUE)
 ```
 
 ### Finding significant PCs
-‘Significant’ PCs will show a strong enrichment of genes with low p-values (solid curve above the dashed line) in the plot below.  
+‘Significant’ PCs will show a strong enrichment of genes with low p-values. To generate the plot below, a resampling test was implemented by the JackStraw procedure (Macosko et al). A subset of the data (1% by default) ws randomly permuted and PCA was computed again. This constructs a 'null distribution' of feature scores where the procedure was repeated numerous times. 'Significant' PCs were identified as those who have a strong enrichment of low p-value features.
 
 ```{r fig.width = 10, fig.height = 7, warning = FALSE, message=FALSE}
 
@@ -136,7 +139,8 @@ JackStrawPlot(object = sobject, dims = 1:20, reduction = "pca")
 
 ```
 
-To further validate the results of the plot above, we can also check out contribution of each PC to total standard deviation and find the elbow point.  
+To further validate the results of the plot above, we can also check out contribution of each PC to total standard deviation and find the elbow point where the contribution to overall variation from each PC drops significantly. 
+
 ```{r fig.width = 10, fig.height = 4}
 
 ElbowPlot(object = sobject)
