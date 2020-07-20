@@ -1,0 +1,158 @@
+---
+title: "Dimensionality reduction plots "
+subtitle: '`r params$sample`'
+author: "Asli Munzur"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  path_to_sce_norm: 'path_to_sce_norm'
+  sce_red: 'sce_red'
+  seed1: 'seed1'
+  seed2: 'seed2'
+  HVG: 'HVG'
+  top_HVG: 'top_HVG'
+  top_PCs: 'top_PCs'
+  
+---
+
+
+```{r include = FALSE}
+
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+
+```
+  
+  
+  
+```{r}
+
+# load sce
+sce_norm <- readRDS(params$path_to_sce_norm)
+
+# compute the number of PCs to use 
+if (params$top_PCs == "computed") { # pipeline decides on the number of PCs to use 
+  
+  set.seed(params$seed1)
+  dec.sce <- modelGeneVarByPoisson(sce_norm) # model gene variation, decompose it into technical and biological components
+  
+  # choose the HVG
+  fraction_HGV <- as.numeric(params$top_HVG) / 100
+  top.sce <- getTopHVGs(dec.sce, prop = fraction_HGV)
+  
+  denoised.sce <- denoisePCA(sce_norm, technical = dec.sce)
+  PCs <- ncol(reducedDim(denoised.sce))
+  
+} else { # user decided how many PCs to use 
+  
+  top_PCs = as.numeric(params$top_PCs)
+  PCs = top_PCs # number of PCs to use is given by the user in the top_PCs parameter
+}
+
+# deal with HVG
+if (params$HVG == "yes") { # user wants to subset the sce to HVG 
+  
+  # pick the HVG
+  gene_var <- modelGeneVar(sce_norm)
+  
+  fraction_HGV <- as.numeric(params$top_HVG) / 100
+  chosen <- getTopHVGs(gene_var, prop = fraction_HGV)
+  
+  # subset to HVG
+  sce_qc_hvg <- sce_norm[chosen,]
+  
+  # add the original count matrix with non HVG to our new sce
+  altExp(sce_qc_hvg, "original") <- sce_norm
+  sce_norm <- sce_qc_hvg
+  
+  set.seed(params$seed2)
+  sce_norm <- runPCA(sce_norm, exprs_values = "logcounts", ncomponents = PCs)
+  
+} else { # compute PCA (and other dim reduction methods) without subsetting to top HVG
+  
+  set.seed(params$seed2)
+  sce_norm <- runPCA(sce_norm, exprs_values = "logcounts", ncomponents = PCs)
+  
+}
+
+# TSNE and UMAP 
+set.seed(params$seed2)
+sce_norm <- runTSNE(sce_norm, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, perplexity = 20)
+sce_norm <- runUMAP(sce_norm, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, min_dist = 0.5, n_neighbors = 15, metric = "euclidean")
+
+# save the output 
+saveRDS(sce_norm, file = params$sce_red)
+
+
+```
+
+```{r include = FALSE}
+
+# some seurat plots here to decide how many PCs to include 
+# convert sce to seurat object
+sobject <- as.Seurat(sce_norm, counts = "counts", data = "logcounts")
+Idents(sobject) <- paste(unique(sce_norm$id))
+
+sobject <- ScaleData(sobject)
+sobject <- FindVariableFeatures(sobject)
+
+sobject@reductions$pca <- sobject@reductions$PCA
+sobject@reductions$tsne <- sobject@reductions$TSNE
+sobject@reductions$umap <- sobject@reductions$UMAP
+
+sobject <- RunPCA(sobject, features = VariableFeatures(object = sobject))
+
+```
+
+#### Visualize top genes associated with reduction components, in top 6 PCs
+```{r, fig.width = 14, fig.height = 10}
+
+VizDimLoadings(sobject, dims = 1:6, reduction = "pca", ncol = 3)
+
+```
+
+### Deciding how many PCs to include in further analysis  
+In the following heatmaps top genes contributing to each PC are visualized. Both cells and genes are ordered by their PC scores, and the 15 genes with the highest and 15 genes with the lowest PC scores are displayed for each PC. Note that the cells are given in the columns and genes are show in the rows. Here the goal is to pick the PCs that can divide the cell population into distinct groups. If all of the cells are the same color (pink), then that PC isn't as significant. 
+
+```{r fig.width = 16, fig.height = 25}
+
+DimHeatmap(sobject, dims = 1:15, cells = 500, balanced = TRUE)
+
+```
+
+### Finding significant PCs
+‘Significant’ PCs will show a strong enrichment of genes with low p-values (solid curve above the dashed line) in the plot below.  
+
+```{r fig.width = 10, fig.height = 7, warning = FALSE, message=FALSE}
+
+sobject <- JackStraw(object = sobject, reduction = "pca", dims = 20, num.replicate = 100,  prop.freq = 0.1, verbose = FALSE)
+
+sobject <- ScoreJackStraw(object = sobject, dims = 1:20, reduction = "pca")
+JackStrawPlot(object = sobject, dims = 1:20, reduction = "pca")
+
+
+```
+
+To further validate the results of the plot above, we can also check out contribution of each PC to total standard deviation and find the elbow point.  
+```{r fig.width = 10, fig.height = 4}
+
+ElbowPlot(object = sobject)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
