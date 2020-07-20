@@ -25,7 +25,7 @@ source(here('pipeline', 'cellassign', 'assign_cell_type.R'))
 
 ```
 
-```{r echo = FALSE, message = FALSE}
+```{r echo = FALSE, message = FALSE, warning = FALSE}
 
 # load sce qc
 sce_cas <- readRDS(params$sce_cas)
@@ -86,9 +86,8 @@ cell_type_plot <- plot_ly(data = df,
         color = ~cell_type,
         type = "scatter",
         mode = "markers",
-        marker = list(size = 5)) %>% 
+        marker = list(size = 5))
 
-    add_markers()
 
 cell_type_plot <- cell_type_plot %>% 
   layout(title = 'cell types in the sample shown in t-SNE plot')
@@ -109,24 +108,33 @@ cluster_plot <- plot_ly(data = df,
         color = ~cluster,
         type = "scatter",
         mode = "markers",
-        marker = list(size = 5)) %>% 
-
-    add_markers()
+        marker = list(size = 5))
 
 cluster_plot <- cluster_plot %>% 
   layout(title = 'clusters in the sample shown in t-SNE plot')
 
 ```
+### Cell assign results  
+Below the cell assign results are shown in t-SNE plots. Also, another t-SNE plot is added to show the clustering results since comparing cell types to different clusters that came up might provide additional insights. The t-SNE plots are interactive, when you hover over the plot, you'll notice that a panel comes up in the upper right corner of the plots where a variety of options are given, like zoom in, zoom out etc.  
 
-```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 7}
+One of the useful tools is to select the area you wish to zoom in, then the plots will automatically take you there.  
+
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 7, warning = FALSE}
 
 cell_type_plot
 cluster_plot
 
 ```
 
+### Ways to interact with the 3d plots below  
+Same information in the plots above is also presented in interactive 3d plots below. Some of the things you can do with the interactive plots below are:  
 
-Cell types are given in the interactive 3D plot below. You can zoom in and drag the plot to see the cells from different angles. Double click on the legend to isolate a certain cell type. 
+ - Zoom in and zoom out using the mouse wheel  
+ - Click on a region in the plot and drag to see different angles  
+ - Double click on a cell type (or cluster number) to hide everyhing else in the plots and show that cell type only. To go back to how the plot was before, double click on the same place in the legend. If you wish to highlight more than one cell type, double click to one of them in the legend, then single click the other one. You can also do this in the 2d plots above as well. 
+ - If you bring your mouse pointer over the 3d plots, you'll notice that a faint panel on the right upper corner of the plot appears. That panel gives more options to interact with the plot. To reset everything in the plot, click "reset camera to last save".  
+
+
 ```{r, message = FALSE, warning = FALSE}
 
 library(plotly)
@@ -136,9 +144,7 @@ p1 <- plot_ly(data = df,
         color = ~cell_type,
         type = "scatter3d",
         mode = "markers",
-        marker = list(size = 3))  %>%    #choose the colors  to color the groups (make sure number of colors specified equal the number of categories)
-
-    add_markers()
+        marker = list(size = 3))  
 
 p1 <- p1 %>% 
   layout(title = '3d t-SNE plot showing cell types')
@@ -152,9 +158,7 @@ p2 <- plot_ly(data = df,
         color = ~cluster,
         type = "scatter3d",
         mode = "markers",
-        marker = list(size = 3))  %>%    #choose the colors  to color the groups (make sure number of colors specified equal the number of categories)
-
-    add_markers()
+        marker = list(size = 3))  
 
 p2 <- p2 %>% 
   layout(title = '3d t-SNE plot showing clusters')
