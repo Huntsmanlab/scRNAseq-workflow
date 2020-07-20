@@ -162,7 +162,7 @@ dm <- readRDS(params$dm_path)
 tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
                   DC2 = eigenvectors(dm)[, 2],
                   DC3 = eigenvectors(dm)[, 3],
-                  cell_type = sce$cell_type) # this will help color based on cluster 
+                  cell_type = sce_cas$cell_type) # this will help color based on cluster 
 
 # make the 2D plot 
 dm_2d <- plot_ly(data = tmp,
