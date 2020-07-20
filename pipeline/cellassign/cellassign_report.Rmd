@@ -11,6 +11,7 @@ params:
   sample: 'ids'
   sce_norm: 'sce_norm'
   sce_cas: 'sce_cas'
+  dm_path: 'dm_path'
   
 ---
 
@@ -71,14 +72,6 @@ df <- data.frame(tsne_1, tsne_2, tsne_3)
 df$cell_type <- as.factor(sce_cas$cell_type)
 df$cluster <- as.factor(sce_cas$cluster)
 
-#############################################################################################################################
-# o <- length(unique(sce_cas$cluster))
-# if (o > 8) {
-#   
-#   mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(o)
-#   
-# } 
-
 # 2d tsne plot showing cell types 
 cell_type_plot <- plot_ly(data = df,
         x = ~tsne_1, y = ~tsne_2,
@@ -91,15 +84,6 @@ cell_type_plot <- plot_ly(data = df,
 
 cell_type_plot <- cell_type_plot %>% 
   layout(title = 'cell types in the sample shown in t-SNE plot')
-
-#############################################################################################################################
-# work on the palette 
-# o <- length(unique(sce_cas$cell_type))
-# if (o > 8) {
-#   
-#   mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(o)
-#   
-# } else {}
 
 # 2d plot showing clusters
 cluster_plot <- plot_ly(data = df,
@@ -137,33 +121,75 @@ Same information in the plots above is also presented in interactive 3d plots be
 
 ```{r, message = FALSE, warning = FALSE}
 
-library(plotly)
 p1 <- plot_ly(data = df,
         x = ~tsne_1, y = ~tsne_2, z = ~tsne_3,
         opacity = 1,
         color = ~cell_type,
         type = "scatter3d",
         mode = "markers",
-        marker = list(size = 3))  
-
-p1 <- p1 %>% 
+        marker = list(size = 3)) %>% 
   layout(title = '3d t-SNE plot showing cell types')
 
-p1
 
-library(plotly)
 p2 <- plot_ly(data = df,
         x = ~tsne_1, y = ~tsne_2, z = ~tsne_3,
         opacity = 1,
         color = ~cluster,
         type = "scatter3d",
         mode = "markers",
-        marker = list(size = 3))  
-
-p2 <- p2 %>% 
+        marker = list(size = 3)) %>% 
   layout(title = '3d t-SNE plot showing clusters')
 
+
+```
+
+```{r message = FALSE, warning = FALSE}
+
+p1
 p2
+
+```
+
+#### Diffusion maps  
+Diffusion maps are a useful technique to pick up branching events in the sample where cells differentiate into different cell types. Below cell type information is shown in both 2 and 3 dimensional diffusion maps. You can interact with these plots same way as above. 
+
+```{r include = FALSE}
+
+# load the dm from params 
+dm <- readRDS(params$dm_path)
+
+# make df with the diffusion map coodinates, we will use this later to make the dm plot 
+tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
+                  DC2 = eigenvectors(dm)[, 2],
+                  DC3 = eigenvectors(dm)[, 3],
+                  cell_type = sce$cell_type) # this will help color based on cluster 
+
+# make the 2D plot 
+dm_2d <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2,
+        opacity = 1,
+        color = ~cell_type,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5)) %>% 
+  layout(title = '2D diffusion map showing cell types')
+
+# make the 3d plot 
+dm_3d <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2, z = ~DC3,
+        opacity = 1,
+        color = ~cell_type,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3))  %>% 
+  layout(title = '3D diffusion map showing cell types')
+
+```
+
+```{r warning = FALSE, message = FALSE}
+
+dm_2d
+dm_3d
 
 ```
 
