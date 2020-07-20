@@ -15,6 +15,7 @@ params:
   HVG: 'HVG'
   top_HVG: 'top_HVG'
   top_PCs: 'top_PCs'
+  dm_path: 'dm_path'
   
 ---
 
@@ -84,9 +85,26 @@ set.seed(params$seed2)
 sce_norm <- runTSNE(sce_norm, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, perplexity = 20)
 sce_norm <- runUMAP(sce_norm, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, min_dist = 0.5, n_neighbors = 15, metric = "euclidean")
 
+```
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+
+message(print("Computing diffusion map coordinates. This may take a while depending on how large your SCE object is, up to 10 minutes."))
+
+sce_logcounts <- logcounts(sce_norm)  # access log-transformed counts matrix
+sce_logcounts <- as.matrix(sce_logcounts)
+
+# Make a diffusion map, this step can take a while depending on how large the sce object is, up to 10 minutes. 
+dm <- DiffusionMap(t(sce_logcounts), n_pcs = 30)
+
+# save this object separately from the sce 
+saveRDS(dm, params$dm_path)
+
+```
+
+```{r include = FALSE}
 # save the output 
 saveRDS(sce_norm, file = params$sce_red)
-
 
 ```
 
