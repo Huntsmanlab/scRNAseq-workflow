@@ -47,6 +47,7 @@ suppressPackageStartupMessages({
   library(ggthemes)
   library(destiny)
   library(ggbeeswarm)
+  library(plotly)
 })
 
 #ADD THEME #### 
@@ -89,6 +90,75 @@ theme_amunzur <- theme(
 # plotDEG_scran()
 # scran_batch_norm()
 ####################################################################################################
+# make_tsne_plot <- function(sce, 
+#                            color, 
+#                            dimensions, 
+#                            title) {
+#   
+#   # extract coordinates and save them in a list 
+#   i <- 1
+#   dimensions_list <- list()
+#   
+#   while (i <= dimensions){
+#     dim <- list(as.numeric(sce@int_colData@listData[["reducedDims"]]$TSNE[, i]))
+#     dimensions_list <- append(dimensions_list, dim) 
+#     
+#     i <- i + 1 
+#     
+#   }
+#   
+#   # make a df from the coordinates 
+#   df <- do.call(data.frame, dimensions_list)
+#   
+#   # do some renaming 
+#   if (dimensions == 3){
+#     names(df) <- c("t-SNE1", "t-SNE2", "t-SNE3")
+#   } else{
+#     names(df) <- c("t-SNE1", "t-SNE2")
+#   }
+#   
+#   # now add another column to df based on what you want to color 
+#   if (color == 'cluster') {
+#     df$cluster <- sce$cluster
+#   } else if (color == 'cell_type'){
+#     df$cell_type <- sce$cell_type
+#   }
+#   
+#   # make the plot here
+#   if (dimensions == 3) {
+#     
+#     dimred_plot <- plot_ly(data = df,
+#                            x = ~df[, 1], y = ~df[, 2], z = ~df[, 1]
+#                            opacity = 1,
+#                            color = ~cell_type,
+#                            type = "scatter",
+#                            mode = "markers",
+#                            marker = list(size = 5)) %>% 
+#       
+#       add_markers()
+#     
+#     cell_type_plot <- cell_type_plot %>% 
+#       layout(title = 'cell types in the sample shown in t-SNE plot')
+#     
+#     
+#   }
+#   
+#   
+#   return(dimred_plot)
+#   
+# }
+# 
+# 
+# 
+# 
+
+
+
+
+
+
+
+
 
 
 
@@ -112,7 +182,10 @@ master_cell_types <- c("B cells",
                        "Myofibroblast",
                        "other",                        
                        "Plasma cells",
+                       "Proliferative cells",
+                       "Stem cells", 
                        "T cells",
+                       "Unciliated_cells", 
                        "Vascular smooth muscle cells")
 
 master_color_palette <- c(
@@ -130,7 +203,10 @@ master_color_palette <- c(
   'chartreuse1',
   'mediumorchid2',
   'khaki1', 
-  'thistle4')
+  "lawngreen",
+  "darkmagenta",
+  'thistle4', 
+  'yellow4')
 
 # to visualize these colors 
 # pie(rep(1, 15), col = master_color_palette)

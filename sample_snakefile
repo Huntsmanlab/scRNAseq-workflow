@@ -1,11 +1,21 @@
 import os.path
 from snakemake_helper_functions import *
 
-ids = ['DH25']
-pair_ids = ['VOA11229_CCOC-DH21_NEW', 'VOA11229_CCOC-DH22_NEW', 'DH7-DH21_NEW', 'DH7-DH22_NEW'] # separate the pairs with "-", no quotation marks. 
+# To make it easy to copy, I added the samples here: 
+# 'bgi_175_001-ilm_175_001' 'bgi_176_001-ilm_176_001', 'bgi_176_002-ilm_176_002' 'DH13', 'DH18', 'VOA11229_CCOC', 'DH7', 'DH8'
+# 'DH24', 'DH7', 'DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16'
 
-ids_integration = ['VOA10286UT_DBZ-VOA10286UT_ctr']
-ids_dge = ['DH24=DH8'] # second id will be compared to first one
+# ids = ['DH21_NEW', 'DH22_NEW', 'DH21_control', 'DH22_control', 'DH21_P5', 'DH21_P5_control'] #  separate the ids with a comma
+# ids = ['sample42', 'sample70_0', 'sample70_2', 'sample70_3', 'combined_sample70']
+# ids = ['DH24', 'DH8', 'DH4', 'DH7', 'DH10', 'DH3', 'DH7', 'VOA11229_CCOC', 'DH21_NEW', 'DH22_NEW', 'DH21_P5']
+
+ids = ['DH25']
+# ids = "DH3"
+# pair_ids = ['DH13-DH21_control', 'DH15-DH22_control', 'DH15-DH21_control', 'DH15-DH22_control', 'DH16-DH21_control', 'DH16-DH22_control', 'VOA11068_ENOC-DH21_control', 'VOA11068_ENOC-DH22_control'] # separate the pairs with "-", no quotation marks
+pair_ids = ["VOA10286UT_control_BOTTOM-VOA10286UT_control_TOP"]
+
+ids_integration = ['VOA11229_CCOC-DH7-DH10', 'VOA11229_CCOC-DH7']
+ids_dge = ['VOA10819UT_control_TOP=VOA10819UT_control_BOTTOM', 'VOA10286UT_control_TOP=VOA10286UT_control_BOTTOM'] # second id will be compared to first one
 
 id_type = []
 
@@ -14,13 +24,16 @@ make_wildcard = lambda some_list: "=".join(some_list)
 common_dge_wildcard = make_wildcard(pair_ids)
 
 # FILE NAMES FOR RULE ALL 
-path_to_10X = '../data/raw/{id}'
-sce_raw = '../data/processed/{id}/sce.rds'
+path_to_10X = '../data/raw/{id}' # where we keep the 10X outputs
+sce_raw = '../data/processed/{id}/sce.rds' # processed 10X outputs into an sce 
 
-sce_qc = '../data/qc/{id}/sce_qc.rds'
-sce_norm = '../data/normalized/{id}/sce_norm.rds'
-sce_clus = '../data/clustered/sce/{id}/sce_clus.rds'
-sce_epith = '../data/epithelial_cells_only/{id}/sce.rds'
+sce_qc = '../data/qc/{id}/sce_qc.rds' # sce after QC
+sce_norm = '../data/normalized/{id}/sce_norm.rds' # normalized sce
+sce_red = '../data/dim_reduction/{id}/sce_red.rds'# sce after dim reduction
+dm_path = '../data/dim_reduction/{id}/dm.rds'# diff map coordinates  
+
+sce_clus = '../data/clustered/sce/{id}/sce_clus.rds' # clustered sce 
+sce_epith = '../data/epithelial_cells_only/{id}/sce.rds' # sce with epithelial cells only
 
 # SEURAT INTEGRATION
 sce_uncorrected = '../data/integrated/{ids_integration}/uncorrected.rds' # combined, but not integrated (has batch effects)
@@ -33,11 +46,10 @@ path_to_batch_report = '../reports/batch_normalization/{ids_integration}/batch_c
 
 # MARKDOWN REPORTS
 summary_stats_report = '../reports/summary_stats_new/{pair_ids}/summary_stats.html'
-
-sce_clus_report = '../reports/separate_clustering/{id}/separate_clustering.html'
-
+dimRed_report = '../reports/dim_reduction/{id}/dim_reduction.html'
 integration_report = '../reports/integration/{ids_integration}/integration_report.html'
 
+sce_clus_report = '../reports/separate_clustering/{id}/separate_clustering.html'
 combined_clustering_report = '../reports/combined_clustering/{pair_ids}/combined_clustering.html'
 combined_clustering_uncorrected = '../data/clustered/combined/{pair_ids}/uncorrected_seurat_object.rds'
 combined_clustering_integrated = '../data/clustered/combined/{pair_ids}/integrated_seurat_object.rds'
@@ -82,6 +94,9 @@ do_qc = expand(sce_qc, id = ids)
 # normalize an sce 
 normalize_sce =  expand(sce_norm, id = ids)
 
+# perform dim reduction in sce 
+perform_dim_reduction = [expand(sce_red, id = ids), expand(dimRed_report, id = ids)]
+
 # cluster an sce
 cluster_sce = [expand(sce_clus, id = ids), expand(sce_clus_report, id = ids)]
 
@@ -119,7 +134,8 @@ rule all:
     # make_sce,
     # do_qc,
     # normalize_sce,
-    # cluster_sce,
+    # perform_dim_reduction,
+    cluster_sce,
     # cluster_two_samples,
     # run_cell_assign_on_INDIVIDUAL_samples,
     # integrate_cell_assign_results,
@@ -179,9 +195,7 @@ rule make_sce_qc:
 # normalize the sce by taking log counts and perform dim reduction at the same time
 rule normalize_sce:
   params:
-    seed = 1756, 
-    HVG = "yes", 
-    top_HVG = 20 # percentage of genes with the highest biological components
+    seed = 1756
   input:
     sce_qc
   output:
@@ -190,17 +204,41 @@ rule normalize_sce:
     "Rscript pipeline/normalization/normalize_sce.R \
      --path_to_QCed_sce {input} \
      --output_file_name {output} \
-     --seed {params.seed} \
-     --HVG {params.HVG} \
-     --top_HVG {params.top_HVG}"
+     --seed {params.seed}"
+     
+rule dim_reduction: 
+  params: 
+    curr_dir = os.getcwd(), 
+    seed1 = 1998, 
+    seed2 = 1999,
+    HVG = "yes", # subset to HVG 
+    top_HVG = 20, 
+    top_PCs = 200 # options are either "computed" or a number that you supply
+  input: 
+    sce_norm = sce_norm
+  output: 
+    sce_red = sce_red, 
+    dimRed_report = dimRed_report,
+    dm_path = dm_path
+  shell:
+    "Rscript -e \"rmarkdown::render('pipeline/dim_reduction/dim_reduction.Rmd',\
+     output_file='{params.curr_dir}/{output.dimRed_report}', \
+     knit_root_dir='{params.curr_dir}',\
+     params = list(seed1 ='{params.seed1}', seed2 = '{params.seed2}', HVG = '{params.HVG}', top_HVG = '{params.top_HVG}', top_PCs = '{params.top_PCs}', \
+     path_to_sce_norm = '{input.sce_norm}', sce_red = '{output.sce_red}', dm_path = '{output.dm_path}'))\" "
 
 # cluster the sce alone 
 rule cluster_sce:
   params:
     curr_dir = os.getcwd(),
-    sample = '{id}'
+    sample = '{id}', 
+    perplexity_list = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100], 
+    chosen_perp = 30, 
+    k_list = [5, 9, 10, 12, 15, 18], # number of nearest neighbors used to construct the shared neighbors plot 
+    chosen_k = 15
   input:
-    path_to_sce_norm = sce_cas
+    path_to_sce_norm = sce_red,
+    dm_path = dm_path
   output:
     output_path = sce_clus, 
     report = sce_clus_report
@@ -208,7 +246,8 @@ rule cluster_sce:
      "Rscript -e \"rmarkdown::render('pipeline/clustering/separate/clustering.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
-     params = list(id ='{params.sample}', output_path = '{output.output_path}', path_to_sce_norm = '{input.path_to_sce_norm}'))\" "
+     params = list(id ='{params.sample}', output_path = '{output.output_path}', dm_path = '{input.dm_path}', path_to_sce_norm = '{input.path_to_sce_norm}', perplexity_list = '{params.perplexity_list}', \
+     chosen_perp = '{params.chosen_perp}', k_list = '{params.k_list}', chosen_k = '{params.chosen_k}'))\" "
 
 
 # integrate (remove batch effects) and cluster 2 sces together 
@@ -335,7 +374,7 @@ rule paired_dge_basic:
     curr_dir = os.getcwd(),
     ids = '{pair_ids}'
   input:
-    sce_clus = lambda wildcards: paired_dge_input_files(wildcards, sce_clus)
+    sce_norm = lambda wildcards: paired_dge_input_files(wildcards, sce_norm)
   output:
     output_path_paired = paired_dge_output,
     report = paired_dge_basic_report
@@ -343,7 +382,7 @@ rule paired_dge_basic:
     "Rscript -e \"rmarkdown::render('pipeline/paired_dge/paired_dge_basic.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}', \
-     params = list(ids ='{params.ids}', sce_clus = '{input.sce_clus}', output_path_paired = '{output.output_path_paired}'))\" "
+     params = list(ids ='{params.ids}', sce_norm = '{input.sce_norm}', output_path_paired = '{output.output_path_paired}'))\" "
      
 # find common dges between two paired dge comparisons 
 rule find_common_dges:
@@ -390,14 +429,15 @@ rule cellassign_report:
     sample = ids
   input: 
     sce_norm = sce_norm, 
-    sce_cas = sce_cas
+    sce_cas = sce_cas, 
+    dm_path = dm_path
   output:
     report = cellassign_report_single_sample
   shell:
     "Rscript -e \"rmarkdown::render('pipeline/cellassign/cellassign_report.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
-     params = list(sample ='{params.sample}', sce_norm = '{input.sce_norm}', sce_cas = '{input.sce_cas}'))\" "
+     params = list(sample ='{params.sample}', sce_norm = '{input.sce_norm}', sce_cas = '{input.sce_cas}', dm_path = '{input.dm_path}'))\" "
      
      
 rule integrate_cellassign:
