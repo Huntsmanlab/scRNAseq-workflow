@@ -70,12 +70,12 @@ if (params$HVG == "yes") { # user wants to subset the sce to HVG
   altExp(sce_qc_hvg, "original") <- sce_norm
   sce_norm <- sce_qc_hvg
   
-  set.seed(params$seed2)
+  set.seed(as.numeric(params$seed2))
   sce_norm <- runPCA(sce_norm, exprs_values = "logcounts", ncomponents = PCs)
   
 } else { # compute PCA (and other dim reduction methods) without subsetting to top HVG
   
-  set.seed(params$seed2)
+  set.seed(as.numeric(params$seed2))
   sce_norm <- runPCA(sce_norm, exprs_values = "logcounts", ncomponents = PCs)
   
 }
@@ -115,13 +115,14 @@ saveRDS(sce_norm, file = params$sce_red)
 sobject <- as.Seurat(sce_norm, counts = "counts", data = "logcounts")
 Idents(sobject) <- paste(unique(sce_norm$id))
 
+# sobject@reductions$pca <- sobject@reductions$PCA
+# sobject@reductions$tsne <- sobject@reductions$TSNE
+# sobject@reductions$umap <- sobject@reductions$UMAP
+
 sobject <- ScaleData(sobject)
 sobject <- FindVariableFeatures(sobject)
 
-sobject@reductions$pca <- sobject@reductions$PCA
-sobject@reductions$tsne <- sobject@reductions$TSNE
-sobject@reductions$umap <- sobject@reductions$UMAP
-
+set.seed(as.numeric(params$seed2))
 sobject <- RunPCA(sobject, features = VariableFeatures(object = sobject))
 
 ```
