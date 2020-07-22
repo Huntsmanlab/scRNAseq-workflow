@@ -172,14 +172,15 @@ do.call(gridExtra::grid.arrange, c(tsne_plots, ncol = 3))
 By inspecting the contribution of each PC to overall variance, we can get a better sense of the heterogeneity of the data.  
 ```{r fig.width = 12, fig.height = 4}
 
-percent.var <- attr(reducedDim(sce), "percentVar")
-
 # visualize first 100 PCs
-if (is.null(percent.var)){
+if (is.null(attr(reducedDim(sce), "percentVar"))){
   
   message(print("Can't produce the plot for this sample. Refer to other methods below to decide how many PCs to include."))
   
-} else {plot(percent.var[1:100], xlab = "PC", ylab = "Variance explained (%)", type = "p", pch = 16, main = "contribution of top 100 PCs to variance") 
+} else {
+  
+  percent.var <- attr(reducedDim(sce), "percentVar")
+  plot(percent.var[1:100], xlab = "PC", ylab = "Variance explained (%)", type = "p", pch = 16, main = "contribution of top 100 PCs to variance") 
 
 }
 
