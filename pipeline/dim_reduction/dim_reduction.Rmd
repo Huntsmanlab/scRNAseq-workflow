@@ -30,7 +30,7 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
   
   
   
-```{r}
+```{r message = FALSE}
 
 # load sce
 sce_norm <- readRDS(params$path_to_sce_norm)
@@ -84,6 +84,7 @@ if (params$HVG == "yes") { # user wants to subset the sce to HVG
 set.seed(params$seed2)
 sce_norm <- runTSNE(sce_norm, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3)
 sce_norm <- runUMAP(sce_norm, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, min_dist = 0.5, n_neighbors = 15, metric = "euclidean")
+
 
 ```
 
