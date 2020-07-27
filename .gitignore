@@ -35,3 +35,12 @@ Snakefile_asli.py
 integration_seurat_cellassign.Rmd 
 integration_seurat_cellassign_O.Rmd 
 run_cellassign_on_raw_data.R 
+
+# ignore the velocity stuff
+velocity
+
+# ignore the scmerge, maybe i'll come back to this later 
+scMerge
+
+# ignore some random script i had been working on 
+comebacklater.Rmd

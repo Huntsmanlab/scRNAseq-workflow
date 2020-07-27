@@ -10,13 +10,19 @@ params:
   id: 'id'
   output_path: 'output_path' # where we save the sce with clustering data 
   path_to_sce_norm: 'sce_norm'
+  chosen_perp: 'chosen_perp'
+  perplexity_list: 'perplexity_list'
+  k_list: 'k_list'
+  chosen_k: 'chosen_k'
+  n_PCs: 'n_PCs'
+  dm_path: 'dm_path'
 ---
   
 In this report, we perform clustering in isolated samples and show the results in dimensionality  
 reduction plots. We also perform modularity analysis and bootstrap to test the quality of our clusters.  
 More info about these two methods are given below, at the top of the respective plots.  
 We use **scran** package for clustering. The algorithm we chose is **nearest neighbors** since it is  
-widely adopted. Scran picks the best number of clusters and uses graph based clustering methods.  
+widely adopted.  
 
 
 ```{r include = FALSE}
@@ -25,180 +31,339 @@ library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 ```
 
-```{r include = FALSE}
+```{r echo = FALSE, message = FALSE}
+
 # load the data - it has to be normalized sce with reduced dimensions 
 sce <- readRDS(params$path_to_sce_norm)
 
+perplexity_list <- params$perplexity_list
+perplexity_list <- strsplit(perplexity_list, " ") # perplexity_list is passed a string with space, get rid of spaces
+perplexity_list <- as.list(c(unlist(list(perplexity_list)))) # save each element separately 
+perplexity_list <- lapply(perplexity_list, function(element) as.numeric(element)) # make them numeric 
+
+k_list <- params$k_list
+k_list <- strsplit(k_list, " ") # perplexity_list is passed a string with space, get rid of spaces
+k_list <- as.list(c(unlist(list(k_list)))) # save each element separately 
+k_list <- lapply(k_list, function(element) as.numeric(element)) # make them numeric 
+
+chosen_perp <- params$chosen_perp
+chosen_perp <- as.numeric(chosen_perp)
+
+chosen_k <- params$chosen_k
+chosen_k <- as.numeric(chosen_k)
+
 ```
 
-### ALGORITHM: Shared neighbor
 ```{r include = FALSE}
-# Build a shared neighbor graph for cells based on their expression profiles.
-g <- buildSNNGraph(sce, use.dimred="UMAP") # shared neighbor weighting
 
-# extract clustering info from the graph that we just made 
-cluster <- igraph::cluster_walktrap(g)$membership
-
-# add that info to the sce 
-sce$cluster <- factor(cluster)
-
-# this table shows how many cells in each cluster 
-cluster_table <- table(sce$cluster)
+g <- buildSNNGraph(sce, use.dimred = "PCA", k = 15) # shared neighbor weighting
+cluster <- igraph::cluster_walktrap(g)$membership # extract clustering info from the graph that we just made 
+sce$cluster <- factor(cluster) # add that info to the sce 
+cluster_table <- table(sce$cluster) # this table shows how many cells in each cluster 
 
 # we can redo the reduced dim plots with the clustering info in mind 
 plotTSNE <- plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', params$id, sep = '_'))
-plotUMAP <- plotUMAP(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', params$id, sep = '_'))
-plotPCA <- plotPCA(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', params$id, sep = '_'))
+
+```
+
+### t-SNE plots with various perplexities  
+Perplexity is an important parameter that determines the granularity of the visualization. Low perplexities will favor resolution of finer structure where local variations dominate, possibly to the point that the visualization is compromised by random noise. Larger perplexity values favor the global geometry of the dataset. Thus, it is advisable to test different perplexity values to ensure that the choice of perplexity does not drive the interpretation of the plot. The performance of SNE is fairly robust to changes in the perplexity, and typical values are between 5 and 50. Below t-SNE plots with various perplexity values are shown. t-SNE with a perplexity of `r params$chosen_perp` is chosen for further downstream analysis.  
+  
+Note that in the plots below, shared neighbor algorithm was used with 15 neighbors. 
+
+```{r, message = FALSE, echo = FALSE}
+
+# perplexity_list <- list(5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100)
+# we will use this to dynamically change the figure height in the next chunk
+dim <- length(perplexity_list) / 3 * 4
+
+```
+
+```{r fig.width = 12, fig.height = dim, message = FALSE}
+
+# define a function to make tsne plots 
+make_tsne_plot <- function(sce, perplexity_value) {
+  
+  sce <- runTSNE(sce, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, perplexity = perplexity_value)
+  p <- list(plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste("perplexity = ", perplexity_value, sep = "")))
+  
+  return(p)
+}
+
+# make copies of the sce object, as many times as the number of different perplexities supplied 
+sce_list <- list()
+i = 1 
+while (i <= length(perplexity_list)) {
+  
+  new_sce <- sce # make a copy of the sce 
+  sce_list[[i]] <- new_sce
+  
+  i = i + 1 
+}
+
+# list of tsne plots with various perplexity values 
+plotlist <- mapply(make_tsne_plot, sce = sce_list, perplexity_value = perplexity_list)
+
+# based on the user passed chosen_perp parameter, pick an sce computed with a certain perplexity value 
+index <- match(chosen_perp, perplexity_list) # find the index of the chosen perp in the perp list 
+sce <- sce_list[[index]]
+
+# visualize all the plots in 3 columns
+do.call(gridExtra::grid.arrange, c(plotlist, ncol = 3))
+
+```
+
+### t-SNE plots with various numbers of clusters 
+After picking a t-SNE plot with a certain perplexity (`r params$chosen_perp`), next we try various numbers for nearest neighbor to see how this changes the number of clusters we have. 
+
+```{r, include = FALSE}
+
+# k_list = list(5, 9, 10, 12, 15, 18)
+
+# we will use this to dynamically change the figure height in the next chunk
+dim <- length(k_list) / 3 * 4
+
+```
+
+
+```{r fig.width = 12, fig.height = dim}
+
+# make copies of the sce object, as many times as the number of different perplexities supplied 
+sce_list <- list()
+i = 1 
+while (i <= length(k_list)) {
+  
+  new_sce <- sce # make a copy of the sce 
+  sce_list[[i]] <- new_sce
+  
+  i = i + 1 
+}
+
+# function to cluster sce with various k values
+cluster_sce <- function(sce, k_value) {
+  
+  g <- buildSNNGraph(sce, use.dimred = "PCA", k = k_value, type = "number") # shared neighbor weighting
+  cluster <- igraph::cluster_louvain(g)$membership # extract clustering info from the graph that we just made 
+  sce$cluster <- factor(cluster) # add that info to the sce 
+
+  return(sce)
+  
+}
+
+# function to make tsne plots for various sces 
+make_tsne_plots <- function(sce, k_value) {
+  
+  p <- list(plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste("k = ", k_value, sep = "")))
+
+  return(p)
+}
+
+sce_list_cluster <- mapply(cluster_sce, sce = sce_list, k_value = k_list) # generate list of sces with various numbers of clusters 
+tsne_plots <- mapply(make_tsne_plots, sce = sce_list_cluster, k_value = k_list) # generate tsne plots using the sce_list and various k values
+
+# based on the user passed chosen_k parameter, pick an sce computed with a certain k value 
+index <- match(chosen_k, k_list) # find the index of the chosen k in the k list 
+sce <- sce_list_cluster[[index]]
+
+do.call(gridExtra::grid.arrange, c(tsne_plots, ncol = 3))
+
+```
+### PCA  
+By inspecting the contribution of each PC to overall variance, we can get a better sense of the heterogeneity of the data.  
+```{r fig.width = 12, fig.height = 4}
+
+percent.var <- attr(reducedDim(sce), "percentVar")
+
+# visualize first 100 PCs
+if (is.null(percent.var)){
+  
+  message(print("Can't produce the plot for this sample. Refer to other methods below to decide how many PCs to include."))
+  
+} else {plot(percent.var[1:100], xlab = "PC", ylab = "Variance explained (%)", type = "p", pch = 16, main = "contribution of top 100 PCs to variance") 
+
+}
+
+```
+We can also plot the top 4 PCs together as shown below to visualize multiple PCs at the same time. Cells grouped according to the cluster they belong to. The diagonal boxes in the scatter plot matrix below show the cell density for each component.  
+
+```{r fig.width = 12, fig.height = 8}
+
+plotReducedDim(sce, dimred="PCA", ncomponents = 4, colour_by="cluster") + ggtitle("4 top PCs")
+
+```
+
+Final dimensionality reduction plots shown below with clustering information: 
+```{r fig.width = 12, fig.height = 8}
+
+p1 <- plotPCA(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', params$id, sep = '_'))
+p2 <- plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('t-SNE', params$id, sep = '_'))
+p3 <- plotUMAP(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', params$id, sep = '_'))
+
+gridExtra::grid.arrange(p1, p2, p3, ncol = 2)
+
+```
+
+### Diffusion maps  
+Diffusion maps are a non-linear dimensionality technique. It achieves dimensionality reduction by re-organising data according to parameters of its underlying geometry. This method can help us  when dealing with data that includes some sort of differentiation or transformation process because diffusion maps are good at picking up brancing in the data. This is a computationally expensive calculation, so to speed things up, it's best to limit the computation to most significant PCs. In this report, top `r params$n_PCs` were used. Results of diffusion map calculation are given in both 2 and 3 dimensional plots below.  
+
+```{r fig.width = 12, fig.height = 8, message = FALSE}
+
+# load the dm from params 
+dm <- readRDS(params$dm_path)
+
+# make df with the diffusion map coodinates, we will use this later to make the dm plot 
+tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
+                  DC2 = eigenvectors(dm)[, 2],
+                  DC3 = eigenvectors(dm)[, 3],
+                  Timepoint = sce$cluster) # this will help color based on cluster 
+
+# make the 2D plot 
+dm_2d <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2,
+        opacity = 1,
+        color = ~Timepoint,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5)) %>% 
+  layout(title = '2D diffusion map showing clusters')
+
+# make the 3d plot 
+dm_3d <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2, z = ~DC3,
+        opacity = 1,
+        color = ~Timepoint,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3))  %>% 
+  layout(title = '3D diffusion map showing clusters')
+
+
+```
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+
+dm_2d
+dm_3d
 
 ```
 
 ```{r include = FALSE}
+
 # here we save the sce object with the clustering data - we only save the shared neighbor clusters 
 saveRDS(sce, file = params$output_path)
 
 ```
 
-```{r echo= FALSE, message = FALSE}
-# now we make the table look nice for the report 
+#### Final clustering plots  
+Below, the final clustering reports are given in interactive plots. When you hover over the plot, you'll notice that a panel comes up in the upper right corner of the plots where a variety of options are given, like zoom in, zoom out etc.  
 
-cluster_table <- as.data.frame(cluster_table) %>% 
-  rename(cluster = Var1, number_of_cells = Freq)
+One of the useful tools is to select the area you wish to zoom in, then the plots will automatically take you there.  
 
-cluster_table %>% 
-  knitr::kable(caption = 'Table 1: number of cells in each cluster - shared neighbor ') %>% 
-  kable_styling(full_width = F)
-
-```
-
-```{r echo = FALSE, message = FALSE}
-# visualize these graphs 
-plotTSNE
-plotUMAP
-plotPCA
-```
 
 ```{r include = FALSE}
-# CHECK THE ACCURACY OF OUR CLUSTERING: 
-# here we calculate the modularity scores for our clusters. this helps understand the relationships between clusters. 
-# we want the clusters to be distinct, so we dont want different clusters to interact closely. 
-ratio <- clusterModularity(g, cluster, as.ratio=TRUE)
 
-# here, we want the diagonal squares to be dark but the other ones to be as light as possible. 
-# darker colors mean higher modularity - higher interaction 
-# this will be helpful to diagnose low quality clustering 
-heatMap_modularity <- pheatmap(log10(ratio+1), cluster_cols=FALSE, cluster_rows=FALSE, col=rev(heat.colors(100)), main = 'modularity')
+# get tsne coordinates
+tsne_1 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$TSNE[, 1])
+tsne_2 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$TSNE[, 2])
+tsne_3 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$TSNE[, 3])
 
-# now we do bootstrapping on our clusters. ideally, a cell in a cluster should always remain there. 
-boot_results <- bootstrapCluster(sce, FUN=function(x) {
-  g <- buildSNNGraph(x, use.dimred="UMAP")
-  igraph::cluster_walktrap(g)$membership}, clusters=sce$cluster)
+df_tsne <- data.frame(tsne_1, tsne_2, tsne_3)
+df_tsne$cluster <- as.factor(sce$cluster)
 
-# same thing, you only want the diagonal squares to have a dark color. 
-heatMap_bootstrap <- pheatmap(boot_results, cluster_cols=FALSE, cluster_rows=FALSE, col=colorRampPalette(c("white", "blue"))(100), main = 'bootstrap')
-```
+# get umap coordinates 
+umap_1 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$UMAP[, 1])
+umap_2 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$UMAP[, 2])
+umap_3 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$UMAP[, 3])
 
+df_umap <- data.frame(umap_1, umap_2, umap_3)
+df_umap$cluster <- as.factor(sce$cluster)
 
-#### Modularity scores 
-Here, we measure how much our clusters interact. Ideally, we want the interaction within a cluster  
-to be high, but we don't want separate clusters to interact. This heatmap helps visualize this:  
-the diagonal squares should be darkest, but the surrounding squares should be as light as possible.  
-If you see a lot of darker squares around, you may want to reconsider your clustering parameters.  
-The lower part of the heatmap is obviously not applicable, just focus on the top part of the plot.   
-Note that the darker the square, stronger the interaction.
-
-```{r echo = FALSE, message = FALSE}
-heatMap_modularity
-```
-
-
-#### Bootstrap results 
-We use bootstrapping multiple times to redo the clustering. Ideally, cells in a cluster would remain there  
-in each time we do the clustering again. The way you read this heatmap is very similar to the heatmap above.  
-The best case is when the diagonal squares are darkest but the other ones are as light as possible.  
-If you see many squares with darker colors outside the main diagonal, that means cells appeared in  
-various clusters as we redid clustering through bootstrapping. 
-
-```{r echo = FALSE, message = FALSE}
-heatMap_bootstrap
-```
-
-### ALGORITHM: k means 
-```{r include = FALSE}
-# Build a k means graph for cells based on their expression profiles.
-g <- buildKNNGraph(sce, use.dimred="UMAP") # k means 
-
-# extract clustering info from the graph that we just made 
-cluster <- igraph::cluster_walktrap(g)$membership
-
-# add that info to the sce 
-sce$cluster <- factor(cluster)
-
-# this table shows how many cells in each cluster 
-cluster_table <- table(sce$cluster)
-
-# we can redo the reduced dim plots with the clustering info in mind 
-plotTSNE <- plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', params$id, sep = '_'))
-plotUMAP <- plotUMAP(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', params$id, sep = '_'))
-plotPCA <- plotPCA(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', params$id, sep = '_'))
-
-```
-
-
-
-
-```{r echo= FALSE, message = FALSE}
-# now we make the table look nice for the report 
-
-cluster_table <- as.data.frame(cluster_table) %>% 
-  rename(cluster = Var1, number_of_cells = Freq)
-
-cluster_table %>% 
-  knitr::kable(caption = 'Table 1: number of cells in each cluster') %>% 
-  kable_styling(full_width = F)
-
-```
-
-```{r echo = FALSE, message = FALSE}
-# visualize these graphs 
-plotTSNE
-plotUMAP
-plotPCA
 ```
 
 
 ```{r include = FALSE}
-# CHECK THE ACCURACY OF OUR CLUSTERING: 
-# here we calculate the modularity scores for our clusters. this helps understand the relationships between clusters. 
-# we want the clusters to be distinct, so we dont want different clusters to interact closely. 
-ratio <- clusterModularity(g, cluster, as.ratio=TRUE)
 
-# here, we want the diagonal squares to be dark but the other ones to be as light as possible. 
-# darker colors mean higher modularity - higher interaction 
-# this will be helpful to diagnose low quality clustering 
-heatMap_modularity <- pheatmap(log10(ratio+1), cluster_cols=FALSE, cluster_rows=FALSE, col=rev(heat.colors(100)), main = 'modularity')
+# make 2d plots according to dims we calculate before 
+tsne <- plot_ly(data = df_tsne,
+        x = ~tsne_1, y = ~tsne_2,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5)) %>% 
+  layout(title = 'clusters shown in t-SNE plot')
 
-# now we do bootstrapping on our clusters. ideally, a cell in a cluster should always remain there. 
-boot_results <- bootstrapCluster(sce, FUN=function(x) {
-  g <- buildSNNGraph(x, use.dimred="UMAP")
-  igraph::cluster_walktrap(g)$membership}, clusters=sce$cluster)
+umap <- plot_ly(data = df_umap,
+        x = ~umap_1, y = ~umap_2,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5)) %>% 
+  layout(title = 'clusters shown in UMAP plot')
 
-# same thing, you only want the diagonal squares to have a dark color. 
-heatMap_bootstrap <- pheatmap(boot_results, cluster_cols=FALSE, cluster_rows=FALSE, col=colorRampPalette(c("white", "blue"))(100), main = 'bootstrap')
+```
+
+```{r}
+
+# make 3d plots below 
+tsne_3d <- plot_ly(data = df_tsne,
+        x = ~tsne_1, y = ~tsne_2, z = ~tsne_3,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 4)) %>% 
+  layout(title = 'clusters shown in t-SNE plot - 3D')
+
+umap_3d <- plot_ly(data = df_umap,
+        x = ~umap_1, y = ~umap_2, z = ~umap_3,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 4)) %>% 
+  layout(title = 'clusters shown in UMAP plot - 3D')
+
 ```
 
 
-#### Modularity scores 
+```{r}
 
-```{r echo = FALSE, message = FALSE}
-heatMap_modularity
+tsne
+umap
+
+```
+
+### Ways to interact with the 3d plots below  
+Same information in the plots above is also presented in interactive 3d plots below. Some of the things you can do with the interactive plots below are:  
+
+ - Zoom in and zoom out using the mouse wheel  
+ - Click on a region in the plot and drag to see different angles  
+ - Double click on a cell type (or cluster number) to hide everyhing else in the plots and show that cell type only. To go back to how the plot was before, double click on the same place in the legend. If you wish to highlight more than one cell type, double click to one of them in the legend, then single click the other one. You can also do this in the 2d plots above as well. 
+ - If you bring your mouse pointer over the 3d plots, you'll notice that a faint panel on the right upper corner of the plot appears. That panel gives more options to interact with the plot. To reset everything in the plot, click "reset camera to last save".  
+
+```{r}
+
+tsne_3d
+umap_3d
+
 ```
 
 
-#### Bootstrap results 
 
-```{r echo = FALSE, message = FALSE}
-heatMap_bootstrap
-```
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

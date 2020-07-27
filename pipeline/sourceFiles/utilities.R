@@ -43,7 +43,11 @@ suppressPackageStartupMessages({
   library(glue)
   library(fgsea)
   library(splatter)
-  
+  library(viridis)
+  library(ggthemes)
+  library(destiny)
+  library(ggbeeswarm)
+  library(plotly)
 })
 
 #ADD THEME #### 
@@ -86,6 +90,75 @@ theme_amunzur <- theme(
 # plotDEG_scran()
 # scran_batch_norm()
 ####################################################################################################
+# make_tsne_plot <- function(sce, 
+#                            color, 
+#                            dimensions, 
+#                            title) {
+#   
+#   # extract coordinates and save them in a list 
+#   i <- 1
+#   dimensions_list <- list()
+#   
+#   while (i <= dimensions){
+#     dim <- list(as.numeric(sce@int_colData@listData[["reducedDims"]]$TSNE[, i]))
+#     dimensions_list <- append(dimensions_list, dim) 
+#     
+#     i <- i + 1 
+#     
+#   }
+#   
+#   # make a df from the coordinates 
+#   df <- do.call(data.frame, dimensions_list)
+#   
+#   # do some renaming 
+#   if (dimensions == 3){
+#     names(df) <- c("t-SNE1", "t-SNE2", "t-SNE3")
+#   } else{
+#     names(df) <- c("t-SNE1", "t-SNE2")
+#   }
+#   
+#   # now add another column to df based on what you want to color 
+#   if (color == 'cluster') {
+#     df$cluster <- sce$cluster
+#   } else if (color == 'cell_type'){
+#     df$cell_type <- sce$cell_type
+#   }
+#   
+#   # make the plot here
+#   if (dimensions == 3) {
+#     
+#     dimred_plot <- plot_ly(data = df,
+#                            x = ~df[, 1], y = ~df[, 2], z = ~df[, 1]
+#                            opacity = 1,
+#                            color = ~cell_type,
+#                            type = "scatter",
+#                            mode = "markers",
+#                            marker = list(size = 5)) %>% 
+#       
+#       add_markers()
+#     
+#     cell_type_plot <- cell_type_plot %>% 
+#       layout(title = 'cell types in the sample shown in t-SNE plot')
+#     
+#     
+#   }
+#   
+#   
+#   return(dimred_plot)
+#   
+# }
+# 
+# 
+# 
+# 
+
+
+
+
+
+
+
+
 
 
 
@@ -109,7 +182,10 @@ master_cell_types <- c("B cells",
                        "Myofibroblast",
                        "other",                        
                        "Plasma cells",
+                       "Proliferative cells",
+                       "Stem cells", 
                        "T cells",
+                       "Unciliated_cells", 
                        "Vascular smooth muscle cells")
 
 master_color_palette <- c(
@@ -127,7 +203,10 @@ master_color_palette <- c(
   'chartreuse1',
   'mediumorchid2',
   'khaki1', 
-  'thistle4')
+  "lawngreen",
+  "darkmagenta",
+  'thistle4', 
+  'yellow4')
 
 # to visualize these colors 
 # pie(rep(1, 15), col = master_color_palette)
@@ -655,4 +734,44 @@ combine_sces <- function(..., sce_list = NULL, prefix_col_name = NULL, suffix_co
   
   return(sce_list[[1]])
   
+}
+
+fMarkersSampling <- function(sce, pivot_cluster, target_group, randomSubsets) {
+  
+  ### Calculate the top DEGs for each random sample comparison
+  idxs_list <- vector("list", randomSubsets)
+  X <- 1:randomSubsets
+  s_names <- sce$id
+  idx_p <- which(s_names %in% c(pivot_cluster))
+  idx_t <- which(s_names %in% c(target_group))
+  
+  U <-  list()
+  for (i in X) { idxs_list[[i]] <- c(idx_p, sample(idx_t, size = length(idx_p))) }# grab random sample indices and pivot indices for loop
+  
+  cnt <- 1
+  repeat {                                                                        # Do randomSubset iterations to find DEGs
+    if(cnt > randomSubsets) {
+      break
+    }
+    
+    idxs <- c(idx_p, sample(idx_t, size = length(idx_p)))
+    x <- sce[rowData(sce)[[3]], idxs]                                             # Grab just the genes passing qc and cells of interest
+    markers <- findMarkers(x, groups = x$id, log.p = TRUE)                        # Do pairwise differential expression (ANY)
+    markers <- markers[[pivot_cluster]]
+    markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(log.FDR < -1.6)
+    markers_sig <- dplyr::arrange(markers_sig, dplyr::desc(abs(markers_sig[,4]))) # order
+    tt_top <- head(markers_sig, 2000)                                             # Identify top '2000' genes
+    
+    U[[cnt]] <- tt_top
+    cnt <- cnt+1
+  }
+  
+  ############### WHHHHHYYYYYYYY DOOOOESSSNNNTTTTTTT this WOOOOOOOOORRRRRKKKKKK????????
+  # L <- lapply(ls, function(l){
+  #   x <- sce[rowData(sce)$qc_pass, l[[1]]]
+  #   marks <- findMarkers(x, groups = x$id, log.p = TRUE)
+  # })
+  ############### 
+  
+  return(U)                                                                       # Return a matrix of gene ranks in order of p-value by sample
 }
