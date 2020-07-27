@@ -77,8 +77,8 @@ suppressPackageStartupMessages({
   library(R.utils)
 })
 
-source(here('source_scripts', 'utility_m.R'))
-source(here('source_scripts', 'utils_dge.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utils_dge.R'))
 
 ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
 clusters <- 'temp'
