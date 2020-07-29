@@ -115,7 +115,7 @@ whatagreatfunction <- function(path_to_sce_cas,
   integrated <- ScaleData(integrated, verbose = FALSE)
   set.seed(1998)
   integrated <- RunPCA(integrated, verbose = FALSE)
-  integrated <- RunUMAP(integrated, dims = 1:30, dim_embed = 3)
+  integrated <- RunUMAP(integrated, dims = 1:30)
   integrated <- RunTSNE(integrated, dims = 1:30, dim_embed = 3)
   
   # saveRDS(integrated, file = "path")
