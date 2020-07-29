@@ -124,11 +124,12 @@ whatagreatfunction <- function(path_to_sce_cas,
   saveRDS(integrated, file = integrated_object_name, compress = TRUE) # corrected data
   # saveRD(integrated, file = "/huntsman/amunzur/data/misc/important_data.gzip", compress = TRUE)
   
-  # compute the combined but uncorrected object 
+  # compute the combined but uncorrected object, only fix the sequencing depth 
   # load the normalized data 
   sces <- lapply(path_to_sce_cas, function(path) readRDS(path))
     
   sces <- intersect_all(sces) # subset to common genes 
+  sces <- scran_batch_norm(sces)  # only correct for sequencing depth
   combined <- do.call(combine_sces, sces) # combine the objects 
     
   # some dim reduction 
