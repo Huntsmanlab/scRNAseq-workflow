@@ -135,8 +135,8 @@ whatagreatfunction <- function(path_to_sce_cas,
   # some dim reduction 
   set.seed(1564)
   combined <- runPCA(combined)
-  combined <- runTSNE(combined, dim.embed = 3, seed.use = 100)
-  combined <- runUMAP(combined, seed.use = 200)
+  combined <- runTSNE(combined, ncomponents = 3)
+  combined <- runUMAP(combined)
     
   # now save the object 
   saveRDS(combined, file = path_to_combined_sce) # uncorrected data 
