@@ -115,8 +115,8 @@ whatagreatfunction <- function(path_to_sce_cas,
   integrated <- ScaleData(integrated, verbose = FALSE)
   set.seed(1998)
   integrated <- RunPCA(integrated, verbose = FALSE)
-  integrated <- RunUMAP(integrated, dims = 1:30)
-  integrated <- RunTSNE(integrated, dims = 1:30, dim_embed = 3)
+  integrated <- RunTSNE(integrated, dims = 1:30, dim.embed = 3, seed.use = 300)
+  integrated <- RunUMAP(integrated, dims = 1:30, seed.use = 1000)
   
   # saveRDS(integrated, file = "path")
   
@@ -134,8 +134,8 @@ whatagreatfunction <- function(path_to_sce_cas,
   # some dim reduction 
   set.seed(1564)
   combined <- runPCA(combined)
-  combined <- runTSNE(combined)
-  combined <- runUMAP(combined)
+  combined <- runTSNE(combined, dim.embed = 3, seed.use = 100)
+  combined <- runUMAP(combined, seed.use = 200)
     
   # now save the object 
   saveRDS(combined, file = path_to_combined_sce) # uncorrected data 
