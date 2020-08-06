@@ -118,10 +118,12 @@ whatagreatfunction <- function(path_to_sce_cas,
   integrated <- RunTSNE(integrated, dims = 1:30, dim.embed = 3, seed.use = 300)
   integrated <- RunUMAP(integrated, dims = 1:30, seed.use = 1000)
   
-  # saveRDS(integrated, file = "path")
+  # clustering
+  integrated <- FindNeighbors(integrated, dims = 1:10)
+  integrated <- FindClusters(integrated, resolution = 0.5)
   
   # save the data
-  saveRDS(integrated, file = integrated_object_name, compress = TRUE) # corrected data
+  saveRDS(integrated, file = integrated_object_name) # corrected data
   # saveRD(integrated, file = "/huntsman/amunzur/data/misc/important_data.gzip", compress = TRUE)
   
   # compute the combined but uncorrected object, only fix the sequencing depth 
