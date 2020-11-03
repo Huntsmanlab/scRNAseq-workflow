@@ -7,30 +7,30 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 
 params:
   # INSTRUCTIONS: Declare the location of the samples that you need for this analysis. Separate samples by a single '-'
-  ins: '/huntsman/amunzur/data/cellassign/VOA10819UT_DBZ/sce_norm_cas.rds'
+  ins: '/huntsman/amunzur/data/normalized/DH6/sce_norm.rds'
   # INSTRUCTIONS: List the ids of the samples from above in the same order. Could also be a name of your choosing. 
-  # Separate samples by a single '-'.
-  ids: 'VOA10819UT_DBZ'
+  # Separate samples by a single '-'. Then add a pipe char '|', to demarcate a comparison if doing so between samples. ex. 'DH8-|-DH6-DH7'
+  ids: 'DH6'
   # INSTRUCTIONS: We can do a differential gene expression calculation between samples or between groups/clusters within samples.
   #               Both flags must be FALSE for b/w sample comparison.
   #               Otherwise set these variables:
   #                 To compare between clusters stored in your sce object's metadata, name the metadata field for the first flag, and
   #                 the clusters in the reporter flag. Fields must match exactly.
   #                 eg. for cell type b/w epithelial cells, put clusters: 'cell_type' and reporter: 'Epithelial ciliated, Epithelial secretory'
-  clusters: 'cell_type'
+  clusters: FALSE
   #                 Set only the reporter flag if you would like the cells containing a single given reporter not already added to the metadata
   #                 separated into their own 'group' and compared. Fields must match exactly.
   #                 Provide the name of the reporter in the sce object, otherwise set the parameter to FALSE.
-  reporter: 'Epithelial cells, Epithelial ciliated cells'
+  reporter: 'dsRED'
   
   # INSTRUCTIONS: Set this flag to run repeat sampling to determine DEGS. For when we have unequal sample sizes. 
   #               First grouping must be the small sample.
   unequal: TRUE
 
   # INSTRUCTIONS: Location where you would like the output data stored
-  output_path: '/huntsman/mdouglas/dh_organoid/data/dge/VOA10819UT_DBZ'
+  output_path: '/huntsman/mdouglas/dh_organoid/data/dge'
   # INSTRUCTIONS: Name of the output data file
-  output_file: 'outputs_27072020.rds'
+  output_file: 'outputs_29102020.rds'
   
   pathwayHmark: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/h.all.v6.2.symbols.gmt'
   pathwayGO: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/c5.all.v6.2.symbols.gmt'
@@ -97,8 +97,24 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control, randomSubsets
     if(is.null(rowData(sce)$qc_pass)) {
       sce <- gene_filter(sce, gene_min_counts = 100, gene_min_detection_rate = 5, reporters = NULL) }
   } else {
+    inputs <- strsplit(inputs, "-")[[1]] # split by "-" SO ID itself must NOT CONTAIN "-"
     sce_list <- lapply(inputs, function(id) readRDS(id))
-    names(sce_list) <- ids
+    if (!is.na(match('|', ids))) {                                                                        # For intersample DGE, find split in samples
+      idx <- match('|', ids)
+      ids <- ids[-idx]
+      names(sce_list) <- ids
+      group1 <- lapply(ids[1:idx-1], function(id) dim(sce_list[[id]])[2])
+      group2 <- lapply(ids[idx:length(ids)], function(id) dim(sce_list[[id]])[2])
+      grp1 <- paste(ids[1:idx-1], collapse = '-')
+      grp2 <- paste(ids[idx:length(ids)], collapse = '-')
+      g_sizes <- c(sum(unlist(group1)), sum(unlist(group2)))
+      g_names <- c(grp1, grp2)
+      g_names <- rep(g_names, g_sizes)
+    } else{
+      names(sce_list) <- ids
+      g_names <- FALSE
+    }
+    
     sce_list <- scran_batch_norm(sce_list)                                                                # Batch normalize the sce(s)
     sce <- combine_sces(sce_list = sce_list, prefix_col_name = 'id', prefix_cell_name = TRUE)             # Combine the sce(s)
     # Do this again b/c we have more cells: remove genes whose total counts < 100 and detected in < 5% of cells, remove mito, ribo genes
@@ -107,15 +123,16 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control, randomSubsets
   
   # Set appropriate parameters for DGE calculation
   if ((params$reporter == FALSE) && (params$clusters == FALSE)) {                                         # Sample 1 vs Sample 2...
-    sce$comparator <- sce$id
-    clusters <<- unique(sce$id)
+    if (g_names == FALSE) { g_names <- sce$id}
+    sce$comparator <- g_names
+    clusters <<- unique(g_names)
   } else if (params$clusters != FALSE) {                                                                  # Cluster 1 vs Cluster 2...
     sce$comparator <- colData(sce)[[params$clusters]]
     clusters <<- trimws(strsplit(params$reporter, ",")[[1]])
   } else {                                                                                                # Reporter +ve vs -ve cells
     # Add Gene presence status to Metadata
-    reportercount <- sce@assays@data@listData[["counts"]][c(params$reporter),]
-    ext_data1 <- mutate(as.data.frame(reportercount), class = if_else(reportercount == 0, ids[2], params$reporter))
+    reportercount <- sce@assays@data@listData[["counts"]][rownames(sce) == params$reporter,]
+    ext_data1 <- mutate(as.data.frame(reportercount), class = if_else(reportercount == 0, ids[1], params$reporter))
     sce$comparator <- ext_data1$class
     clusters <<- unique(ext_data1$class)
   }
@@ -125,7 +142,6 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control, randomSubsets
     suppressWarnings(markers <- findMarkers(sce[rowData(sce)$qc_pass, ], groups = sample(sce$comparator), log.p = TRUE)) # Only pass in the genes that pass qc
   } else{
     suppressWarnings(markers <- findMarkers(sce[rowData(sce)$qc_pass, ], groups = sce$comparator, log.p = TRUE))    # Only pass in the genes that pass qc
-    
   }
   
   
@@ -140,7 +156,7 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control, randomSubsets
       tooLow <- function(x) (ifelse(x < 1e-315, 1e-315, x))
       markers_sig <- markers_sig %>% mutate_at(c("p.value", "FDR"), tooLow)
       # Order the genes for plotting
-      to_keep <- str_replace_all(clusters, ' ', '.')
+      to_keep <- str_replace_all(clusters, '[ -]', '.')
       markers_sig <- markers_sig[, c(rep(TRUE, 4), colnames(markers_sig)[5:length(colnames(markers_sig))] %in% paste0('logFC.', to_keep))]
       markers_sig <- dplyr::arrange(markers_sig, dplyr::desc(abs(markers_sig[,5])))     # order
       t_mark <- markers_sig                                                             # make copy
@@ -150,7 +166,7 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control, randomSubsets
     } else {                                                                            # Case when p = log.p.value
       markers_sig <- as.data.frame(markers_i) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(log.FDR < -1.6)
       # Order the genes for plotting
-      to_keep <- str_replace_all(clusters, ' ', '.')
+      to_keep <- str_replace_all(clusters, '[ -]', '.')
       markers_sig <- markers_sig[, c(rep(TRUE, 4), colnames(markers_sig)[5:length(colnames(markers_sig))] %in% paste0('logFC.', to_keep))]
       markers_sig <- dplyr::arrange(markers_sig, dplyr::desc(abs(markers_sig[,5])))     # order
       t_mark <- markers_sig                                                             # make copy
@@ -167,11 +183,12 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control, randomSubsets
            subtitle = 'positive logFC means up-regulated in experimental sample') + theme(plot.subtitle = element_text(hjust = 0.5))
     
     output <- list(markers_all = markers_all, markers_sig = markers_sig, tt_top = tt_top, plot = p)
-
+    
     # Cluster/Subset DGE Analysis by repeated sampling 
     if (params$unequal != FALSE) {
-      degs <- fMarkersSampling(sce, clusters[1], clusters[2], randomSubsets)
+      degs <- fMarkersSampling(sce, clusters[2], clusters[1], randomSubsets)
       commonDEGs <- assembleMarkersByP(degs)
+      commonDEGs$fc_median <- commonDEGs$fc_median*-1
       samplingPlot <- plotDEGs(commonDEGs, clusters, ntop, params$reporter)
       output <- append(output, list(smarkers_sig = commonDEGs))
       output <- append(output, list(splot = samplingPlot))
@@ -239,15 +256,17 @@ run_gene_enrichment <- function(markers, pathways_input, nperm){
   
   pathways <- gmtPathways(pathways_input)
   # IF NON-HUMAN GENE, NEED TO MAP TO HUMAN GENOME FISRT, WE USE HUMAN GENOME SO OK
-  marker <- markers$markers_all %>% dplyr::select(gene_symbol, paste0("logFC.", str_replace_all(clusters[2], ' ', '.'))) %>% na.omit() %>% distinct()
+  if (length(outputs) > 4) {
+    marker <- markers$smarkers_sig %>% dplyr::select(adjP.gene_symbol, fc_median) %>% na.omit() %>% distinct()
+  } else {
+    marker <- markers$markers_all %>% dplyr::select(gene_symbol, paste0("logFC.", str_replace_all(clusters[2], '[ -]', '.'))) %>% na.omit() %>% distinct()
+  }
   ranks <- deframe(marker)
   fgseaRes <- fgsea(pathways = pathways, stats = ranks, nperm = nperm) %>% as_tibble() %>% dplyr::arrange(desc(NES))
   sig_pathways <- fgseaRes[fgseaRes$padj < 0.05 , c('pathway', 'pval', 'padj', 'NES')]
   
   results <- list(fgseaRes = fgseaRes, sig_pathways = sig_pathways)
-  
   return(results)
-  
 }
 
 make_ge_plots <- function(fgseaRes, pathway_name, pthresh = 0.05, ntop = 10, y_text_size = 10){
@@ -269,9 +288,7 @@ make_ge_plots <- function(fgseaRes, pathway_name, pthresh = 0.05, ntop = 10, y_t
       return(plot)
     
     } else{
-    
       return(NULL)
-    
     }
 }
 
