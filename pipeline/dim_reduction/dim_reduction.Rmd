@@ -1,7 +1,6 @@
 ---
 title: "Dimensionality reduction plots "
 subtitle: '`r params$sample`'
-author: "Asli Munzur"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
   html_document:
@@ -16,6 +15,7 @@ params:
   top_HVG: 'top_HVG'
   top_PCs: 'top_PCs'
   dm_path: 'dm_path'
+  compute_dm: 'compute_dm'
   
 ---
 
@@ -82,7 +82,7 @@ if (params$HVG == "yes") { # user wants to subset the sce to HVG
 
 # TSNE and UMAP 
 set.seed(params$seed2)
-sce_norm <- runTSNE(sce_norm, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3)
+sce_norm <- runTSNE(sce_norm, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, perplexity = 10)
 sce_norm <- runUMAP(sce_norm, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, min_dist = 0.5, n_neighbors = 15, metric = "euclidean")
 
 
@@ -90,16 +90,20 @@ sce_norm <- runUMAP(sce_norm, dimred = "PCA", exprs_values = "logcounts", ncompo
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 
-message(print("Computing diffusion map coordinates. This may take a while depending on how large your SCE object is, up to 10 minutes."))
+if (params$compute_dm == "yes"){
+  
+  message(print("Computing diffusion map coordinates. This may take a while depending on how large your SCE object is."))
 
-sce_logcounts <- logcounts(sce_norm)  # access log-transformed counts matrix
-sce_logcounts <- as.matrix(sce_logcounts)
+  sce_logcounts <- logcounts(sce_norm)  # access log-transformed counts matrix
+  sce_logcounts <- as.matrix(sce_logcounts)
+  
+  # Make a diffusion map, this step can take a while depending on how large the sce object is, up to 10 minutes. 
+  dm <- DiffusionMap(t(sce_logcounts), n_pcs = 30)
+  
+  # save this object separately from the sce 
+  saveRDS(dm, params$dm_path)
 
-# Make a diffusion map, this step can take a while depending on how large the sce object is, up to 10 minutes. 
-dm <- DiffusionMap(t(sce_logcounts), n_pcs = 30)
-
-# save this object separately from the sce 
-saveRDS(dm, params$dm_path)
+}
 
 ```
 
