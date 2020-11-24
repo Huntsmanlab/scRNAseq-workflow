@@ -33,10 +33,11 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, include = FALSE}
-# Packages, Libraries, and Functions to import
 
+# Packages, Libraries, and Functions to import
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
+source('/huntsman/mdouglas/dh_organoid/source_scripts/utils_dge.R') # maxwell's dge functions 
 
 ```
 
@@ -51,7 +52,7 @@ plot_markers <- function(ids, ntop = 100, negative_control, randomSubsets = 100)
   
   ids <- lapply(sce_list, function(sce) unique(sce$id)) # extract ids 
   sce_list <- intersect_all(sce_list) # subset to common genes 
-  sce_list <- scran_batch_norm(sce_list) # batch norm with scran 
+  sce_list <- scran_batch_norm(sce_list) # batch norm with scran
   sce <- combine_sces(sce_list = sce_list, prefix_col_name = 'id', prefix_cell_name = TRUE) # combine sces 
   
   # gene filtering 
@@ -85,25 +86,24 @@ plot_markers <- function(ids, ntop = 100, negative_control, randomSubsets = 100)
     t_mark$log.FDR <- -(t_mark[,4])
     tt_top <- head(t_mark, ntop)                                                      # Identify top 'n' genes
   }
-
+  
   p <- ggplot(t_mark, aes_string(x = names(t_mark)[5], y = names(t_mark)[4])) +
     geom_point(colour = 'gray') +
     geom_text_repel(data = tt_top, aes(label = gene_symbol), colour = 'red', size = 5) +
     geom_point(data = tt_top, aes_string(x = names(t_mark)[5], y = names(t_mark)[4]), colour = "blue") +
-    theme_minimal() + 
-    xlab('logFC') + 
-    labs(title = glue('{infected}  vs. {control} top {ntop} DEGs', infected = ids[[1]], 
+    theme_minimal() +
+    xlab('logFC') +
+    labs(title = glue('{infected}  vs. {control} top {ntop} DEGs', infected = ids[[1]],
                       control = ids[[2]], ntop = ntop),
          subtitle = 'positive logFC means up-regulated in experimental sample') + theme(plot.subtitle = element_text(hjust = 0.5))
-  p
-  
+
   # Cluster/Subset DGE Analysis by repeated sampling 
-  # degs <- fMarkersSampling(sce, ids[1], ids[2], randomSubsets)
-  # commonDEGs <- assembleMarkersByP(degs)
-  # samplingPlot <- plotDEGs(commonDEGs, ids, ntop, params$reporter)
+  degs <- fMarkersSampling(sce, ids[1], ids[2], randomSubsets)
+  commonDEGs <- assembleMarkersByP(degs)
+  samplingPlot <- plotDEGs(commonDEGs, ids, ntop, params$reporter)
   
-  # outputs <- list(markers_all = markers_all, markers_sig = markers_sig, tt_top = tt_top, plot = p, smarkers_sig = commonDEGs, splot = samplingPlot)
-  outputs <- list(markers_all = markers_all, markers_sig = markers_sig, tt_top = tt_top, plot = p)
+  outputs <- list(markers_all = markers_all, markers_sig = markers_sig, tt_top = tt_top, plot = p, smarkers_sig = commonDEGs, splot = samplingPlot)
+  # outputs <- list(markers_all = markers_all, markers_sig = markers_sig, tt_top = tt_top, plot = p)
 }
 
 paths <- as.list(unlist(strsplit(params$sce_norm[[1]], ' '))) 
@@ -115,10 +115,10 @@ saveRDS(outputs, file = params$output_path_paired)
 
 ```
 
-```{r fig.height= 10, fig.width= 20}
-# p <- plot_grid(outputs$plot, outputs$splot, labels = "AUTO")
-# p
-outputs$plot
+```{r fig.height= 10, fig.width= 12}
+p <- plot_grid(outputs$plot, outputs$splot, labels = "AUTO")
+p
+# outputs$plot
 ```
 
 **positive logFC = upregulated in transduced sample, genes sorted by absolute logFC**
@@ -140,7 +140,6 @@ outputs$markers_sig %>%
 run_gene_enrichment <- function(markers, pathways_input, nperm){
   
   pathways <- fgsea::gmtPathways(pathways_input)
-  # IF NON-HUMAN GENE, NEED TO MAP TO HUMAN GENOME FISRT, WE USE HUMAN GENOME SO OK
   marker <- markers$markers_all %>% dplyr::select(gene_symbol, logFC) %>% na.omit() %>% distinct()
 
   ranks <- deframe(marker)
@@ -183,7 +182,6 @@ make_ge_plots <- function(fgseaRes, pathway_name, pthresh = 0.05, ntop = 10, y_t
 ```{r fig.height=5, fig.width=20, message=FALSE, warning=FALSE}
 
 set.seed(123458)
-message(print(colnames(outputs$markers_all)))
 fgseaReslist <- run_gene_enrichment(markers = outputs, pathways_input = params$pathwayHmark, nperm = 10000)
 make_ge_plots(fgseaRes = fgseaReslist$fgseaRes, pathway_name = "HALLMARK", pthresh = 0.05, ntop = 10)
 ```
