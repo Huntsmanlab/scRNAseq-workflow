@@ -57,11 +57,11 @@ make_sce_qc <- function(whichMethod,
     mt_genes <- grepl("^mt", rowData(sce)$Symbol)
     ribo_genes <- grepl("^Rp[sl][[:digit:]]", rowData(sce)$Symbol)
   } else {                                                                                  # For human
-    mt_genes <- grepl("^MT-", rowData(sce)$Symbol)
+    mt_genes <- grepl("^MT", rowData(sce)$Symbol)
     ribo_genes <- grepl("^RP[LS]", rowData(sce)$Symbol)
   }
   
-  feature_ctrls <- list(mito = rownames(sce)[mt_genes],
+    feature_ctrls <- list(mito = rownames(sce)[mt_genes],
                         ribo = rownames(sce)[ribo_genes])
   
   if (whichMethod == 'default') {
