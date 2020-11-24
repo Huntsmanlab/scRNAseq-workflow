@@ -1,0 +1,717 @@
+---
+title: "`r params$ids` Heatmaps"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  ids: 'ids'
+  path_to_data: 'path_to_data'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+
+source('/huntsman/amunzur/scRNAseq-workflow/pipeline/sourceFiles/utilities.R')
+library(readxl)
+
+```
+
+```{r}
+
+  # this function works the same if you have seurat objects or sce objects 
+  is_in <- function(markers, sce) {
+    
+    idx <- match(markers, rownames(sce))
+    na_values <- which(is.na(idx))
+    na_genes <- markers[na_values]
+    
+    markers <-  markers[!(markers %in% na_genes)]
+  
+    return(markers)
+    
+  }
+
+```
+
+
+```{r include = FALSE}
+
+############################################
+# OUR OWN MARKERS 
+############################################
+
+############################################
+# load genes 
+############################################
+
+# load marker genes list
+genes <- read_excel("/huntsman/amunzur/projects/paper/gene_list/lineage_markers.xlsx")
+names(genes) <- c("non_ciliated_cells", "ciliated_cells", "proliferative_cells", "cluster4", "secretory_cells_like" )
+
+non_ciliated_cells <- na.omit(genes$non_ciliated_cells)
+ciliated_cells <- na.omit(genes$ciliated_cells)
+proliferative_cells <- na.omit(genes$proliferative_cells)
+cluster4 <- na.omit(genes$cluster4)
+secretory_cells_like <- na.omit(genes$secretory_cells_like)
+
+############################################
+# make heatmap function 
+############################################
+
+make_heatmap <- function(sce, all_markers, row_annot, col_annot){
+
+# subset the sce to the markers 
+idx <- na.omit(match(all_markers, rownames(sce)))
+sce_subsetted <- sce[idx, ]
+
+# accoding to type of object we are dealing with, extract the counts matrix in a different way 
+if (is.null(sce$orig.ident)) {
+  
+  # sce object
+  df_main <- as.data.frame(logcounts(sce_subsetted))
+  
+  # seurat object 
+} else { df_main <- as.data.frame(GetAssayData(object = sce[["integrated"]], slot = "data")) }
+
+# something to try here 
+df_matrix <- as.matrix(df_main)
+idx <- which(df_matrix < 0)
+
+df_matrix[idx] <- 0
+df_main <- as.data.frame(df_matrix)
+
+# extract the counts matrix 
+df_main_copy <- df_main # make a copy 
+
+# reorder CELLS according to the clustering order in col annot
+idx_main <- match(rownames(col_annot), colnames(df_main))
+df_main <- df_main[, idx_main]
+
+# reorder GENES according to row annotations 
+idx_rows <- match(rownames(row_annot), rownames(df_main))
+df_main <- df_main[idx_rows, ]
+
+###################### Annotation colors
+
+# recompute min and max values
+min_cluster <- as.numeric(min(as.vector(sce$cluster)))
+max_cluster <- max(as.numeric(as.character(sce$cluster)))
+
+cluster_name <- min_cluster:max_cluster
+cluster_color_list <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494", "#B3B3B3", 
+                      '#E2201C', '#1D91C0', "#E7298A", '#32A028')
+cluster_colors <- cluster_color_list[1:max_cluster]
+names(cluster_colors) <- cluster_name
+
+sample_id <- as.vector(as.character(unique(sce$id)))
+sample_colors <- colorRampPalette(brewer.pal(8, "RdYlBu"))(length(sample_id))
+names(sample_colors) <- sample_id
+
+marker_name <- c('non_ciliated_cells', 'ciliated_cells', 'proliferative_cells', 'cluster4', 'secretory_cells_like')
+marker_colors <- c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", '#32A028')
+names(marker_colors) <- marker_name
+
+my_colours <- list(cluster_colors, sample_colors, marker_colors)
+names(my_colours) <- c(colnames(col_annot), ' ')
+
+
+h <- pheatmap(df_main,
+      color = inferno(10),
+      show_colnames = FALSE,
+      show_rownames = TRUE,
+      cluster_cols = FALSE,
+      cluster_rows = FALSE, 
+      annotation_col = col_annot,
+      annotation_row = row_annot,
+      annotation_colors = my_colours)
+          
+}
+
+############################################
+# load the data 
+############################################
+
+# load the integrated object 
+integ1 <- readRDS(params$path_to_data)
+
+if (!is.null(integ1$orig.ident)){
+  
+  integ1$cluster <- as.factor(as.numeric(integ1$seurat_clusters))
+  
+}
+
+############################################
+# make row and col annotations
+############################################
+
+# ROW ANNOTATIONS
+non_ciliated_cells <- is_in(non_ciliated_cells, integ1)
+ciliated_cells <- is_in(ciliated_cells, integ1)
+proliferative_cells <- is_in(proliferative_cells, integ1)
+cluster4 <- is_in(cluster4, integ1)
+secretory_cells_like <- is_in(secretory_cells_like, integ1)
+
+# remove dups, TPM1
+idx <- which(cluster4 == "TPM1")
+cluster4 <- as.list(cluster4)
+cluster4[idx] <- NULL
+cluster4 <- as.vector(cluster4)
+
+idx <- which(cluster4 == "AKAP12")
+cluster4 <- as.list(cluster4)
+cluster4[idx] <- NULL
+cluster4 <- as.vector(cluster4)
+
+all_markers <- c(non_ciliated_cells, ciliated_cells, proliferative_cells, cluster4, secretory_cells_like)
+
+###################### make ROW annotations
+non_ciliated_cells_rep <- rep("non_ciliated_cells", length(non_ciliated_cells))
+ciliated_cells_rep <- rep("ciliated_cells", length(ciliated_cells))
+proliferative_cells_rep <- rep("proliferative_cells", length(proliferative_cells))
+cluster4_rep <- rep("cluster4", length(cluster4))
+secretory_cells_like_rep <- rep("secretory_cells_like", length(secretory_cells_like))
+
+all_names_rep <- c(non_ciliated_cells_rep, ciliated_cells_rep, proliferative_cells_rep, cluster4_rep, secretory_cells_like_rep)
+
+row_annot <- data.frame(unlist(all_markers), all_names_rep)
+names(row_annot) <- c("marker_genes", "marker_type")
+rownames(row_annot) <- row_annot$marker_genes
+row_annot$marker_genes <- NULL
+
+names(row_annot) <- " "
+
+###################### make COL annotations
+# make a data frame with colnames of the sce object as rownames here 
+col_annot <- data.frame(colnames(integ1), integ1$cluster, integ1$id, row.names = colnames(integ1))
+names(col_annot) <- c("column_names", "cluster", 'sample_id')
+
+# this will help order cells according to the cluster they belong to
+col_annot <- col_annot[order(col_annot$cluster), ] 
+col_annot$column_names <- NULL
+col_annot$cluster <- as.vector(as.character(col_annot$cluster))
+col_annot$sample_id <- as.vector(as.character(col_annot$sample_id))
+
+p1 <- make_heatmap(integ1, unlist(all_markers), row_annot, col_annot)
+
+```
+
+
+
+
+
+
+```{r include = FALSE}
+
+############################################
+# NATURE MED MARKERS  
+############################################
+
+# load marker genes list
+genes <- read_csv("/huntsman/amunzur/projects/paper/gene_list/natureMed_markers.csv")
+names(genes) <- c("unciliated_epithelium", "ciliated_epithelium", "stromal_fibroblasts", "endothelium", "macrophage" )
+
+unciliated_epithelium <- na.omit(genes$unciliated_epithelium)
+ciliated_epithelium <- na.omit(genes$ciliated_epithelium)
+stromal_fibroblasts <- na.omit(genes$stromal_fibroblasts)
+endothelium <- na.omit(genes$endothelium)
+macrophage <- na.omit(genes$macrophage)
+
+############################################
+# make heatmap function 
+############################################
+
+make_heatmap <- function(sce, all_markers, row_annot, col_annot){
+
+# subset the sce to the markers 
+idx <- na.omit(match(all_markers, rownames(sce)))
+sce_subsetted <- sce[idx, ]
+
+# accoding to type of object we are dealing with, extract the counts matrix in a different way 
+if (is.null(sce$orig.ident)) {
+  
+  # sce object
+  df_main <- as.data.frame(logcounts(sce_subsetted))
+  
+  # seurat object 
+} else { df_main <- as.data.frame(GetAssayData(object = sce[["integrated"]], slot = "data")) }
+
+# something to try here 
+df_matrix <- as.matrix(df_main)
+idx <- which(df_matrix < 0)
+
+df_matrix[idx] <- 0
+df_main <- as.data.frame(df_matrix)
+
+# extract the counts matrix 
+df_main_copy <- df_main # make a copy 
+
+# reorder CELLS according to the clustering order in col annot
+idx_main <- match(rownames(col_annot), colnames(df_main))
+df_main <- df_main[, idx_main]
+
+# reorder GENES according to row annotations 
+idx_rows <- match(rownames(row_annot), rownames(df_main))
+df_main <- df_main[idx_rows, ]
+
+###################### Annotation colors
+
+# recompute min and max values
+min_cluster <- as.numeric(min(as.vector(sce$cluster)))
+max_cluster <- max(as.numeric(as.character(sce$cluster)))
+
+cluster_name <- min_cluster:max_cluster
+cluster_color_list <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494", "#B3B3B3", 
+                      '#E2201C', '#1D91C0', "#E7298A", '#32A028')
+cluster_colors <- cluster_color_list[1:max_cluster]
+names(cluster_colors) <- cluster_name
+
+sample_id <- as.vector(as.character(unique(sce$id)))
+sample_colors <- colorRampPalette(brewer.pal(8, "RdYlBu"))(length(sample_id))
+names(sample_colors) <- sample_id
+
+marker_name <- c('unciliated_epithelium', 'ciliated_epithelium', 'stromal_fibroblasts', 'endothelium', 'macrophage')
+marker_colors <- c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", '#32A028')
+names(marker_colors) <- marker_name
+
+my_colours <- list(cluster_colors, sample_colors, marker_colors)
+names(my_colours) <- c(colnames(col_annot), ' ')
+
+
+h <- pheatmap(df_main,
+      color = inferno(10),
+      show_colnames = FALSE,
+      show_rownames = TRUE,
+      cluster_cols = FALSE,
+      cluster_rows = FALSE, 
+      annotation_col = col_annot,
+      annotation_row = row_annot,
+      annotation_colors = my_colours)
+          
+}
+
+############################################
+# load the data 
+############################################
+
+# load the integrated object 
+integ1 <- readRDS(params$path_to_data)
+
+if (!is.null(integ1$orig.ident)){
+  
+  integ1$cluster <- as.factor(as.numeric(integ1$seurat_clusters))
+  
+}
+
+############################################
+# make row and col annotations
+############################################
+
+# ROW ANNOTATIONS
+unciliated_epithelium <- is_in(unciliated_epithelium, integ1)
+ciliated_epithelium <- is_in(ciliated_epithelium, integ1)
+stromal_fibroblasts <- is_in(stromal_fibroblasts, integ1)
+endothelium <- is_in(endothelium, integ1)
+macrophage <- is_in(macrophage, integ1)
+
+all_markers <- c(unciliated_epithelium, ciliated_epithelium, stromal_fibroblasts, endothelium, macrophage)
+
+###################### make ROW annotations
+unciliated_epithelium_rep <- rep("unciliated_epithelium", length(unciliated_epithelium))
+ciliated_epithelium_rep <- rep("ciliated_epithelium", length(ciliated_epithelium))
+stromal_fibroblasts_rep <- rep("stromal_fibroblasts", length(stromal_fibroblasts))
+endothelium_rep <- rep("endothelium", length(endothelium))
+macrophage_rep <- rep("macrophage", length(macrophage))
+
+all_names_rep <- c(unciliated_epithelium_rep, ciliated_epithelium_rep, stromal_fibroblasts_rep, endothelium_rep, macrophage_rep)
+
+row_annot <- data.frame(unlist(all_markers), all_names_rep)
+names(row_annot) <- c("marker_genes", "marker_type")
+rownames(row_annot) <- row_annot$marker_genes
+row_annot$marker_genes <- NULL
+
+names(row_annot) <- " "
+
+###################### make COL annotations
+# make a data frame with colnames of the sce object as rownames here 
+col_annot <- data.frame(colnames(integ1), integ1$cluster, integ1$id, row.names = colnames(integ1))
+names(col_annot) <- c("column_names", "cluster", 'sample_id')
+
+# this will help order cells according to the cluster they belong to
+col_annot <- col_annot[order(col_annot$cluster), ] 
+col_annot$column_names <- NULL
+col_annot$cluster <- as.vector(as.character(col_annot$cluster))
+col_annot$sample_id <- as.vector(as.character(col_annot$sample_id))
+
+p2 <- make_heatmap(integ1, unlist(all_markers), row_annot, col_annot)
+
+```
+
+
+
+```{r include = FALSE}
+
+############################################
+# COMBINATION OF MARKERS  
+############################################
+
+# load marker genes list OUR OWN
+our_genes <- read_excel("/huntsman/amunzur/projects/paper/gene_list/lineage_markers.xlsx")
+names(our_genes) <- c("non_ciliated_cells", "ciliated_cells", "proliferative_cells", "cluster4", "secretory_cells_like" )
+
+# load marker genes list from NATURE
+nature_genes <- read_csv("/huntsman/amunzur/projects/paper/gene_list/natureMed_markers.csv")
+names(nature_genes) <- c("unciliated_epithelium", "ciliated_epithelium", "stromal_fibroblasts", "endothelium", "macrophage" )
+
+non_ciliated_cells <- na.omit(our_genes$non_ciliated_cells)
+ciliated_cells <- na.omit(our_genes$ciliated_cells)
+epithelial_cells <- c('CLDN3', 'CLDN4', 'KRT8', 'KRT19', 'WFDC2', 'KLF5', 'SDC4', 'UCA1', 'TACSTD2', 'LINC01541', 'ELF3', 'C1orf186', 'DSP', 'CLDN4', 'PERP', 'KRT18', 'CD9', 'USP53')
+lymphocyte_cells <- c("MS4A1", 'CD79A', 'PTPRC', 'CD19', 'BANK1', 'CD24', 'IGKC', "CD4","PTPRC","CD2","CD3G","CD3D","CD28","CD3E", "CCL5", "STK17B")
+endothelial_cells <- na.omit(nature_genes$endothelium)
+macrophage <- na.omit(nature_genes$macrophage)
+stromal_fibroblasts <- na.omit(nature_genes$stromal_fibroblasts)
+
+############################################
+# make heatmap function 
+############################################
+
+make_heatmap <- function(sce, all_markers, row_annot, col_annot){
+
+# subset the sce to the markers 
+idx <- na.omit(match(all_markers, rownames(sce)))
+sce_subsetted <- sce[idx, ]
+
+# accoding to type of object we are dealing with, extract the counts matrix in a different way 
+if (is.null(sce$orig.ident)) {
+  
+  # sce object
+  df_main <- as.data.frame(logcounts(sce_subsetted))
+  
+  # seurat object 
+} else { df_main <- as.data.frame(GetAssayData(object = sce[["integrated"]], slot = "data")) }
+
+# df_main[df_main > 10] <- 10
+
+# something to try here 
+df_matrix <- as.matrix(df_main)
+idx <- which(df_matrix < 0)
+
+df_matrix[idx] <- 0
+df_main <- as.data.frame(df_matrix)
+
+# extract the counts matrix 
+df_main_copy <- df_main # make a copy 
+
+# reorder CELLS according to the clustering order in col annot
+idx_main <- match(rownames(col_annot), colnames(df_main))
+df_main <- df_main[, idx_main]
+
+# reorder GENES according to row annotations 
+idx_rows <- match(rownames(row_annot), rownames(df_main))
+df_main <- df_main[idx_rows, ]
+
+###################### Annotation colors
+
+# recompute min and max values
+min_cluster <- as.numeric(min(as.vector(sce$cluster)))
+max_cluster <- max(as.numeric(as.character(sce$cluster)))
+
+cluster_name <- min_cluster:max_cluster
+cluster_color_list <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494", "#B3B3B3", 
+                      '#E2201C', '#1D91C0', "#E7298A", '#32A028', "green", "lightcoral", "lightgoldenrod1", "lightpink",
+                      "mediumpurple1", "navyblue")
+cluster_colors <- cluster_color_list[1:max_cluster]
+names(cluster_colors) <- cluster_name
+
+sample_id <- as.vector(as.character(unique(sce$id)))
+sample_colors <- colorRampPalette(brewer.pal(8, "RdYlBu"))(length(sample_id))
+names(sample_colors) <- sample_id
+
+marker_name <- c('non_ciliated_cells', 'ciliated_cells', 'epithelial_cells', 'lymphocyte_cells', 'endothelial_cells', 'macrophage_cells', 'stromal_fibroblasts')
+marker_colors <- c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", '#32A028', 'darkgoldenrod1', 'brown3' )
+names(marker_colors) <- marker_name
+
+my_colours <- list(cluster_colors, sample_colors, marker_colors)
+names(my_colours) <- c(colnames(col_annot), ' ')
+
+
+h <- pheatmap(df_main,
+      color = inferno(10),
+      show_colnames = FALSE,
+      show_rownames = TRUE,
+      cluster_cols = FALSE,
+      cluster_rows = FALSE, 
+      annotation_col = col_annot,
+      annotation_row = row_annot,
+      annotation_colors = my_colours)
+
+return(h)
+          
+}
+
+############################################
+# load the data 
+############################################
+
+# load the integrated object 
+integ1 <- readRDS(params$path_to_data)
+
+if (!is.null(integ1$orig.ident)){
+  
+  integ1$cluster <- as.factor(as.numeric(integ1$seurat_clusters))
+  
+}
+
+############################################
+# make row and col annotations
+############################################
+
+
+non_ciliated_cells <- na.omit(our_genes$non_ciliated_cells)
+ciliated_cells <- na.omit(our_genes$ciliated_cells)
+epithelial_cells <- c('EPCAM', 'CLDN3', 'CLDN4', 'KRT8', 'KRT19', 'WFDC2', 'KLF5', 'SDC4', 'UCA1', 'TACSTD2', 'LINC01541', 'ELF3', 'C1orf186', 'DSP', 'PERP', 'KRT18', 'CD9', 'USP53')
+lymphocyte_cells <- c("MS4A1", 'CD79A', 'PTPRC', 'CD19', 'BANK1', 'CD24', 'IGKC', "CD4","CD2","CD3G","CD3D","CD28","CD3E", "CCL5", "STK17B")
+endothelial_cells <- na.omit(nature_genes$endothelium)
+macrophage_cells <- na.omit(nature_genes$macrophage)
+stromal_fibroblasts <- na.omit(nature_genes$stromal_fibroblasts)
+
+# ROW ANNOTATIONS
+non_ciliated_cells <- is_in(non_ciliated_cells, integ1)
+ciliated_cells <- is_in(ciliated_cells, integ1)
+epithelial_cells <- is_in(epithelial_cells, integ1)
+lymphocyte_cells <- is_in(lymphocyte_cells, integ1)
+endothelial_cells <- is_in(endothelial_cells, integ1)
+macrophage_cells <- is_in(macrophage_cells, integ1)
+stromal_fibroblasts <- is_in(stromal_fibroblasts, integ1)
+
+all_markers <- c(non_ciliated_cells, ciliated_cells, epithelial_cells, lymphocyte_cells, endothelial_cells, macrophage_cells, stromal_fibroblasts)
+
+###################### make ROW annotations
+non_ciliated_cells_rep <- rep("non_ciliated_cells", length(non_ciliated_cells))
+ciliated_cells_rep <- rep("ciliated_cells", length(ciliated_cells))
+epithelial_cells_rep <- rep("epithelial_cells", length(epithelial_cells))
+lymphocyte_cells_rep <- rep("lymphocyte_cells", length(lymphocyte_cells))
+endothelial_cells_rep <- rep("endothelial_cells", length(endothelial_cells))
+macrophage_cells_rep <- rep("macrophage_cells", length(macrophage_cells))
+stromal_fibroblasts_rep <- rep("stromal_fibroblasts", length(stromal_fibroblasts))
+
+all_names_rep <- c(non_ciliated_cells_rep, ciliated_cells_rep, epithelial_cells_rep, lymphocyte_cells_rep, endothelial_cells_rep, macrophage_cells_rep, stromal_fibroblasts_rep)
+
+row_annot <- data.frame(unlist(all_markers), all_names_rep)
+names(row_annot) <- c("marker_genes", "marker_type")
+rownames(row_annot) <- row_annot$marker_genes
+row_annot$marker_genes <- NULL
+
+names(row_annot) <- " "
+
+###################### make COL annotations
+# make a data frame with colnames of the sce object as rownames here 
+col_annot <- data.frame(colnames(integ1), integ1$cluster, integ1$id, row.names = colnames(integ1))
+names(col_annot) <- c("column_names", "cluster", 'sample_id')
+
+# this will help order cells according to the cluster they belong to
+col_annot <- col_annot[order(col_annot$cluster), ] 
+col_annot$column_names <- NULL
+col_annot$cluster <- as.vector(as.character(col_annot$cluster))
+col_annot$sample_id <- as.vector(as.character(col_annot$sample_id))
+
+p3 <- make_heatmap(integ1, unlist(all_markers), row_annot, col_annot)
+
+```
+
+
+```{r include = FALSE}
+
+############################################
+# NEW MARKERS FROM 4 SAMPLES  
+############################################
+
+# load marker genes list OUR OWN
+our_genes <- read_excel("/huntsman/amunzur/projects/paper/gene_list/new_lineage_markers.xlsx")
+names(our_genes) <- c("non_ciliated_cells", "ciliated_cells", "proliferative_cells", "third_endpoint_cells" )
+
+non_ciliated_cells <- na.omit(our_genes$non_ciliated_cells)
+ciliated_cells <- na.omit(our_genes$ciliated_cells)
+proliferative_cells <- na.omit(our_genes$proliferative_cells)
+third_endpoint_cells <- na.omit(our_genes$third_endpoint)
+
+############################################
+# make heatmap function 
+############################################
+
+make_heatmap <- function(sce, all_markers, row_annot, col_annot){
+
+# subset the sce to the markers 
+idx <- na.omit(match(all_markers, rownames(sce)))
+sce_subsetted <- sce[idx, ]
+
+# accoding to type of object we are dealing with, extract the counts matrix in a different way 
+if (is.null(sce$orig.ident)) {
+  
+  # sce object
+  df_main <- as.data.frame(logcounts(sce_subsetted))
+  
+  # seurat object 
+} else { df_main <- as.data.frame(GetAssayData(object = sce[["integrated"]], slot = "data")) }
+
+# df_main[df_main > 10] <- 10
+
+# something to try here 
+df_matrix <- as.matrix(df_main)
+idx <- which(df_matrix < 0)
+
+df_matrix[idx] <- 0
+df_main <- as.data.frame(df_matrix)
+
+# extract the counts matrix 
+df_main_copy <- df_main # make a copy 
+
+# reorder CELLS according to the clustering order in col annot
+idx_main <- match(rownames(col_annot), colnames(df_main))
+df_main <- df_main[, idx_main]
+
+# reorder GENES according to row annotations 
+idx_rows <- match(rownames(row_annot), rownames(df_main))
+df_main <- df_main[idx_rows, ]
+
+###################### Annotation colors
+
+# recompute min and max values
+min_cluster <- as.numeric(min(as.vector(sce$cluster)))
+max_cluster <- max(as.numeric(as.character(sce$cluster)))
+
+cluster_name <- min_cluster:max_cluster
+cluster_color_list <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494", "#B3B3B3", 
+                      '#E2201C', '#1D91C0', "#E7298A", '#32A028', "green", "lightcoral", "lightgoldenrod1", "lightpink",
+                      "mediumpurple1", "navyblue")
+cluster_colors <- cluster_color_list[1:max_cluster]
+names(cluster_colors) <- cluster_name
+
+sample_id <- as.vector(as.character(unique(sce$id)))
+sample_colors <- colorRampPalette(brewer.pal(8, "RdYlBu"))(length(sample_id))
+names(sample_colors) <- sample_id
+
+marker_name <- c('non_ciliated_cells', 'ciliated_cells', 'proliferative_cells', 'third_endpoint_cells')
+marker_colors <- c("#1B9E77", "#D95F02", "#7570B3", "#E7298A" )
+names(marker_colors) <- marker_name
+
+my_colours <- list(cluster_colors, sample_colors, marker_colors)
+names(my_colours) <- c(colnames(col_annot), ' ')
+
+
+h <- pheatmap(df_main,
+      color = inferno(10),
+      show_colnames = FALSE,
+      show_rownames = TRUE,
+      cluster_cols = FALSE,
+      cluster_rows = FALSE, 
+      annotation_col = col_annot,
+      annotation_row = row_annot,
+      annotation_colors = my_colours)
+
+return(h)
+          
+}
+
+############################################
+# load the data 
+############################################
+
+# load the integrated object 
+integ1 <- readRDS(params$path_to_data)
+
+if (!is.null(integ1$orig.ident)){
+  
+  integ1$cluster <- as.factor(as.numeric(integ1$seurat_clusters))
+  
+}
+
+############################################
+# make row and col annotations
+############################################
+
+
+non_ciliated_cells <- na.omit(our_genes$non_ciliated_cells)
+ciliated_cells <- na.omit(our_genes$ciliated_cells)
+proliferative_cells <- na.omit(our_genes$proliferative_cells)
+third_endpoint_cells <- na.omit(our_genes$third_endpoint_cells)
+
+# ROW ANNOTATIONS
+non_ciliated_cells <- is_in(non_ciliated_cells, integ1)
+ciliated_cells <- is_in(ciliated_cells, integ1)
+proliferative_cells <- is_in(proliferative_cells, integ1)
+third_endpoint_cells <- is_in(third_endpoint_cells, integ1)
+
+all_markers <- c(non_ciliated_cells, ciliated_cells, proliferative_cells, third_endpoint_cells)
+
+###################### make ROW annotations
+non_ciliated_cells_rep <- rep("non_ciliated_cells", length(non_ciliated_cells))
+ciliated_cells_rep <- rep("ciliated_cells", length(ciliated_cells))
+proliferative_cells_rep <- rep("proliferative_cells", length(proliferative_cells))
+third_endpoint_cells_rep <- rep("third_endpoint_cells", length(third_endpoint_cells))
+
+all_names_rep <- c(non_ciliated_cells_rep, ciliated_cells_rep, proliferative_cells_rep, third_endpoint_cells_rep)
+
+row_annot <- data.frame(unlist(all_markers), all_names_rep)
+names(row_annot) <- c("marker_genes", "marker_type")
+rownames(row_annot) <- row_annot$marker_genes
+row_annot$marker_genes <- NULL
+
+names(row_annot) <- " "
+
+###################### make COL annotations
+# make a data frame with colnames of the sce object as rownames here 
+col_annot <- data.frame(colnames(integ1), integ1$cluster, integ1$id, row.names = colnames(integ1))
+names(col_annot) <- c("column_names", "cluster", 'sample_id')
+
+# this will help order cells according to the cluster they belong to
+col_annot <- col_annot[order(col_annot$cluster), ] 
+col_annot$column_names <- NULL
+col_annot$cluster <- as.vector(as.character(col_annot$cluster))
+col_annot$sample_id <- as.vector(as.character(col_annot$sample_id))
+
+p4 <- make_heatmap(integ1, unlist(all_markers), row_annot, col_annot)
+
+```
+
+
+
+
+
+### Our own list of curated markers 
+```{r fig.height = 15, fig.width = 16}
+
+p1
+
+```
+
+### List of markers from NatureMed paper
+#### "Single-cell transcriptomic atlas of the human endometrium during the menstrual cycle"
+```{r fig.height = 15, fig.width = 16}
+
+p2
+
+```
+
+### Combination of markers 
+#### Ciliated cell marker: our own, non-ciliated cell markers: our own, epithelial cell markers: our own, lymphocyte markers: CCL5, STK17B and our own, endothelial: NatMed paper, macrophage: NatMed paper, stromal: NatMed paper
+```{r fig.height = 15, fig.width = 16}
+
+p3
+
+```
+
+### New markers from random samping of DH9_control, DH11_control, DH12_control, DH14_control
+```{r fig.height = 15, fig.width = 16}
+
+p4
+
+```
+
+
+
+
