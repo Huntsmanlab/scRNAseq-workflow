@@ -36,14 +36,13 @@ rule all:
     # run_seurat_integration
 ```  
 
-User should uncomment the name of the analyses they wish to do to, there is not a limit on the number of analyses that can be done. In the given example above, Snakemake would do DGE analysis with scran and run summary stats. Once the above steps are completed, pipeline can be run with the `snakemake` command.  
+User should uncomment the name of the analyses they wish to do to, there is not a limit on the number of analyses that can be done. In the given example above, Snakemake would do DGE analysis with scran and run summary stats. Once the above steps are completed, pipeline can be run with the `snakemake` command. This command should be typed to the terminal window in RStudio.   
 
 **Removing mitochondrial and ribosomal genes**  
 When doing quality control, you have the option to remove mitochondrial and ribosomal genes. If you wish to remove them, navigate to the "make_sce_qc" rule in the Snakefile and set the "remove_mito_and_ribo" parameter to "yes". If you write "no", mitochondrial and ribosomal genes will be retained.  
 
 **Subsetting the SCE object to HVG**  
 In the dim  step, you also have the option to subset the sces to highly variable genes (HVG). If you set the "HVG" parameter in the "normalize_sce" rule, you also need to need to indicate a percentage in the "top_HVG" parameter. The percentage you write here will be used to determine the percentage of genes with highest biological components. Note that pipeline will give an error if you write a fraction here, you must supply an integer. Default number provided is 20. SCE object will subsetted to HVG, but original count matrix will be retained as well as an alternate expression named "original". You can execute the following code to get the original counts with all the genes present:  
-
 ```
 # to recover original counts 
 sce_qc_original <- altExp(sce_qc_hvg, "original", withColData=TRUE)
@@ -109,7 +108,7 @@ User can pass "computed" (with quotation marks) to let the pipeline calculate th
 Clusters a given sce object and projects results in various t-SNE plots.  
   
 **perplexity_list:** a list of any length, including numbers between 1 and 100  
-These values are used to generate t-SNE plots with various perplexities. Default values are `perplexity_list = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100]`. Note that t-SNE is robust to changes in perplexity between 5 and 50.    
+These values are used to generate t-SNE plots with various perplexities. Default values are `perplexity_list = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100]`. Note that t-SNE is rather robust to changes in perplexity between 5 and 50.    
   
 **chosen_perp:** one single number, taken from the perplexity list given above  
 After viewing t-SNE plots with various perplexities, user is expected to pick a perplexity value and save t-SNE coordinates for that value for more downstream analysis. After running the clustering script once and inspecting the t-SNE plots, you can pick one of the perplexities and run the clustering script again. The default value is set to 30.  
