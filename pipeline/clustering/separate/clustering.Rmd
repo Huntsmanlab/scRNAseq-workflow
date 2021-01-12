@@ -343,7 +343,7 @@ dm_3d
 
 ```
 
-```{r include = FALSE}
+```{r eval = FALSE, include = FALSE}
 
 # here we save the sce object with the clustering data - we only save the shared neighbor clusters 
 saveRDS(sce, file = params$output_path)
