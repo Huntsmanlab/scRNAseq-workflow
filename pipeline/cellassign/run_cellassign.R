@@ -5,7 +5,7 @@ source(here('pipeline', 'cellassign', 'assign_cell_type.R'))
 
 parser <- ArgumentParser(description = "run cell assign on a sample")
 
-parser$add_argument('--sce_norm', metavar='DIRECTORY', type='character', help="path to sce norm")
+parser$add_argument('--sce_clus', metavar='DIRECTORY', type='character', help="path to sce clus")
 
 parser$add_argument('--sce_cas', metavar='DIRECTORY', type='character', help="where we save the marker matrix")
 
@@ -13,31 +13,27 @@ parser$add_argument('--marker_mat_path', metavar='DIRECTORY', type='character', 
 
 parser$add_argument('--cellassignment_path', metavar='DIRECTORY', type='character', help="where we run cell assignment")
 
-parser$add_argument('--mode', metavar='DIRECTORY', type='character', help="do you wanna split epithelial cells?")
-
 args <- parser$parse_args()
 
-cellAssign <- function(sce_norm, 
+cellAssign <- function(sce_clus, 
                        sce_cas, 
                        marker_mat_path,
-                       cellassignment_path,
-                       mode){
+                       cellassignment_path){
   
-  marker_mat <- create_marker_mat(marker_mat_path, mode) 
+  marker_mat <- create_marker_mat(marker_mat_path) 
                                  
   
   #### Run cell assign
-  find_cell_type(path_to_sceqc = sce_norm, 
+  find_cell_type(path_to_sceqc = sce_clus, 
                  path_to_marker_mat = marker_mat_path,  
                  output_file_name1 = sce_cas, 
                  output_file_name2 = cellassignment_path)
 }
 
 
-cellAssign(sce_norm = args$sce_norm, 
+cellAssign(sce_clus = args$sce_clus, 
            sce_cas = args$sce_cas, 
            marker_mat_path = args$marker_mat_path,
-           cellassignment_path = args$cellassignment_path,
-           mode = args$mode)
+           cellassignment_path = args$cellassignment_path)
 
 
