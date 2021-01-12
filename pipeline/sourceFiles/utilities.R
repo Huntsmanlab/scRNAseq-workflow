@@ -175,7 +175,6 @@ master_cell_types <- c("B cells",
                        "Endothelial cells",            
                        "Epithelial cells",
                        "Epithelial ciliated cells",    
-                       "High grade serous tumor cells",
                        "Mesenchymal cells",            
                        "Mesenchymal stem cells",
                        "Monocyte/Macrophage",
@@ -183,30 +182,29 @@ master_cell_types <- c("B cells",
                        "other",                        
                        "Plasma cells",
                        "Proliferative cells",
-                       "Stem cells", 
                        "T cells",
-                       "Unciliated_cells", 
-                       "Vascular smooth muscle cells")
+                       "Vascular smooth muscle cells", 
+                       "Cluster2_like")
 
 master_color_palette <- c(
   "cyan2", # red
   "firebrick1",
   "green3", # purple
   "indianred1",
-  "lightskyblue", 
+  "lightskyblue",
   "gold1", # lt pink
-  "lightsalmon1",
-  "plum2", 
-  "springgreen", 
-  "darkslateblue", 
+  "plum2",
+  "springgreen",
+  "darkslateblue",
   'royalblue1',
   'chartreuse1',
   'mediumorchid2',
-  'khaki1', 
+  'khaki1',
   "lawngreen",
   "darkmagenta",
-  'thistle4', 
-  'yellow4')
+  'thistle4')
+
+master_color_palette <- colorRampPalette(brewer.pal(8, "Set2"))(20)
 
 # to visualize these colors 
 # pie(rep(1, 15), col = master_color_palette)
@@ -242,7 +240,9 @@ visualize_cellassign <- function(seurat_object, reduction_type, group_by, master
 intersect_all <- function(sces){
   rownames_list <- lapply(sces, function(sce) rownames(sce)) # extract row names 
   universal <- Reduce(intersect, rownames_list) # find the common row names in the list 
-  sces <- lapply(sces, function(sce) sce[universal, ]) # subset to common genes 
+  sces <- lapply(sces, function(sce) sce[universal, ]) # subset to common genes
+  
+  return(sces)
 }
 
 
@@ -765,13 +765,6 @@ fMarkersSampling <- function(sce, pivot_cluster, target_group, randomSubsets) {
     U[[cnt]] <- tt_top
     cnt <- cnt+1
   }
-  
-  ############### WHHHHHYYYYYYYY DOOOOESSSNNNTTTTTTT this WOOOOOOOOORRRRRKKKKKK????????
-  # L <- lapply(ls, function(l){
-  #   x <- sce[rowData(sce)$qc_pass, l[[1]]]
-  #   marks <- findMarkers(x, groups = x$id, log.p = TRUE)
-  # })
-  ############### 
   
   return(U)                                                                       # Return a matrix of gene ranks in order of p-value by sample
 }
