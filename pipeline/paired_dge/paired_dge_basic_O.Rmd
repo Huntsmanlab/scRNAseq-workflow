@@ -46,7 +46,6 @@ output:
       max-width: 90% !important;
       width: 90% !important;
     }
-
     body {
       max-width: 90% !important;
     }
@@ -58,7 +57,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 # Packages, Libraries, and Functions to import
-
 suppressPackageStartupMessages({
   library(tidyverse)
   library(SingleCellExperiment)
@@ -76,10 +74,8 @@ suppressPackageStartupMessages({
   library(fgsea)
   library(R.utils)
 })
-
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 source(here('pipeline', 'sourceFiles', 'utils_dge.R'))
-
 ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
 clusters <- 'temp'
 # names(ids) <- c('experimental_id', 'control_id')
@@ -88,7 +84,6 @@ clusters <- 'temp'
 
 
 ```{r}
-
 plot_markers <- function(inputs, ids, ntop = 50, negative_control, randomSubsets = 100){
   
   # Read in sample(s) and if there is more than one combine, normalize, and re-filter
@@ -150,7 +145,6 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control, randomSubsets
   for (i in clusters) {
     markers_i <- markers[[i]] # pos logFC = up-regulated in tranduced cells
     markers_all <- as.data.frame(markers_i) %>% rownames_to_column('gene_symbol')
-
     if ("FDR" %in% colnames(markers_all)) {                                             # Case when p = p.value
       markers_sig <- as.data.frame(markers_i) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(FDR <= 0.05)
       tooLow <- function(x) (ifelse(x < 1e-315, 1e-315, x))
@@ -204,7 +198,6 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control, randomSubsets
   
   return(outputs)
 }
-
 outputs <- plot_markers(params$ins, ids, ntop = 50, negative_control = FALSE)
 suppressWarnings(mkdirs(params$output_path))
 saveRDS(outputs, paste(params$output_path, '/', params$output_file, sep = ""))
@@ -219,7 +212,6 @@ if (length(clusters) < 3) {
 } else {
   writeLines('Not yet implemented')
 }
-
 ```
 
 ## Differentially Expressed Gene Tables {.tabset}
@@ -251,7 +243,6 @@ outputs$smarkers_sig %>%
 **Plots show top 10 significant pathways**
 
 ```{r}
-
 run_gene_enrichment <- function(markers, pathways_input, nperm){
   
   pathways <- gmtPathways(pathways_input)
@@ -268,7 +259,6 @@ run_gene_enrichment <- function(markers, pathways_input, nperm){
   results <- list(fgseaRes = fgseaRes, sig_pathways = sig_pathways)
   return(results)
 }
-
 make_ge_plots <- function(fgseaRes, pathway_name, pthresh = 0.05, ntop = 10, y_text_size = 10){
   
   fgseaRes <- fgseaRes[fgseaRes$padj < pthresh , ]
@@ -291,7 +281,6 @@ make_ge_plots <- function(fgseaRes, pathway_name, pthresh = 0.05, ntop = 10, y_t
       return(NULL)
     }
 }
-
 ```
 
 ```{r fig.height=5, fig.width=20, message=FALSE, warning=FALSE}
@@ -351,4 +340,3 @@ outputs$markers_sig %>%
     options = list(dom = 'Bfrtip', 
                    buttons = list("copy", "excel", "csv", "pdf")))
 ```
-

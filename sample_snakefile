@@ -77,11 +77,6 @@ sce_cas_uncorrected = '../data/integrated_cellassign/{ids_integration}/uncorrect
 # multiple samples 
 cellassign_multiple_report = '../reports/cellassign_integrated/{ids_integration}/cellassign_integrated_report.html'
 
-# preparing for velocity analysis 
-sce_raw_with_sum_factors = '../data/processed/{id}/sce_with_sum_factors.rds'
-sce_raw_cas = '../data/cellassign/{id}/sce_pro_cas.rds'
-loom_cas = '../data/loom_cas/{id}/seurat_cas.loom'
-
 ##########################################
 # user friendly naming 
 
@@ -145,11 +140,8 @@ rule all:
     # DGE_edgeR_MULTIPLE_samples,
     # run_summary_stats,
     # do_batch_correction,
-    # run_seurat_integration,
-    # expand(sce_raw_with_sum_factors, id = ids),
-    # expand(sce_raw_cas, id = ids),
-    # expand(loom_cas, id = ids)
-
+    # run_seurat_integration
+    
 # convert 10X counts to an sce
 rule make_sce:
   input:

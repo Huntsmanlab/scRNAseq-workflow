@@ -11,12 +11,12 @@ library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 # update here when you have a new list. 
-id.list <-list('DH4', 'DH17')
+id.list <-list('VOA10286UT_DBZ', 'VOA10286UT_ctr', 'VOA10819UT_DBZ', 'VOA10819UT_ctr', 'DH2_DBZ', 'DH2_control', 'DH9_DBZ', 'DH9_control', 'DH11_DBZ', 'DH11_control')
 id.orig <- id.list
 
 # lets start! 
 # load the data, note that we aren't using the normalized data since we will use seurat's normalization method 
-sces <- lapply(id.list, function(id) readRDS(here('..', 'data', 'qc', id, 'sce_qc.rds')))
+sces <- lapply(id.list, function(id) readRDS(here('..', 'data', 'cellassign', id, 'sce_norm_cas.rds')))
 
 # subset to common genes across a group of sces 
 sces <- intersect_all(sces)
