@@ -256,27 +256,60 @@ def common_dges_input_files(pair_ids):
 
 # INTEGRATE CELL ASSIGN 
 # wildcards are given as a string in a list, separated by '-', like this: ['DH1-DH2']
-def integrate_cell_assign_files(wildcards, sce_norm_cas, integrated_cas ): 
-    
+def integrate_cell_assign_files(wildcards, sce_norm_cas, integrated_cas ):
+
   path_to_cas = remove_last_two_dirs(sce_norm_cas)
   path_to_integ = remove_last_two_dirs(integrated_cas)
-  
+
   separate_samples = wildcards[0].split('-')
-  
-  i = 0 
-  sce_cas_path_list = [] # input files 
-  
-  while i < len(separate_samples): 
-    
+
+  i = 0
+  sce_cas_path_list = [] # input files
+
+  while i < len(separate_samples):
+
     sce_cas_path = path_to_cas + separate_samples[i] + '/sce_norm_cas.rds'
     sce_cas_path_list.append(sce_cas_path)
-    
-    i += 1 
-    
+
+    i += 1
+
   path_to_integrated_output = path_to_integ + wildcards[0] + '/integrated_cas.rds'
   path_to_combined_sce = path_to_integ + wildcards[0] + '/uncorrected_cas.rds'
-  
+
   return sce_cas_path_list, path_to_integrated_output, path_to_combined_sce
+  
+  
+  
+  
+  
+  
+  
+  
+  
+# def integrate_cell_assign_files(wildcards, sce_norm_cas): 
+#   
+#   path_to_cas = remove_last_two_dirs(sce_norm_cas)
+#   
+#   separate_samples = wildcards[0].split('-')
+# 
+#   i = 0 
+#   sce_cas_path_list = [] # input files 
+#   
+#   while i < len(separate_samples): 
+#     
+#     sce_cas_path = path_to_cas + separate_samples[i] + '/sce_norm_cas.rds'
+#     sce_cas_path_list.append(sce_cas_path)
+#     
+#     i += 1 
+#   
+#   return sce_cas_path_list
+
+  
+  
+  
+  
+  
+  
 
 # generate report for the integrated sample
 
