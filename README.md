@@ -1,6 +1,5 @@
 # scRNAseq-workflow
 
-<<<<<<< HEAD
 > This repository contains the code used by the Huntsman Lab at BCCRC for single cell RNA sequencing analysis.
 
 **The steps of the pipeline are as follows:**  
