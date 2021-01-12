@@ -40,7 +40,14 @@ suppressPackageStartupMessages({
   library(ggplotify)
   library(EnhancedVolcano)
   library(ggrepel)
-  
+  library(glue)
+  library(fgsea)
+  library(splatter)
+  library(viridis)
+  library(ggthemes)
+  library(destiny)
+  library(ggbeeswarm)
+  library(plotly)
 })
 
 #ADD THEME #### 
@@ -83,12 +90,159 @@ theme_amunzur <- theme(
 # plotDEG_scran()
 # scran_batch_norm()
 ####################################################################################################
+# make_tsne_plot <- function(sce, 
+#                            color, 
+#                            dimensions, 
+#                            title) {
+#   
+#   # extract coordinates and save them in a list 
+#   i <- 1
+#   dimensions_list <- list()
+#   
+#   while (i <= dimensions){
+#     dim <- list(as.numeric(sce@int_colData@listData[["reducedDims"]]$TSNE[, i]))
+#     dimensions_list <- append(dimensions_list, dim) 
+#     
+#     i <- i + 1 
+#     
+#   }
+#   
+#   # make a df from the coordinates 
+#   df <- do.call(data.frame, dimensions_list)
+#   
+#   # do some renaming 
+#   if (dimensions == 3){
+#     names(df) <- c("t-SNE1", "t-SNE2", "t-SNE3")
+#   } else{
+#     names(df) <- c("t-SNE1", "t-SNE2")
+#   }
+#   
+#   # now add another column to df based on what you want to color 
+#   if (color == 'cluster') {
+#     df$cluster <- sce$cluster
+#   } else if (color == 'cell_type'){
+#     df$cell_type <- sce$cell_type
+#   }
+#   
+#   # make the plot here
+#   if (dimensions == 3) {
+#     
+#     dimred_plot <- plot_ly(data = df,
+#                            x = ~df[, 1], y = ~df[, 2], z = ~df[, 1]
+#                            opacity = 1,
+#                            color = ~cell_type,
+#                            type = "scatter",
+#                            mode = "markers",
+#                            marker = list(size = 5)) %>% 
+#       
+#       add_markers()
+#     
+#     cell_type_plot <- cell_type_plot %>% 
+#       layout(title = 'cell types in the sample shown in t-SNE plot')
+#     
+#     
+#   }
+#   
+#   
+#   return(dimred_plot)
+#   
+# }
+# 
+# 
+# 
+# 
+
+
+
+
+
+
+
+
+
+
+
+# CELL ASSIGN COLORS
+library(RColorBrewer)
+n <- 20
+qual_col_pals <-  brewer.pal.info[brewer.pal.info$category == 'qual',]
+most_distinct_color_palette <- unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+# 14 colors, one color for each cell type. cell types given in alphabetical order 
+master_cell_types <- c("B cells",
+                       "Cytotoxic T cells",
+                       "Endometrial stem cells",
+                       "Endothelial cells",            
+                       "Epithelial cells",
+                       "Epithelial ciliated cells",    
+                       "Mesenchymal cells",            
+                       "Mesenchymal stem cells",
+                       "Monocyte/Macrophage",
+                       "Myofibroblast",
+                       "other",                        
+                       "Plasma cells",
+                       "Proliferative cells",
+                       "T cells",
+                       "Vascular smooth muscle cells", 
+                       "Cluster2_like")
+
+master_color_palette <- c(
+  "cyan2", # red
+  "firebrick1",
+  "green3", # purple
+  "indianred1",
+  "lightskyblue",
+  "gold1", # lt pink
+  "plum2",
+  "springgreen",
+  "darkslateblue",
+  'royalblue1',
+  'chartreuse1',
+  'mediumorchid2',
+  'khaki1',
+  "lawngreen",
+  "darkmagenta",
+  'thistle4')
+
+master_color_palette <- colorRampPalette(brewer.pal(8, "Set2"))(20)
+
+# to visualize these colors 
+# pie(rep(1, 15), col = master_color_palette)
+
+# this function plots cell assign results in a dim reduction plot. 
+visualize_cellassign <- function(seurat_object, reduction_type, group_by, master_color_palette, master_cell_types){
+  
+  # find cell types present in the seurat object, sort them alphabetically
+  unique_cell_types <- as.vector(sort(unique(seurat_object$cell_types)))
+  
+  # find common cell types between our lists and the master cell type list 
+  common <- intersect(unique_cell_types, master_cell_types)
+  
+  # find the indices where we have common these cell types in the master cell type list 
+  idx <- match(common, master_cell_types)
+  
+  # pick colors that correspond to the indices
+  colors_chosen <- master_color_palette[idx]
+  
+  # make cell assign plot
+  plot <- DimPlot(object = seurat_object,
+                  dims = c(1, 2),
+                  reduction = reduction_type,
+                  group.by = group_by,
+                  pt.size = 1.5) +
+    scale_color_manual(values = colors_chosen)
+  
+  return(plot)
+  
+} # end of function
 
 # this fucntion finds common genes in a given list of sces and subsets them to the common genes 
 intersect_all <- function(sces){
   rownames_list <- lapply(sces, function(sce) rownames(sce)) # extract row names 
   universal <- Reduce(intersect, rownames_list) # find the common row names in the list 
-  sces <- lapply(sces, function(sce) sce[universal, ]) # subset to common genes 
+  sces <- lapply(sces, function(sce) sce[universal, ]) # subset to common genes
+  
+  return(sces)
 }
 
 
@@ -302,11 +456,54 @@ make_pseudo_counts_seurat <- function(sobject) {
 
 ####################################################################################################
 
+make_pseudo_counts_sce <- function(sce_list) {
+  
+  # subset all sces to common genes 
+  
+  df_list <- do.call(counts, sce_list)
+  df_sum <- rowSums(df)
+  
+  return(df_sum)
+  
+}
+
+
+####################################################################################################
+
+# assuming that we already subsetted sces to common genes before, so make sure to run intersect_all
+find_and_bind_multiple <- function(sce_list) {
+  
+  # extract counts - make a df 
+  df_list <- lapply(sce_list, function(sce) as.data.frame(as.matrix(counts(sce))))
+  
+  # now sum the rows 
+  df_list <- lapply(df_list, function(df) as.data.frame(rowSums(df)))
+  
+  # turn rownames to columns for all data frames
+  df_list <- lapply(df_list, function(df) df %>% rownames_to_column())
+  
+  # do an inner join by rowname
+  combined <- Reduce(function(x, y) inner_join(x, y, by = "rowname"), df_list)
+  
+  # col back to rowname 
+  combined <- combined %>% column_to_rownames()
+  
+  # rename the columns 
+  combined_sce <- do.call(combine_sces, sce_list)
+  names <- unique(combined_sce$id)
+  colnames(combined) <- names
+  
+  return(combined)
+  
+}
+
+####################################################################################################
+
 find_and_bind <- function(df_list){
   
   # find common genes
   universal <- intersect(rownames(df_list[[1]]), rownames(df_list[[2]]))
-
+  
   # subset to common genes 
   df_list[[1]] <- df_list[[1]][universal, ]
   df_list[[2]] <- df_list[[2]][universal, ]
@@ -320,9 +517,9 @@ find_and_bind <- function(df_list){
   
   # remove negative counts
   combined <- combined[apply(combined, 1, function(combined) all(combined >= 0)), ]
-
+  
   return(combined)
-
+  
 }
 
 ####################################################################################################
@@ -537,4 +734,37 @@ combine_sces <- function(..., sce_list = NULL, prefix_col_name = NULL, suffix_co
   
   return(sce_list[[1]])
   
+}
+
+fMarkersSampling <- function(sce, pivot_cluster, target_group, randomSubsets) {
+  
+  ### Calculate the top DEGs for each random sample comparison
+  idxs_list <- vector("list", randomSubsets)
+  X <- 1:randomSubsets
+  s_names <- sce$id
+  idx_p <- which(s_names %in% c(pivot_cluster))
+  idx_t <- which(s_names %in% c(target_group))
+  
+  U <-  list()
+  for (i in X) { idxs_list[[i]] <- c(idx_p, sample(idx_t, size = length(idx_p))) }# grab random sample indices and pivot indices for loop
+  
+  cnt <- 1
+  repeat {                                                                        # Do randomSubset iterations to find DEGs
+    if(cnt > randomSubsets) {
+      break
+    }
+    
+    idxs <- c(idx_p, sample(idx_t, size = length(idx_p)))
+    x <- sce[rowData(sce)[[3]], idxs]                                             # Grab just the genes passing qc and cells of interest
+    markers <- findMarkers(x, groups = x$id, log.p = TRUE)                        # Do pairwise differential expression (ANY)
+    markers <- markers[[pivot_cluster]]
+    markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(log.FDR < -1.6)
+    markers_sig <- dplyr::arrange(markers_sig, dplyr::desc(abs(markers_sig[,4]))) # order
+    tt_top <- head(markers_sig, 2000)                                             # Identify top '2000' genes
+    
+    U[[cnt]] <- tt_top
+    cnt <- cnt+1
+  }
+  
+  return(U)                                                                       # Return a matrix of gene ranks in order of p-value by sample
 }

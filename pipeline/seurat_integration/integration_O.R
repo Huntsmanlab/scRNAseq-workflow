@@ -1,10 +1,3 @@
----
-title: "delete"
-author: "asli"
-date: "3/26/2020"
-output: html_document
----
-```{r include = FALSE}
 # This script is for integrating multiple data sets. integrating allows us to combine data sets and remove batch effects at the same time 
 # we may need to integrate data in various situations, so this script can be used in multiple types of analysis, such as: 
 # running a clustering analysis on the combined sample 
@@ -15,23 +8,17 @@ output: html_document
 
 # load a few necessary things 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
-# update here when you have a new list. update the same update the 
-id.list <-list('VOA11068_ENOC', 'DH13', 'DH18')
+# update here when you have a new list. 
+id.list <-list('VOA10286UT_DBZ', 'VOA10286UT_ctr', 'VOA10819UT_DBZ', 'VOA10819UT_ctr', 'DH2_DBZ', 'DH2_control', 'DH9_DBZ', 'DH9_control', 'DH11_DBZ', 'DH11_control')
 id.orig <- id.list
 
 # lets start! 
 # load the data, note that we aren't using the normalized data since we will use seurat's normalization method 
-sces <- lapply(id.list, function(id) readRDS(here('..', 'data', 'qc', id, 'sce_qc.rds')))
+sces <- lapply(id.list, function(id) readRDS(here('..', 'data', 'cellassign', id, 'sce_norm_cas.rds')))
 
 # subset to common genes across a group of sces 
-intersect_all <- function(sces){
-  rownames_list <- lapply(sces, function(sce) rownames(sce)) # extract row names 
-  universal <- Reduce(intersect, rownames_list) # find the common row names in the list 
-  sces <- lapply(sces, function(sce) sce[universal, ]) # subset to common genes 
-}
-
 sces <- intersect_all(sces)
 
 # add the id number in front of cell barcodes
@@ -87,10 +74,6 @@ integrated <- RunPCA(integrated, verbose = FALSE)
 integrated <- RunUMAP(integrated, dims = 1:30)
 integrated <- RunTSNE(integrated, dims = 1:30)
 
-plots <- DimPlot(integrated, group.by = c('id'), combine = FALSE)
-plots <- lapply(X = plots, FUN = function(x) x + theme(legend.position = "top") + guides(color = guide_legend(nrow = 3, 
-                                                                                                              byrow = TRUE, override.aes = list(size = 3))))
-CombinePlots(plots)
 
 # save the data, assuming you made the folder where the data would be saved 
 saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'integrated.rds' )) # corrected data 
@@ -100,7 +83,9 @@ saveRDS(integrated, file = here('..', 'data', 'integrated', paste(unlist(id.orig
 # load the normalized data 
 sces_norm <- lapply(id.orig, function(id) readRDS(here('..', 'data', 'normalized', id, 'sce_norm.rds')))
 sces_norm <- intersect_all(sces_norm) # subset to common genes 
-uncorrected <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]]) 
+
+# combine the normalized sces 
+uncorrected <- do.call(combine_sces, sces_norm)
 
 # some dim reduction 
 set.seed(1564)
@@ -111,4 +96,20 @@ uncorrected <- runUMAP(uncorrected)
 # now save the object 
 saveRDS(uncorrected, file = here('..', 'data', 'integrated', paste(unlist(id.orig), collapse = '-'), 'uncorrected.rds' )) # uncorrected data 
 
-```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

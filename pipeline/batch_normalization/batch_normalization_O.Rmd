@@ -1,0 +1,92 @@
+---
+title: 'Correcting for batch effects'
+subtitle: '`r params$ids`'
+author: 'asli'
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  ids: 'DH13-DH18'
+---
+
+#### Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots before and after batch normalization in these samples:  
+`r params$ids`
+
+
+```{r include = FALSE}
+
+library(here)
+source(here('..', 'sourceFiles', 'utilities.R'))
+
+```
+
+```{r include = FALSE}
+
+# load the sces
+ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+dh_organoid_ids <- as.list(c(unlist(ids)))
+
+sces <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'clustered', 'sce', id, 'sce_clus.rds')))
+
+```
+
+```{r include = FALSE}
+
+# subset to common genes 
+universe <- Reduce(intersect, lapply(sces, function(sce) rownames(sce)))
+sces <- lapply(sces, function(sce) sce[universe, ])
+
+# make the sces comparable by removing sequencing depth 
+sces <- do.call(multiBatchNorm, sces)
+
+# find highly variable genes  
+vars <- lapply(sces, function(sce) modelGeneVar(sce))
+combined.var <- do.call(combineVar, vars)
+chosen.hvgs <- combined.var$bio > 0
+
+# combine without any correction yet
+combined <- do.call(correctExperiments, c(PARAM=NoCorrectParam(), sces))
+
+# some renaming so thar we can have pretty plots 
+combined <- runPCA(combined, subset_row = chosen.hvgs)
+combined <- runTSNE(combined, dimred = "PCA")
+combined <- runUMAP(combined, dimred = "PCA")
+
+p1 <- plotTSNE(combined, colour_by = "id")
+p2 <- plotUMAP(combined, colour_by = "id")
+
+# batch correction! 
+batch_removed <- fastMNN(combined, batch = combined$id, subset.row = chosen.hvgs)
+
+batch_removed <- runTSNE(batch_removed, dimred="corrected")
+batch_removed <- runUMAP(batch_removed, dimred="corrected")
+
+p3 <- plotTSNE(batch_removed, colour_by = "batch")
+p4 <- plotUMAP(batch_removed, colour_by = "batch")
+
+```
+
+**Before** batch correction
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 9}
+
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+
+```
+
+**After** batch correction
+```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 8}
+
+gridExtra::grid.arrange(p3, p4, nrow = 1)
+
+```
+
+```{r include = FALSE}
+# save the uncorrected object
+saveRDS(combined, file = here('..', 'data', 'batch_corrected', params$ids, 'uncorrected.rds'))
+
+# save the corrected object 
+saveRDS(batch_removed, file = here('..', 'data', 'batch_corrected', params$ids, 'corrected.rds'))
+
+```

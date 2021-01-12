@@ -3,7 +3,7 @@
 # as inputs, it needs a list of filepaths that contains all the data we need. 
 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 convert_to_sces <- function(path_to_10X, ids) {
 

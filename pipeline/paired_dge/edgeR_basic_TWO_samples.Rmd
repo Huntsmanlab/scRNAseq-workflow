@@ -1,106 +1,68 @@
 ---
-title: "ovary_vs_endometrium"
-author: "asli"
+title: 'DGE - Comparing strsplit(params$ids, "=")[[1]][[2]] to strsplit(params$ids, "=")[[1]][[1]]'
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
+author: 'asli munzur'
 output: 
   html_document:
     code_folding: hide
 
 params:
-  ova: 'VOA11068_ENOC-DH13-DH18-DH8-DH24-VOA11229_CCOC-DH7'
-  endo: 'DH4-DH17-DH10-DH3-DH15-DH16'
-
-  output_path: 'output_path' # where we save the sce with clustering data 
+  ids: 'ids_dge' # write the control first to compare experimental to control 
+  sce_clus: 'sce_clus'
+  
+  seed: 123
 ---
 
-#### Here we show the results of DGE analysis between ovarian and endometrial tumors.  
-**Ovarian samples are:**  
-VOA11068_ENOC  
-DH13  
-DH18  
-DH8  
-DH24  
-VOA11229_CCOC  
-DH7  
+```{r PREPARE, include = FALSE}
 
-**Endometrial samples are:**  
-DH3  
-DH4  
-DH10  
-DH15  
-DH16  
-DH17  
-
-```{r prepare, include = FALSE}
-
+# source some files
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
-ova <- readRDS(here('..', 'data', 'integrated', 'VOA11068_ENOC-DH13-DH18-DH8-DH24-VOA11229_CCOC-DH7', 'integrated.rds'))
-endo <- readRDS(here('..', 'data', 'integrated', 'DH3-DH4-DH10-DH15-DH16-DH17', 'integrated.rds'))
+```
+
+```{r include = FALSE}
+
+# generate the id lists 
+ids_1 <- strsplit(params$ids, "=")[[1]][[1]] # split by "=" 
+
+ids_2 <- strsplit(params$ids, "=")[[1]][[2]] # split by "=" 
+
+```
+
+```{r PSEUDOBULKING, include = FALSE, message = FALSE}
+
+# extract individual paths from strings passed through snakemake 
+path <- params$sce_clus[1]
   
-```
+path_sample1 <- as.list(unlist(strsplit(path, ' ')))[[1]]
+path_sample2 <- as.list(unlist(strsplit(path, ' ')))[[2]]
 
-```{r pseudobulking-ova, include = FALSE }
+# load the clustered objects  
+sample1 <- readRDS(path_sample1[1])
+sample2 <- readRDS(path_sample2[1])
 
-# remember that this is how we named the cells (columns): sampleID_barcode. We will rename all the columns now, cells from the same sample will no longer have different barcodes, but they will instead have the sample ID as the column name. 
+# some quick batch correction 
+sce_list <- scran_batch_norm(list(sample1, sample2))
+sample1 <- sce_list[[1]]
+sample2 <- sce_list[[2]]
 
-new_names <- strsplit(colnames(ova), '.', fixed = TRUE)
-new_names <- lapply(new_names, function(element) as.list(element)[[1]])
-new_names <- c(unlist(new_names))
+# extract assay data 
+sample1_df <- as.data.frame(counts(sample1))
+sample2_df <- as.data.frame(counts(sample2))
 
-ova_df <- as.data.frame(GetAssayData(ova))
-colnames(ova_df) <- new_names
+# find common genes, subset to that and cbind all the samples
+combined <- find_and_bind(list(sample1_df, sample2_df))
 
-# here we sum the gene counts for the rows that have the same column name. this allows us to sum all the counts for a specific sample 
-ova_df <- sapply(unique(colnames(ova_df)), function(x) rowSums(ova_df[, colnames(ova_df) == x, drop=FALSE]))
+# now make the group, we will use this to make the DGE object later on 
+group <- c(rep(1, ncol(sample1_df)), rep(2, ncol(sample2_df)))
 
-```
-
-```{r pseudobulking-endo, include = FALSE }
-
-# remember that this is how we named the cells (columns): sampleID_barcode. We will rename all the columns now, cells from the same sample will no longer have different barcodes, but they will instead have the sample ID as the column name. 
-
-new_names <- strsplit(colnames(endo), '.', fixed = TRUE)
-new_names <- lapply(new_names, function(element) as.list(element)[[1]])
-new_names <- c(unlist(new_names))
-
-endo_df <- as.data.frame(GetAssayData(endo))
-colnames(endo_df) <- new_names
-
-# here we sum the gene counts for the rows that have the same column name. this allows us to sum all the counts for a specific sample 
-endo_df <- sapply(unique(colnames(endo_df)), function(x) rowSums(endo_df[, colnames(endo_df) == x, drop=FALSE]))
 
 ```
 
+```{r edgeR, include = FALSE}
 
-```{r combine_pseudobulking, include = FALSE }
-ova_df <- as.data.frame(ova_df)
-endo_df <- as.data.frame(endo_df)
-
-# find common genes
-universal <- intersect(rownames(ova_df), rownames(endo_df))
-
-# subset to common genes 
-ova_df <- ova_df[universal, ]
-endo_df <- endo_df[universal, ]
-
-# order genes alphabetically so that samples will have the same order of genes 
-ova_df <- ova_df[ order(row.names(ova_df)), ]
-endo_df <- endo_df[ order(row.names(endo_df)), ]
-
-# now cbind: 
-combined <- cbind(ova_df, endo_df)
-
-# remove negative counts
-combined <- combined[apply(combined, 1, function(combined) all(combined >= 0)), ]
-
-```
-
-
-```{r DGE, include = FALSE}
-
-dgeObject <- DGEList(counts = combined, genes = rownames(combined), group = factor(c(1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2)))
+dgeObject <- DGEList(counts = combined, genes = rownames(combined), group = group)
 
 # filter the lowly expressed genes - have at least in 0.5 cpm in at least 2 samples 
 keep <- rowSums(cpm(dgeObject) > 0.5) >= 2 
@@ -109,7 +71,6 @@ dgeObject <- dgeObject[keep, ]
 # normalize using edgeR's method 
 dgeObject <- calcNormFactors(dgeObject)
 
-group <- factor(c(1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2))
 designMatrix <- model.matrix(~group)
 
 # estimate the dispersion (variance) of genes 
@@ -125,7 +86,6 @@ qlf <- glmQLFTest(fit, coef = 2)
 qlf_threshold <- glmTreat(fit, coef = 2, lfc = 0.5)
 
 ```
-
 
 ```{r gene_enrichment, include = FALSE}
 
@@ -150,25 +110,14 @@ rownames(qlf_modified) <- as.integer(geneIDs$ENTREZID)
 go <- goana(qlf_modified, species= "Hs") # entrez gene ids are in mapping 
 keg <- kegga(qlf_modified, geneid = geneIDs$ENTREZID, species="Hs")
 
-
 ```
 
 ### Diagnostic Plots 
 These plots are intended to give an idea about the model and whether it is a good fit to represent the data we are interested in analyzing. 
 
-Plot cells on a two-dimensional scatterplot so that distances on the plot approximate the expression differences between the cells  
-In the plot below, the distance between each pair of samples can be interpreted as the leading log-fold change between the samples for the genes that best distinguish that pair of samples. Therefore, samples shown farther apart are more different in terms of gene expression. Ideally we would expect to see the replicates closer together. However, note that decreasing the number of dimensions down to two may not represent the data as accurately. This plot is here only to give an idea about how similar the samples are. Dimensionality reduction plots are more reliable to look at. Blue squares are ovarian and red squares are endometrial. 
-
-```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 4}
-
-plotMDS(dgeObject, col = c('blue', 'red'), pch = 15)
-
-```
-
-
 #### Plot biological coefficient of variation against gene abundance, in log2 counts per million.  
-Biological coefficient of variation is the true variation between genes, and it corresponds to the dispersion parameter of the negative binomial model. To learn more about dispersion, variation and how they relate to one another, read more about the negative binomial model and its implementation in scRNA sequencing data.  
-Look for these to make sure your the model is a good fit:  
+Biological coefficient of variation is the true variation between genes, and it corresponds to the dispersion parameter of the negative binomial model. To learn more about dispersion, variation and how they relate to one another, you can check out the negative binomial model and its implementation in scRNA sequencing data.  
+Look for these to make sure the model is a good fit:  
 **1.** High dispersion (variance) for low counts is expected. Dispersion is expected to decrease smoothly as the abundance increases.  
 **2.** For humans, common dispersion (the red line) should be around 0.3 - 0.4, meaning replicates can differ by 30% or more. If the common dispersion is more, the results of this analysis may not be as reliable.  
 
@@ -180,7 +129,7 @@ plotBCV(dgeObject)
 ```
 
 #### Plot the genewise quasi-likelihood dispersion against the gene abundance (in log2 counts per million).
-In this script, we squeeze the dispersion values from raw counts towards the trended dispersion. (This just means we transform the data in certain ways to make the model fit.)
+In this analysis, we squeeze the dispersion values from raw counts towards the trended dispersion. This helps transform the data in certain to make the model fit.  
 The plots gives an idea about how much the data was squeezed. The expected is too see squeezed dispersion values (shown in red) closer to the trended (blue) line.  
 
 ```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 4}
@@ -194,8 +143,7 @@ plotQLDisp(fit)
 Now we take a closer look at the **upregulated** genes. To look for interesting genes, we do the following filtering:  
 We don't show genes with log fold change (LogFC) less than 0.5. 
 We also eliminate genes with p values more than 0.05.  
-We resticted this table to first 50 genes. 
-  
+
 To help interpret, we use the follwing ranking system: 
 Genes are ranked separately for log fold change (high to low) and p values (low to high). We then add these ranks together to get **summed_ranks.**  
 Genes with smaller summed_ranks have high fold changes and low p values.
@@ -211,12 +159,12 @@ DT::datatable(upregulated_genes_table,
   options = list(dom = 'Bfrtip',
                  buttons = list("copy", "excel", "csv", "pdf")))
 
-# # save the table to be loaded later 
-# write.csv(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR_up', paste(params$ids)))
+# save the table to be loaded later 
+# saveRDS(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR', paste(params$ids, 'up.rds')))
 
 ```
 
-#### Downregulated genes 
+#### Downregulated genes  
 Filtering and ranking systems is the same as upregulated genes, as explained above. Genes with the highest fold changes and lowest p values have lower summed_ranks.
   
 ```{r echo = FALSE, message = FALSE}
@@ -231,12 +179,12 @@ DT::datatable(downregulated_genes_table,
                  buttons = list("copy", "excel", "csv", "pdf")))
 
 # save the table to be loaded later 
-# write.csv(downregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR_down', paste(params$ids)))
+# saveRDS(upregulated_genes_table, file = here('..', 'data', 'dge', 'edgeR', paste(params$ids, 'down.rds')))
 
 ```
 
 #### Plot the differentially expressed genes  
-The blue lines indicate 1-fold up or down. The number of genes that are significantly up or down regulated are shown in the table, according to the plot. Here, we compare the endometrial tumors to ovarian tumors.  
+The blue lines indicate 1-fold up or down. The number of genes that are significantly up or down regulated are shown in the table, according to the plot. Here, we compare transduced sample to the control sample.  
 ```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 5}
 # plot the differentially expressed genes 
 
@@ -245,7 +193,7 @@ abline(h=c(-1,1), col="blue")
 
 ```
 
-Now we take a look at the DE genes in a volcano plot. Note that we label the first 40 significantly up and downregulated genes in endometrial samples compared to ovarian samples.  
+Now we take a look at the DE genes in a volcano plot. Note that we label the first 40 significantly up and downregulated genes in the transduced sample compared to control samples.  
 Fold change cut off is 1, p value cut off is 10e-5.  
 ```{r echo = FALSE, message = FALSE, fig.height = 9, fig.width = 11}
 # we need to work on qlf a little bit so that we can use the enhancedvolcano function 
@@ -258,6 +206,8 @@ data <- data %>%
 
 cool_genes <- c(upregulated_genes_table[1][1: 15, ], downregulated_genes_table[1][1: 15, ])
 
+x_limits = max(max(upregulated_genes_table[, 2]), abs(min(downregulated_genes_table[, 2])))
+
 library(EnhancedVolcano)
 
 EnhancedVolcano(data,
@@ -265,7 +215,7 @@ EnhancedVolcano(data,
   x = 'log2FoldChange',
   y = 'pvalue',
   title = 'Differentially Expressed Genes',
-  subtitle = 'endometrium vs ovary', 
+  subtitle = 'transduced vs control', 
   selectLab = cool_genes, 
   labCol = 'black',
   labFace = 'bold',
@@ -273,7 +223,7 @@ EnhancedVolcano(data,
   widthConnectors = 0.4,
   colConnectors = 'black',
   pointSize = 0.7, 
-  xlim = c(-5, 8), 
+  xlim = c(-x_limits, x_limits), 
   FCcutoff = 1, 
   pCutoff = 10e-5, 
   legend=c('not significant','Log (base 2) fold-change','P value',
@@ -285,7 +235,7 @@ EnhancedVolcano(data,
 
 ```
 
-Number of DE genes in endometrial tumors compared to ovarian tumors: 
+Number of DE genes in transduced sample compared to the control sample: 
 ```{r, echo = FALSE, message = FALSE}
 
 summary <- summary(decideTests(qlf))
@@ -305,8 +255,6 @@ summary %>%
     kable_styling(full_width = F)
 
 ```
-
-
 
 ### Gene enrichment  
 #### GO Pathway analysis  
@@ -351,27 +299,3 @@ DT::datatable(keggtable,
                  buttons = list("copy", "excel", "csv", "pdf")))
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

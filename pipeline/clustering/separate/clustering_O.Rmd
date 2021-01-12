@@ -1,0 +1,207 @@
+---
+title: "`r params$id` Clustering in separate samples"
+author: "aslı"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  id: 'DH16'
+  output_path: '/huntsman/amunzur/data/clustered/sce/DH16/sce_clus.rds' # where we save the sce with clustering data 
+---
+  
+In this report, we perform clustering in isolated samples and show the results in dimensionality  
+reduction plots. We also perform modularity analysis and bootstrap to test the quality of our clusters.  
+More info about these two methods are given below, at the top of the respective plots.  
+We use **scran** package for clustering. The algorithm we chose is **nearest neighbors** since it is  
+widely adopted. Scran picks the best number of clusters and uses graph based clustering methods.  
+
+
+```{r include = FALSE}
+# source some files 
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+```
+
+```{r include = FALSE}
+# load the data - it has to be normalized sce with reduced dimensions 
+sce <- readRDS(here('..', 'data', 'normalized', params$id, 'sce_norm.rds'))
+```
+
+### ALGORITHM: Shared neighbor
+```{r include = FALSE}
+# Build a shared neighbor graph for cells based on their expression profiles.
+g <- buildSNNGraph(sce, use.dimred="UMAP") # shared neighbor weighting
+
+# extract clustering info from the graph that we just made 
+cluster <- igraph::cluster_walktrap(g)$membership
+
+# add that info to the sce 
+sce$cluster <- factor(cluster)
+
+# this table shows how many cells in each cluster 
+cluster_table <- table(sce$cluster)
+
+# we can redo the reduced dim plots with the clustering info in mind 
+plotTSNE <- plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', params$id, sep = '_'))
+plotUMAP <- plotUMAP(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', params$id, sep = '_'))
+plotPCA <- plotPCA(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', params$id, sep = '_'))
+
+```
+
+```{r include = FALSE}
+# here we save the sce object with the clustering data - we only save the shared neighbor clusters 
+saveRDS(sce, file = params$output_path)
+
+```
+
+
+```{r echo= FALSE, message = FALSE}
+# now we make the table look nice for the report 
+
+cluster_table <- as.data.frame(cluster_table) %>% 
+  rename(cluster = Var1, number_of_cells = Freq)
+
+cluster_table %>% 
+  knitr::kable(caption = 'Table 1: number of cells in each cluster - shared neighbor ') %>% 
+  kable_styling(full_width = F)
+
+```
+
+```{r echo = FALSE, message = FALSE}
+# visualize these graphs 
+plotTSNE
+plotUMAP
+plotPCA
+```
+
+```{r include = FALSE}
+# CHECK THE ACCURACY OF OUR CLUSTERING: 
+# here we calculate the modularity scores for our clusters. this helps understand the relationships between clusters. 
+# we want the clusters to be distinct, so we dont want different clusters to interact closely. 
+ratio <- clusterModularity(g, cluster, as.ratio=TRUE)
+
+# here, we want the diagonal squares to be dark but the other ones to be as light as possible. 
+# darker colors mean higher modularity - higher interaction 
+# this will be helpful to diagnose low quality clustering 
+heatMap_modularity <- pheatmap(log10(ratio+1), cluster_cols=FALSE, cluster_rows=FALSE, col=rev(heat.colors(100)), main = 'modularity')
+
+# now we do bootstrapping on our clusters. ideally, a cell in a cluster should always remain there. 
+boot_results <- bootstrapCluster(sce, FUN=function(x) {
+  g <- buildSNNGraph(x, use.dimred="UMAP")
+  igraph::cluster_walktrap(g)$membership}, clusters=sce$cluster)
+
+# same thing, you only want the diagonal squares to have a dark color. 
+heatMap_bootstrap <- pheatmap(boot_results, cluster_cols=FALSE, cluster_rows=FALSE, col=colorRampPalette(c("white", "blue"))(100), main = 'bootstrap')
+```
+
+
+#### Modularity scores 
+Here, we measure how much our clusters interact. Ideally, we want the interaction within a cluster  
+to be high, but we don't want separate clusters to interact. This heatmap helps visualize this:  
+the diagonal squares should be darkest, but the surrounding squares should be as light as possible.  
+If you see a lot of darker squares around, you may want to reconsider your clustering parameters.  
+The lower part of the heatmap is obviously not applicable, just focus on the top part of the plot.   
+Note that the darker the square, stronger the interaction.
+
+```{r echo = FALSE, message = FALSE}
+heatMap_modularity
+```
+
+
+#### Bootstrap results 
+We use bootstrapping multiple times to redo the clustering. Ideally, cells in a cluster would remain there  
+in each time we do the clustering again. The way you read this heatmap is very similar to the heatmap above.  
+The best case is when the diagonal squares are darkest but the other ones are as light as possible.  
+If you see many squares with darker colors outside the main diagonal, that means cells appeared in  
+various clusters as we redid clustering through bootstrapping. 
+
+```{r echo = FALSE, message = FALSE}
+heatMap_bootstrap
+```
+
+### ALGORITHM: k means 
+```{r include = FALSE}
+# Build a k means graph for cells based on their expression profiles.
+g <- buildKNNGraph(sce, use.dimred="UMAP") # k means 
+
+# extract clustering info from the graph that we just made 
+cluster <- igraph::cluster_walktrap(g)$membership
+
+# add that info to the sce 
+sce$cluster <- factor(cluster)
+
+# this table shows how many cells in each cluster 
+cluster_table <- table(sce$cluster)
+
+# we can redo the reduced dim plots with the clustering info in mind 
+plotTSNE <- plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', params$id, sep = '_'))
+plotUMAP <- plotUMAP(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', params$id, sep = '_'))
+plotPCA <- plotPCA(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', params$id, sep = '_'))
+
+```
+
+
+
+
+```{r echo= FALSE, message = FALSE}
+# now we make the table look nice for the report 
+
+cluster_table <- as.data.frame(cluster_table) %>% 
+  rename(cluster = Var1, number_of_cells = Freq)
+
+cluster_table %>% 
+  knitr::kable(caption = 'Table 1: number of cells in each cluster') %>% 
+  kable_styling(full_width = F)
+
+```
+
+```{r echo = FALSE, message = FALSE}
+# visualize these graphs 
+plotTSNE
+plotUMAP
+plotPCA
+```
+
+
+```{r include = FALSE}
+# CHECK THE ACCURACY OF OUR CLUSTERING: 
+# here we calculate the modularity scores for our clusters. this helps understand the relationships between clusters. 
+# we want the clusters to be distinct, so we dont want different clusters to interact closely. 
+ratio <- clusterModularity(g, cluster, as.ratio=TRUE)
+
+# here, we want the diagonal squares to be dark but the other ones to be as light as possible. 
+# darker colors mean higher modularity - higher interaction 
+# this will be helpful to diagnose low quality clustering 
+heatMap_modularity <- pheatmap(log10(ratio+1), cluster_cols=FALSE, cluster_rows=FALSE, col=rev(heat.colors(100)), main = 'modularity')
+
+# now we do bootstrapping on our clusters. ideally, a cell in a cluster should always remain there. 
+boot_results <- bootstrapCluster(sce, FUN=function(x) {
+  g <- buildSNNGraph(x, use.dimred="UMAP")
+  igraph::cluster_walktrap(g)$membership}, clusters=sce$cluster)
+
+# same thing, you only want the diagonal squares to have a dark color. 
+heatMap_bootstrap <- pheatmap(boot_results, cluster_cols=FALSE, cluster_rows=FALSE, col=colorRampPalette(c("white", "blue"))(100), main = 'bootstrap')
+```
+
+
+#### Modularity scores 
+
+```{r echo = FALSE, message = FALSE}
+heatMap_modularity
+```
+
+
+#### Bootstrap results 
+
+```{r echo = FALSE, message = FALSE}
+heatMap_bootstrap
+```
+
+
+
+
+
+
+

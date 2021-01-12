@@ -8,23 +8,23 @@
 
 # load a few necessary things 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 parser <- ArgumentParser(description = "integrate multiple datasets to remove batch effects")
 
-parser$add_argument('--path_to_sce_qc', metavar='DIRECTORY', type='character',
+parser$add_argument('--path_to_sce_qc', nargs='+', metavar='DIRECTORY', type='character',
                     help="Path to sce after quality control")
 
-parser$add_argument('--path_to_sce_norm', metavar='DIRECTORY', type='character',
+parser$add_argument('--path_to_sce_norm', nargs='+', metavar='DIRECTORY', type='character',
                     help="Path to sce after normalization")
 
-parser$add_argument('--output_file_name_uncorrected', metavar='FILE', type='character',
+parser$add_argument('--output_file_name_uncorrected', nargs = 1, metavar='FILE', type='character',
                     help="path to the uncorrected but combined samples, has batch effects")
 
-parser$add_argument('--output_file_name_integrated', metavar='FILE', type='character',
+parser$add_argument('--output_file_name_integrated', nargs = 1, metavar='FILE', type='character',
                     help="Path to integrated samples, doesnt have batch effects")
 
-parser$add_argument('--ids_integrated', metavar='FILE', type='character',
+parser$add_argument('--ids_integration', metavar='FILE', type='character',
                     help="the name of the samples you want to integrate")
 
 
@@ -38,18 +38,19 @@ integrate <- function(path_to_sce_qc,
                       path_to_sce_norm, 
                       output_file_name_uncorrected, 
                       output_file_name_integrated, 
-                      ids_integrated) {
-
-  id.list <-ids_integrated
+                      ids_integration) {
+  
+  id.list <-ids_integration
   
   id.list <- strsplit(id.list, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
-  id.list <- list(id.list[[1]], id.list[[2]], id.list[[3]])
+  id.list <- as.list(c(unlist(list(id.list))))
+  id.list <- do.call(list, id.list)  
   
   id.orig <- id.list
   
   # lets start! 
   # load the data, note that we aren't using the normalized data since we will use seurat's normalization method 
-  sces <- readRDS(path_to_sce_qc)
+  sces <- lapply(path_to_sce_qc, function(path) readRDS(path))
   
   # subset to common genes across a group of sces 
   intersect_all <- function(sces){
@@ -83,7 +84,7 @@ integrate <- function(path_to_sce_qc,
   id.features <- SelectIntegrationFeatures(object.list = seurats, nfeatures = nrow(seurats[[1]]))
   
   # make a reference list for the next step  
-  anchors <- FindIntegrationAnchors(object.list = seurats, dims = 1:30)
+  anchors <- FindIntegrationAnchors(object.list = seurats, dims = 1:30, k.filter = 60)
   
   # find the common genes 
   total.genes <- lapply(seurats, function(seurat) rownames(seurat@assays$RNA@counts))
@@ -110,8 +111,12 @@ integrate <- function(path_to_sce_qc,
   integrated <- ScaleData(integrated, verbose = FALSE)
   set.seed(1998)
   integrated <- RunPCA(integrated, verbose = FALSE)
-  integrated <- RunUMAP(integrated, dims = 1:30)
-  integrated <- RunTSNE(integrated, dims = 1:30)
+  integrated <- RunTSNE(integrated, dims = 1:30, dim.embed = 3, seed.use = 300, perplexity = 20)
+  integrated <- RunUMAP(integrated, dims = 1:30, n.components = 3L, seed.use = 1000)
+  
+  # clustering
+  integrated <- FindNeighbors(integrated, dims = 1:10)
+  integrated <- FindClusters(integrated, resolution = 0.5)
   
   # save the data
   saveRDS(integrated, file = output_file_name_integrated) # corrected data 
@@ -119,10 +124,10 @@ integrate <- function(path_to_sce_qc,
   # UNCORRECTED DATA
   # here we do the combined but uncorrected sample, with the batch effects
   # load the normalized data 
-  sces_norm <- readRDS(path_to_sce_norm)
+  sces_norm <- lapply(path_to_sce_norm, function(path) readRDS(path))
   
   sces_norm <- intersect_all(sces_norm) # subset to common genes 
-  combined <- combine_sces(sces_norm[[1]], sces_norm[[2]], sces_norm[[3]]) # combine the objects by doing a simple r bind 
+  combined <- do.call(combine_sces, sces_norm) # combine the objects by doing a simple r bind 
   
   # some dim reduction 
   set.seed(1564)
@@ -138,8 +143,8 @@ integrate <- function(path_to_sce_qc,
 integrate(path_to_sce_qc = args$path_to_sce_qc, 
           path_to_sce_norm = args$path_to_sce_norm, 
           output_file_name_uncorrected = args$output_file_name_uncorrected, 
-          output_file_name_integrated, args$output_file_name_integrated, 
-          ids_integrated = args$ids_integrated)
+          output_file_name_integrated = args$output_file_name_integrated, 
+          ids_integration = args$ids_integration)
 
 
 

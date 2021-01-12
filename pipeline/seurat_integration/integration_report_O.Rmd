@@ -1,6 +1,6 @@
 ---
-title: Comparing dim reduction plots before and after batch effect removal 
-subtitle: '`r params$ids`'
+title: Comparing dim reduction plots before and after integration  
+subtitle: '`r params$ids` - `r params$id_type`'
 author: "aslı"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
@@ -8,20 +8,22 @@ output:
     code_folding: hide
 
 params:
-  ids: 'ids_integration'
+  ids: 'DH8-DH24' # write here the ids you want to integrate, separate by '-'
+  id_type: 'id_type' # here you can write a quick summary of what these ids are, like tissue types etc. 
 ---
 
-#### Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots before and after batch normalization. 
+#### Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots before and after batch normalization through Seurat's integration method. 
 
 ```{r include = FALSE}
 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ```
 
 ```{r include = FALSE}
 # we start with the plots for uncorrected samples  
+
 uncorrected <- readRDS(here('..', 'data', 'integrated', params$ids, 'uncorrected.rds'))
 
 # some dim red plots 
@@ -43,7 +45,7 @@ p4 <- ggplotify::as.grob(p4[[1]])
 
 ```
 
-Samples **before** batch correction  
+Samples **before** integration   
 Here we would expect samples to be separated by batch effects.  
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 10}
 
@@ -51,8 +53,8 @@ gridExtra::grid.arrange(p1, p2, nrow = 1)
 
 ```
 
-Samples **after** batch correction  
-Successful batch effect normalization should remove batch effect. Therefore we would expect to see samples dispersed more evenly. 
+Samples **after** integration  
+Successful batch effect normalization should remove the batch effect. Therefore we would expect to see samples dispersed more evenly. 
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 10}
 
 gridExtra::grid.arrange(p3, p4, nrow = 1)

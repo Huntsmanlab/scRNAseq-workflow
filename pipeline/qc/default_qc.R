@@ -1,5 +1,5 @@
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 parser <- ArgumentParser(description = "perform qc on sce")
 
@@ -13,14 +13,17 @@ parser$add_argument('--mito_thresh_max', metavar='FILE', type='integer', help="M
 
 parser$add_argument('--mito_thresh_min', metavar='FILE', type='integer', help="Minium pct of mito counts allowed in cells")
 
+parser$add_argument('--ribo_thresh_max', metavar='FILE', type='integer', help="Maximum pct of ribo counts allowed in cells")
+
 parser$add_argument('--nmads', metavar='FILE', type='integer', help="MAD threshold")
 
 parser$add_argument('--seed', metavar='FILE', type='integer', help="seed for UMAP, TNSE, PCA approximation")
 
 parser$add_argument('--min_features', metavar='FILE', type='integer', help="Minimum number of detected genes")
 
-args <- parser$parse_args()
+parser$add_argument('--remove_mito_and_ribo', metavar = 'FILE', type = 'character', help = 'Do you want to remove mito and ribo genes from the sces?')
 
+args <- parser$parse_args()
 
 # this is the default_qc function from max. the method is the same but we no longer use deprecated functions, and it is a little more flexible. 
 # whichMethods can have 2 values, both must be strings: 'default' or 'quantile'. 
@@ -32,7 +35,16 @@ args <- parser$parse_args()
 
 # source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R')
 
-make_sce_qc <- function(whichMethod, path_to_sce, output_file_name, mito_thresh_max, mito_thresh_min, nmads, seed, min_features){
+make_sce_qc <- function(whichMethod, 
+                        path_to_sce, 
+                        output_file_name,
+                        mito_thresh_max, 
+                        mito_thresh_min, 
+                        ribo_thresh_max, 
+                        nmads, 
+                        seed, 
+                        min_features, 
+                        remove_mito_and_ribo){
   
   # set seed for reproducibility 
   set.seed(seed)
@@ -45,11 +57,11 @@ make_sce_qc <- function(whichMethod, path_to_sce, output_file_name, mito_thresh_
     mt_genes <- grepl("^mt", rowData(sce)$Symbol)
     ribo_genes <- grepl("^Rp[sl][[:digit:]]", rowData(sce)$Symbol)
   } else {                                                                                  # For human
-    mt_genes <- grepl("^MT-", rowData(sce)$Symbol)
+    mt_genes <- grepl("^MT", rowData(sce)$Symbol)
     ribo_genes <- grepl("^RP[LS]", rowData(sce)$Symbol)
   }
   
-  feature_ctrls <- list(mito = rownames(sce)[mt_genes],
+    feature_ctrls <- list(mito = rownames(sce)[mt_genes],
                         ribo = rownames(sce)[ribo_genes])
   
   if (whichMethod == 'default') {
@@ -62,11 +74,12 @@ make_sce_qc <- function(whichMethod, path_to_sce, output_file_name, mito_thresh_
     
     # this combines the cells we drop because of too many or too little mito percentage 
     mito_drop <- sce$subsets_mito_percent > mito_thresh_max | sce$subsets_mito_percent < mito_thresh_min
+    ribo_drop <- sce$subsets_ribo_percent > ribo_thresh_max
     libsize_drop <- isOutlier(sce$sum, nmads=nmads, type="lower", log=TRUE)
     gene_drop <- isOutlier(sce$detected, nmads=nmads, type="lower", log=TRUE)
     
     # apply these indices to our sce, keeping the cells with indices FALSE
-    sce_qc <- sce[ , !(mito_drop | libsize_drop | gene_drop)]
+    sce_qc <- sce[ , !(mito_drop | libsize_drop | gene_drop | ribo_drop)]
     
   } # end of if loop - whichMethod == 'default'  
   
@@ -77,7 +90,7 @@ make_sce_qc <- function(whichMethod, path_to_sce, output_file_name, mito_thresh_
     libsize_quantile <- quantile(sce$sum, probs = seq(0, 1, 0.25)) # this tests the number of RNA reads
     gene_quantile <- quantile(sce$detected, probs = seq(0, 1, 0.25)) # this tests the number of detected genes 
     mito_quantile <- quantile(sce$subsets_mito_percent, probs = seq(0, 1, 0.25)) # this test the mito RNA 
-    
+
     # determine which cells are in the 25% quantile
     libsize_drop <- sce$sum < libsize_quantile[['25%']]
     gene_drop <- sce$detected < gene_quantile[['25%']]
@@ -92,18 +105,36 @@ make_sce_qc <- function(whichMethod, path_to_sce, output_file_name, mito_thresh_
     
   } # end of else - whichMethod == 'quantile'
   
+####################################################################
+# deal with mito and ribo 
+  if (remove_mito_and_ribo == "yes") {
+    
+    # get index of mito genes 
+    mito_idx <- which(mt_genes)
+    
+    # subset the sce 
+    sce_qc <- sce_qc[-mito_idx, ]
+    
+    # get index of ribo genes 
+    ribo_idx <- which(ribo_genes)
+    
+    # subset the sce 
+    sce_qc <- sce_qc[-ribo_idx, ]  } # end of if
+  
   # Save sce_qc as .rds file
   saveRDS(sce_qc, file = output_file_name)
   
-}
+} # end of make_sce_qc function 
 
 make_sce_qc(whichMethod = args$whichMethod, 
             path_to_sce = args$path_to_sce, 
             output_file_name = args$output_file_name,
             mito_thresh_max = args$mito_thresh_max, 
             mito_thresh_min = args$mito_thresh_min, 
+            ribo_thresh_max = args$ribo_thresh_max, 
             nmads = args$nmads, 
             seed = args$seed, 
-            min_features = args$min_features)
+            min_features = args$min_features, 
+            remove_mito_and_ribo = args$remove_mito_and_ribo)
 
 

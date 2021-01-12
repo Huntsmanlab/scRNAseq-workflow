@@ -1,7 +1,7 @@
 # this script has a function that makes a sce from cell ranger output. 
 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ##################################
 
@@ -71,8 +71,6 @@ convert_to_sces <- function(path_to_10X, id, output_file_name) {
   sce <- addPerCellQC(sce, subsets = feature_ctrls)
   
   saveRDS(sce, file = output_file_name) #save the sce object we made in this function 
-  
-  print('test')
   
 } # end of function 
 
