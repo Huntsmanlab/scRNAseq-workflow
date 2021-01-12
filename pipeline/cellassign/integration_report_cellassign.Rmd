@@ -28,10 +28,9 @@ params:
 * Vascular Smooth Muscle  
 * Endothelial  
 * PlasmaB  
-* Epithelial Ciliated  
+* Epithelial Ciliated  s
 * Endometrial Stem  
 * Mesenchymal Stem  
-* Tumor cells: PAX8, WT1, STMN1 (my addition)  
 * Mesenchymal cells  
 
 ```{r include = FALSE, message = FALSE}
@@ -156,7 +155,7 @@ while (i <= length(seur_sce_list)){
 ```
 
 ### Samples **after** integration and cell assign run  
-#### tsne plots  
+#### t-SNE plots  
 ```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15}
 
 gridExtra::grid.arrange(p3, p4, nrow = 1)
@@ -195,7 +194,7 @@ grid.arrange(clustering_plot, cell_type_plot, nrow = 1)
 #### Clustering  
 Running a clustering algorithm on individual samples can help better understand possible sub cell populations in these samples. 0.5 was chosen for resolution. We show cell type and clustering results side by side. Clustering plots (tsne) are given on the left side and cell assign results are given on the right side for each separate sample given.  
 
-```{r echo = FALSE, fig.height = 3 * length(plots_list), fig.width = 15, fig.show = 'hold'}
+```{r echo = FALSE, fig.height = 3.2 * length(plots_list), fig.width = 15, fig.show = 'hold'}
 
 # now we visualize the results based on the number of samples analyzed
 
