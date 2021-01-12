@@ -7,10 +7,10 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 
 params:
   # INSTRUCTIONS: Declare the location of the samples that you need for this analysis. Separate samples by a single '-'
-  ins: '/huntsman/amunzur/data/clustered/sce/cedarsSinai_lawrenson/H12/sce_clus_subset.rds-/huntsman/amunzur/data/clustered/sce/cedarsSinai_lawrenson/G12/sce_clus_subset.rds'
+  ins: '/huntsman/amunzur/data/normalized/DH6/sce_norm.rds'
   # INSTRUCTIONS: List the ids of the samples from above in the same order. Could also be a name of your choosing. 
   # Separate samples by a single '-'. Then add a pipe char '|', to demarcate a comparison if doing so between samples. ex. 'DH8-|-DH6-DH7'
-  ids: 'H12-|-G12'
+  ids: 'DH6'
   # INSTRUCTIONS: We can do a differential gene expression calculation between samples or between groups/clusters within samples.
   #               Both flags must be FALSE for b/w sample comparison.
   #               Otherwise set these variables:
@@ -21,20 +21,20 @@ params:
   #                 Set only the reporter flag if you would like the cells containing a single given reporter not already added to the metadata
   #                 separated into their own 'group' and compared. Fields must match exactly.
   #                 Provide the name of the reporter in the sce object, otherwise set the parameter to FALSE.
-  reporter: FALSE
+  reporter: 'dsRED'
   
   # INSTRUCTIONS: Set this flag to run repeat sampling to determine DEGS. For when we have unequal sample sizes. 
   #               First grouping must be the small sample.
   unequal: TRUE
 
   # INSTRUCTIONS: Location where you would like the output data stored
-  output_path: '/huntsman/amunzur/data/dge/paired_dge_basic/cedarsSinai_lawrenson'
+  output_path: '/huntsman/mdouglas/dh_organoid/data/dge'
   # INSTRUCTIONS: Name of the output data file
-  output_file: 'dge_output.rds'
+  output_file: 'outputs_29102020.rds'
   
-  pathwayHmark: '/huntsman/minhbui/dh_organoid/data/gene_enrichment/input/h.all.v6.2.symbols.gmt'
-  pathwayGO: '/huntsman/minhbui/dh_organoid/data/gene_enrichment/input/c5.all.v6.2.symbols.gmt'
-  pathwayReact: '/huntsman/minhbui/dh_organoid/data/gene_enrichment/input/c2.cp.reactome.v7.0.symbols.gmt'
+  pathwayHmark: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/h.all.v6.2.symbols.gmt'
+  pathwayGO: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/c5.all.v6.2.symbols.gmt'
+  pathwayReact: '/huntsman/mdouglas/dh_organoid/data/gene_enrichment/input/c2.cp.reactome.v7.0.symbols.gmt'
 
 output:
   html_document:
@@ -83,7 +83,7 @@ clusters <- 'temp'
 
 
 
-```{r include = FALSE}
+```{r}
 plot_markers <- function(inputs, ids, ntop = 50, negative_control, randomSubsets = 100){
   
   # Read in sample(s) and if there is more than one combine, normalize, and re-filter
@@ -329,7 +329,7 @@ fgseaReslist$sig_pathways %>%
 
 **Should return no DEG or very few DEGs**
 
-```{r include = FALSE}
+```{r}
 outputs <- plot_markers(params$ins, ids, ntop = 50, negative_control = TRUE)
 ```
 

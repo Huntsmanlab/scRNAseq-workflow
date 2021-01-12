@@ -1,4 +1,4 @@
-"Blymphocyte","MS4A1", 'CD79A', 'PTPRC', 'CD19', 'BANK1', 'CD24', 'IGKC'
+"Blymphocyte","MS4A1", "CD79A", "PTPRC", "CD19", "BANK1", "CD24", "IGKC"
 "Tlymphocyte","CD4","PTPRC","CD2","CD3G","CD3D","CD28","CD3E"
 "CytotoxicT","PTPRC","NKG7","CD2","GZMA","CD8A","CD3G","CD3D","CD28","PRF1","CD3E"
 "Monocyte","CD4","PTPRC","LYZ","CD33","ITGAX","ITGAM","CD14","FCGR3A"
@@ -6,12 +6,12 @@
 "Myofibroblast","ACTA2","COL1A1","SERPINH1","COL3A1"
 "VascularSmoothMuscle","MYLK","MCAM","ACTA2","COL1A1","MYH11","SERPINH1","COL3A1","PLN"
 "Endothelial","MCAM","VWF","SERPINH1","EMCN","CLEC14A","CDH5","PECAM1"
-"PlasmaB",'CD79A', 'PTPRC', 'SDC1', 'IGKC', 'IGHG1', 'IGHG2', 'CAV1'
+"PlasmaB","CD79A", "PTPRC", "SDC1", "IGKC", "IGHG1", "IGHG2", "CAV1"
 "EpithelialCiliated","FUT4","EPCAM","CDH1","CLDN3","CLDN4","KRT8","KRT18","KRT19","FOXJ1","DYDC2","SNTN","WDR16","FAM92B","C20orf85","TPPP3","C9orf24","OMG","IGFBP7","FAM183A","RSPH1","C1orf194","C5orf49","RP11-356K23.1"
 "EndometrialStem","ABCG2","ENG","VCAM1","KIT","PROM1","CD140b","MCAM","CD166","ITGB1","PECAM1","CD34","CD44","PTPRC","ITGA4","ICAM1","NT5E","THY1","IPO13","LGR5","MSI1","NES","POU5F1","SOX2","SSEA4"
 "MesenchymalStem","ENG","THY1","ALCAM","CD34","PTPRC","NT5E"
-"Ovarian_cancer",'PAX8', 'WT1', 'STMN1', 'MUC16', 'KL6', 'KL7', 'KL8'
-'Mesenchymal cells', 'CD44', 'CDH2', 'ITGA5', 'VIM', 'FN1', 'S100A4', 'TNC', 'MMP2', 'ACTA2', 'TWIST1', 'WNT5A', 'SNAI2', 'ZEB1', 'ZEB2'
+"Ovarian_cancer","PAX8", "WT1", "STMN1", "MUC16", "KL6", "KL7", "KL8"
+"Mesenchymal cells", "CD44", "CDH2", "ITGA5", "VIM", "FN1", "S100A4", "TNC", "MMP2", "ACTA2", "TWIST1", "WNT5A", "SNAI2", "ZEB1", "ZEB2"
 
 
 
