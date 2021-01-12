@@ -1,0 +1,216 @@
+---
+title: "Dimensionality reduction plots "
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+
+params:
+  sce_clus: 'sce_clus'
+  dm_path: 'dm_path'
+
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r include = FALSE}
+
+# source some files 
+source("/huntsman/amunzur/scRNAseq-workflow/pipeline/sourceFiles/utilities.R")
+
+```
+
+```{r}
+
+sce <- readRDS(params$sce_clus)
+
+colors_list <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494", "#B3B3B3", '#E2201C', '#1D91C0', '#6B3E9A', '#32A028', "deepskyblue", "black")
+
+min_cluster <- as.numeric(min(as.vector(sce$cluster)))
+max_cluster <- max(as.numeric(as.character(sce$cluster)))
+
+cluster_name <- min_cluster:max_cluster
+
+colors_list <- colors_list[1:max_cluster]
+
+```
+
+`r unique(sce$id)`
+
+
+```{r fig.width = 12, fig.height = 8, message = FALSE}
+
+# load the dm from params 
+dm <- readRDS(params$dm_path)
+
+# make df with the diffusion map coodinates, we will use this later to make the dm plot 
+tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
+                  DC2 = eigenvectors(dm)[, 2],
+                  DC3 = eigenvectors(dm)[, 3],
+                  Timepoint = as.factor(sce$cluster), 
+                  ids = sce$id) # this will help color based on cluster 
+
+# make the 2D plot 
+dm_2d <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2,
+        opacity = 1,
+        color = ~Timepoint,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5), 
+        colors = colors_list) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+# make the 3d plot 
+dm_3d <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2, z = ~DC3,
+        opacity = 1,
+        color = ~Timepoint,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3), 
+        colors = colors_list)  %>% 
+  layout(legend= list(itemsizing='constant'))
+
+
+```
+
+```{r}
+
+# get tsne coordinates
+tsne_1 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["TSNE"]][, 1])
+tsne_2 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["TSNE"]][, 2])
+tsne_3 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["TSNE"]][, 3])
+
+# get pca coordinates 
+pca_1 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["PCA"]][, 1])
+pca_2 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["PCA"]][, 2])
+pca_3 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["PCA"]][, 3])
+
+# get pca coordinates 
+umap_1 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["UMAP"]][, 1])
+umap_2 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["UMAP"]][, 2])
+umap_3 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["UMAP"]][, 3])
+
+# make dfs 
+df_tsne <- data.frame(tsne_1, tsne_2, tsne_3)
+df_tsne$id <- as.factor(sce$id) 
+df_tsne$cluster <- as.factor(sce$cluster)
+
+df_pca <- data.frame(pca_1, pca_2, pca_3)
+df_pca$id <- as.factor(sce$id) 
+df_pca$cluster <- as.factor(sce$cluster)
+
+df_umap <- data.frame(umap_1, umap_2, umap_3)
+df_umap$id <- as.factor(sce$id) 
+df_umap$cluster <- as.factor(sce$cluster)
+
+```
+
+```{r include = FALSE}
+
+# TSNE
+tsne_3d <- plot_ly(data = df_tsne,
+        x = ~tsne_1, y = ~tsne_2, z = ~tsne_3,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3), 
+        colors = colors_list) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+tsne_2d <- plot_ly(data = df_tsne,
+        x = ~tsne_1, y = ~tsne_2,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 3), 
+        colors = colors_list) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+
+# PCA
+pca_3d <- plot_ly(data = df_pca,
+        x = ~pca_1, y = ~pca_2, z = ~pca_3,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3), 
+        colors = colors_list) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+pca_2d <- plot_ly(data = df_pca,
+        x = ~pca_1, y = ~pca_2,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 3), 
+        colors = colors_list) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+# UMAP
+umap_3d <- plot_ly(data = df_umap,
+        x = ~umap_1, y = ~umap_2, z = ~umap_3,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3), 
+        colors = colors_list) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+umap_2d <- plot_ly(data = df_umap,
+        x = ~umap_1, y = ~umap_2,
+        opacity = 1,
+        color = ~cluster,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 3), 
+        colors = colors_list) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+```
+
+# PCA
+```{r}
+
+pca_2d
+pca_3d
+
+```
+
+# t-SNE
+```{r}
+
+tsne_2d
+tsne_3d
+
+```
+
+# UMAP
+```{r}
+
+umap_2d
+umap_3d
+
+```
+
+# Diffusion Maps
+```{r}
+
+dm_2d
+dm_3d
+
+```
+
+
+
+
+
+
+
+
+
+
