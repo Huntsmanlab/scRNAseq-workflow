@@ -637,7 +637,7 @@ if (!is.null(integ1$orig.ident)){
 
 non_ciliated_cells <- na.omit(our_genes$non_ciliated_cells)
 ciliated_cells <- na.omit(our_genes$ciliated_cells)
-proliferative_cells <- na.omit(our_genes$proliferative_cells)
+proliferative_cells <- c(na.omit(our_genes$proliferative_cells), "KIAA0101", "CENPF", "CDT1")
 third_endpoint_cells <- na.omit(our_genes$third_endpoint_cells)
 
 # ROW ANNOTATIONS

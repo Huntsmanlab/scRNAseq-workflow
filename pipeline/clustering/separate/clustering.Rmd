@@ -224,6 +224,13 @@ df_umap$cluster <- as.factor(sce$cluster)
 ```
 
 
+```{r echo= FALSE, message = FALSE}
+# now we make the table look nice for the report 
+
+cluster_table <- as.data.frame(cluster_table) %>% 
+  rename(cluster = Var1, number_of_cells = Freq)
+```
+
 ```{r include = FALSE}
 
 # make 2d plots according to dims we calculate before 
@@ -343,7 +350,7 @@ dm_3d
 
 ```
 
-```{r include = FALSE}
+```{r eval = FALSE, include = FALSE}
 
 # here we save the sce object with the clustering data - we only save the shared neighbor clusters 
 saveRDS(sce, file = params$output_path)

@@ -1,7 +1,6 @@
 ---
 title: " `r params$ids` Summary stats and quality control results"
 subtitle: '`r params$pair_ids`'
-author: "Asli Munzur"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
   html_document:
@@ -51,11 +50,13 @@ dh_organoid_ids <- list(ids[[1]], ids[[2]])
 
 ```
 
-```{r include = FALSE, message = FALSE}
+```{r, include = FALSE, message = FALSE}
 
 # snakemake passes paths to input files as one string where paths to individual objects are separated by spaces. now we account for that here and get the separate paths.  
 sce_raw_paths <- as.list(unlist(strsplit(params$path_to_sce_raw[[1]], ' '))) 
 sce_qc_paths <- as.list(unlist(strsplit(params$path_to_sce_qc[[1]], ' '))) 
+
+
 
 # load objects 
 sce_raws <- lapply(sce_raw_paths, function(some_path) readRDS(some_path))

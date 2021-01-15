@@ -45,7 +45,6 @@ fMarkersSampling <- function(sce, pivot_cluster, target_group, randomSubsets) {
     markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(log.FDR < -1.6)
     markers_sig <- dplyr::arrange(markers_sig, dplyr::desc(abs(markers_sig[,4]))) # order
     tt_top <- head(markers_sig, 2000)                                             # Identify top '2000' genes
-    
     U[[cnt]] <- tt_top
     cnt <- cnt+1
   }

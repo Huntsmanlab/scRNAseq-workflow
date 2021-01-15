@@ -26,6 +26,8 @@ edgeR_HKG_O.Rmd
 edgeR_cluster_O.html
 edgeR_basic.Rmd
 edgeR_basic_batch.Rmd
+edgeR_pseudo.Rmd
+paired_dge_basic_O_old.Rmd
 edgeR_pseudo.Rmd        
 
 # this my own version, has some extra stuff that shouldnt be on the pipeline 
@@ -41,6 +43,13 @@ velocity
 
 # ignore the scmerge, maybe i'll come back to this later 
 scMerge
+
+# ignore some random script i had been working on 
+comebacklater.Rmd
+
+test.txt
+velocity.md
+pipeline/cellassign/
 
 # ignore some random script i had been working on 
 comebacklater.Rmd

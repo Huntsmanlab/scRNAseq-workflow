@@ -122,15 +122,17 @@ run_seurat_integration = [expand(sce_uncorrected, ids_integration = ids_integrat
 # combined cluster
 cluster_two_samples = [expand(combined_clustering_report, pair_ids = pair_ids), expand(combined_clustering_uncorrected, pair_ids = pair_ids), expand(combined_clustering_integrated, pair_ids = pair_ids)]
 
+process_qc_normalization = expand(sce_norm, id = ids)
 ##########################################
 
 rule all:
   input:
     # make_sce,
+    process_qc_normalization,
     # do_qc,
     # normalize_sce,
     # perform_dim_reduction,
-    cluster_sce,
+    # cluster_sce,
     # cluster_two_samples,
     # run_cell_assign_on_INDIVIDUAL_samples,
     # integrate_cell_assign_results,
@@ -141,6 +143,45 @@ rule all:
     # run_summary_stats,
     # do_batch_correction,
     # run_seurat_integration
+    
+rule process_sce: 
+  input: 
+    path_to_10X
+  output: 
+    sce_norm
+  params: 
+    id = "{id}" # wildcard here 
+    whichMethod = 'default', # to use different parameters here, just update them.
+    min_features = 1000,
+    mito_thresh_max = 60,
+    mito_thresh_min = 1,
+    ribo_thresh_max = 60, 
+    nmads = 3,
+    remove_mito_and_ribo = "yes" # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
+  shell:
+      "Rscript pipeline/process_qc_normalization \
+     --path_to_10X {input} \
+     --whichMethod {params.whichMethod} \
+     --min_features {params.min_features} \
+     --output_file_name {output} \
+     --mito_thresh_max {params.mito_thresh_max} \
+     --mito_thresh_min {params.mito_thresh_min} \
+     --ribo_thresh_max {params.ribo_thresh_max} \
+     --nmads {params.nmads} \
+     --remove_mito_and_ribo {params.remove_mito_and_ribo}"
+
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
     
 # convert 10X counts to an sce
 rule make_sce:
@@ -394,10 +435,11 @@ rule find_common_dges:
      knit_root_dir='{params.curr_dir}', \
      params = list(pair_ids ='{params.pair_ids}', paired_dge_output = '{input.paired_dge_output}', ntop = '{params.ntop}', common_dge_outfile_name = '{output.common_dge_outfile_name}', common_dge_plot_file_name = '{output.common_dge_plot_file_name}'))\" "
 
-# run cell assign in a single sample 
+# run cell assign in a single sample, this rule uses cellassign's own markers lists 
 rule run_cellassign: 
   params: 
     mode = 'split_epithelial' # or nosplit epithelial 
+    user_defined_markers = 'no' # if yes, cellassign will use user's own markers, not the default markers that come with cellassign
   input: 
     sce_norm
   output: 
@@ -412,7 +454,6 @@ rule run_cellassign:
      --marker_mat_path {output.marker_mat_path}\
      --cellassignment_path {output.cellassignment_path}"
      
-
 # make report of cell assign run in a single sample.
 # if you wish to visualize a few samples together, use the next rule! 
 rule cellassign_report: 

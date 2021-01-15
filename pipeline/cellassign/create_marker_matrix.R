@@ -7,8 +7,6 @@ suppressPackageStartupMessages({
   library(aargh)
 })
 
-source(here('pipeline', 'cellassign', 'marker_genes_list.R'))
-
 ######################################
 #### Build the CellAssign Marker Matrix
 ######################################
@@ -25,92 +23,47 @@ source(here('pipeline', 'cellassign', 'marker_genes_list.R'))
 # grid.table(marks)
 # dev.off()
 
-create_marker_mat <- function(output_file_name, 
-                              mode){
+create_marker_mat <- function(output_file_name){
   
   # load the marker genes provided by cellassign
   data(example_TME_markers)
   
   # contruct gene marker matrix
-  marker_list <- example_TME_markers$ensembl
-  marker_list <- lapply(marker_list, function(list) list[! names(list) %in% c('VIM')]) # remove VIM
+  # marker_list <- example_TME_markers$ensembl
+  # marker_list <- lapply(marker_list, function(list) list[! names(list) %in% c('VIM')]) # remove VIM
   
-  if(mode == "split_epithelial"){
-    
-    gene_symbols = Reduce(union, list(B_gene_symbols, 
-                                      Plasma_gene_symbols, 
-                                      Epithelial_gene_symbols, 
-                                      Epithelial_ciliated_gene_symbols, 
-                                      endo_stem_cell, 
-                                      mes_stem_cell, 
-                                      ovarian_cancer, 
-                                      Mesenchymal_gene_symbols, 
-                                      Proliferative_cells, 
-                                      Cluster2_like))
-    
-    id_map <- select(org.Hs.eg.db, keys = gene_symbols, columns = c("ENSEMBL"), keytype = "SYMBOL")
-    colnames(id_map) <- c("hgnc_symbol", "ensembl_gene_id")
-
-    id_map <- id_map[!duplicated(id_map$hgnc_symbol), ] # remove duplicate genes, keep first occurence
-    
-    cell_types <- c('B cells', 
-                    'Plasma cells', 
-                    'Epithelial cells', 
-                    'Epithelial ciliated cells', 
-                    'Endometrial stem cells', 
-                    'Mesenchymal stem cells', 
-                    'Mesenchymal cells', 
-                    'Proliferative cells', 
-                    'Cluster2_like')
-    
-    cell_markers <- list(B_gene_symbols, 
-                         Plasma_gene_symbols, 
-                         Epithelial_gene_symbols, 
-                         Epithelial_ciliated_gene_symbols, 
-                         endo_stem_cell, 
-                         mes_stem_cell, 
-                         ovarian_cancer, 
-                         Mesenchymal_gene_symbols, 
-                         Proliferative_cells, 
-                         Cluster2_like)
-    
-    
-  } else if(mode == 'nosplit_epithelial'){
-    
-    gene_symbols = Reduce(union, list(B_gene_symbols, 
-                                      Plasma_gene_symbols, 
-                                      Epithelial_gene_symbols, 
-                                      endo_stem_cell, 
-                                      mes_stem_cell, 
-                                      ovarian_cancer, 
-                                      Mesenchymal_gene_symbols, 
-                                      Proliferative_cells, 
-                                      Cluster2_like))
-    
-    id_map <- select(org.Hs.eg.db, keys = gene_symbols, columns = c("ENSEMBL"), keytype = "SYMBOL")
-    colnames(id_map) <- c("hgnc_symbol", "ensembl_gene_id")
-    
-    id_map <- id_map[!duplicated(id_map$hgnc_symbol), ] # remove duplicate genes, keep first occurence
-    
-    cell_types <- c('B cells', 
-                    'Plasma cells', 
-                    'Epithelial cells', 
-                    'Endometrial stem cells', 
-                    'Mesenchymal stem cells', 
-                    'Mesenchymal cells', 
-                    'Proliferative cells', 
-                    'Cluster2_like')
-    
-    cell_markers <- list(B_gene_symbols, 
-                         Plasma_gene_symbols, 
-                         Epithelial_gene_symbols, 
-                         endo_stem_cell, 
-                         mes_stem_cell, 
-                         ovarian_cancer, 
-                         Mesenchymal_gene_symbols, 
-                         Proliferative_cells, 
-                         Cluster2_like)
-  }
+  marker_list <- list(epithelial_cells = c('CLDN3', 'KRT8', 'KRT19', 'WFDC2', 'KLF5', 'SDC4', 'UCA1', 'TACSTD2', 'LINC01541', 'ELF3', 'C1orf186', 'DSP', 'CLDN4', 'PERP', 'KRT18', 'CD9', 'USP53'),
+                      lymphocyte_cells = c("MS4A1", 'CD79A', 'PTPRC', 'CD19', 'BANK1', 'CD24', 'IGKC', "CD4","CD2","CD3G","CD3D","CD28","CD3E", "CCL5", "STK17B"),
+                      endothelial_cells = na.omit(nature_genes$endothelium),
+                      macrophage_cells = na.omit(nature_genes$macrophage),
+                      stromal_fibroblast_cells = na.omit(nature_genes$stromal_fibroblasts),
+                      plasma_cells = c('SDC1', 'IGHG1', 'IGHG2', 'CAV1'))
+  
+  gene_symbols = Reduce(union, list(epithelial_cells,
+                                    lymphocyte_cells,
+                                    endothelial_cells,
+                                    macrophage_cells,
+                                    stromal_fibroblast_cells,
+                                    plasma_cells))
+  
+  id_map <- select(org.Hs.eg.db, keys = gene_symbols, columns = c("ENSEMBL"), keytype = "SYMBOL")
+  colnames(id_map) <- c("hgnc_symbol", "ensembl_gene_id")
+  
+  id_map <- id_map[!duplicated(id_map$hgnc_symbol), ] # remove duplicate genes, keep first occurence
+  
+  cell_types <- c('epithelial_cells', 
+                  'lymphocyte_cells', 
+                  'endothelial_cells', 
+                  'macrophage_cells', 
+                  'stromal_fibroblast_cells', 
+                  'plasma_cells')
+  
+  cell_markers <- list(epithelial_cells,
+                       lymphocyte_cells,
+                       endothelial_cells,
+                       macrophage_cells,
+                       stromal_fibroblast_cells,
+                       plasma_cells)
   
   modify_marker_list <- function(cell_types, cell_markers, marker_list, id_map){
     

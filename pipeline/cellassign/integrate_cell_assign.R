@@ -99,13 +99,11 @@ whatagreatfunction <- function(path_to_sce_cas,
   # add this to the metadata 
   integrated <- AddMetaData(integrated, sample_names, col.name = 'id')
   
-  # now we add the cell type info from cell assigh to the metadata, we start by extracting this info from the sces 
-  cell_types <- lapply(sces, function(sce) sce$cell_type)
-  cell_types <- as.list(c(unlist(list(cell_types))))  # prepare for rbind by putting data in a good format
-  cell_types <- do.call(rbind, cell_types)
+
   
   # add cell types to metadata 
   # integrated <- AddMetaData(integrated, cell_types, col.name = 'cell_types') # this one doesnt work for some reason, but code below does
+  Idents(integrated) <- "cluster"
   integrated$cell_types <- cell_types
   
   # the default assay is the new one 
