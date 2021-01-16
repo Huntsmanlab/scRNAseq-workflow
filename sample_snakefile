@@ -123,14 +123,15 @@ run_seurat_integration = [expand(sce_uncorrected, ids_integration = ids_integrat
 cluster_two_samples = [expand(combined_clustering_report, pair_ids = pair_ids), expand(combined_clustering_uncorrected, pair_ids = pair_ids), expand(combined_clustering_integrated, pair_ids = pair_ids)]
 
 process_qc_normalization = expand(sce_norm, id = ids)
+dimred_cluster = expand(sce_clus, id = ids)
+compute_diff_map = expand(dm_path, id = ids)
 ##########################################
 
 rule all:
   input:
-    # make_sce,
     process_qc_normalization,
-    # do_qc,
-    # normalize_sce,
+    dimred_cluster,
+    compute_diff_map,
     # perform_dim_reduction,
     # cluster_sce,
     # cluster_two_samples,
@@ -144,7 +145,7 @@ rule all:
     # do_batch_correction,
     # run_seurat_integration
     
-rule process_qc_normalize_sce: 
+rule process_qc_normalize: 
   input: 
     path_to_10X
   output: 
@@ -170,118 +171,52 @@ rule process_qc_normalize_sce:
      --nmads {params.nmads} \
      --remove_mito_and_ribo {params.remove_mito_and_ribo}"
 
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-    
-# convert 10X counts to an sce
-rule make_sce:
-  input:
-    path_to_10X
-  output:
-    sce_raw
-  params:
-    "{id}"
-  shell:
-    "Rscript pipeline/data_preparation/convert_to_sces.R \
-     --path_to_10X {input} \
-     --output_file_name {output} \
-     --id {params} "
-
-# perform quality control on the sce 
-rule make_sce_qc:
-  params:
-    whichMethod = 'default', # to use different parameters here, just update them.
-    min_features = 1000,
-    mito_thresh_max = 60,
-    mito_thresh_min = 1,
-    ribo_thresh_max = 60, 
-    nmads = 3,
-    seed = 1756, 
-    remove_mito_and_ribo = "yes" # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
-  input:
-    sce_raw
-  output:
-    sce_qc
-  shell:
-    "Rscript pipeline/qc/default_qc.R \
-     --whichMethod {params.whichMethod} \
-     --path_to_sce {input} \
-     --output_file_name {output} \
-     --mito_thresh_max {params.mito_thresh_max} \
-     --mito_thresh_min {params.mito_thresh_min} \
-     --ribo_thresh_max {params.ribo_thresh_max} \
-     --nmads {params.nmads} \
-     --seed {params.seed} \
-     --min_features {params.min_features} \
-     --remove_mito_and_ribo {params.remove_mito_and_ribo}"
-
-# normalize the sce by taking log counts and perform dim reduction at the same time
-# rule normalize_sce:
-#   params:
-#     seed = 1756
-#   input:
-#     sce_qc
-#   output:
-#     sce_norm
-#   shell:
-#     "Rscript pipeline/normalization/normalize_sce.R \
-#      --path_to_QCed_sce {input} \
-#      --output_file_name {output} \
-#      --seed {params.seed}"
-     
-rule dim_reduction: 
-  params: 
-    curr_dir = os.getcwd(), 
-    seed1 = 1998, 
-    seed2 = 1999,
-    HVG = "yes", # subset to HVG 
-    top_HVG = 20, 
-    top_PCs = 200 # options are either "computed" or a number that you supply
+rule dimred_cluster: 
   input: 
-    sce_norm = sce_norm
+    sce_norm
   output: 
-    sce_red = sce_red, 
-    dimRed_report = dimRed_report,
-    dm_path = dm_path
+    sce_clus
+  params: 
+    id = "{id}", # wildcard here
+    HVG = "yes",
+    top_HVG = 20, 
+    top_PCs = 200, 
+    k_value = 15
   shell:
-    "Rscript -e \"rmarkdown::render('pipeline/dim_reduction/dim_reduction.Rmd',\
-     output_file='{params.curr_dir}/{output.dimRed_report}', \
-     knit_root_dir='{params.curr_dir}',\
-     params = list(seed1 ='{params.seed1}', seed2 = '{params.seed2}', HVG = '{params.HVG}', top_HVG = '{params.top_HVG}', top_PCs = '{params.top_PCs}', \
-     path_to_sce_norm = '{input.sce_norm}', sce_red = '{output.sce_red}', dm_path = '{output.dm_path}'))\" "
-
-# cluster the sce alone 
-rule cluster_sce:
-  params:
-    curr_dir = os.getcwd(),
-    sample = '{id}', 
-    perplexity_list = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100], 
-    chosen_perp = 30, 
-    k_list = [5, 9, 10, 12, 15, 18], # number of nearest neighbors used to construct the shared neighbors plot 
-    chosen_k = 15
-  input:
-    path_to_sce_norm = sce_red,
-    dm_path = dm_path
-  output:
-    output_path = sce_clus, 
-    report = sce_clus_report
+    "Rscript pipeline/dimred_cluster/dimred_cluster.R \
+       --path_to_sce_norm {input} \
+       --output_file_name {output} \
+       --HVG {params.HVG} \
+       --top_HVG {params.top_HVG} \
+       --top_PCs {params.top_PCs} \
+       --k_value {params.k_value}"
+       
+rule compute_diff_maps: 
+  input: 
+    sce_clus
+  output: 
+    dm_path
   shell:
-     "Rscript -e \"rmarkdown::render('pipeline/clustering/separate/clustering.Rmd',\
-     output_file='{params.curr_dir}/{output.report}', \
-     knit_root_dir='{params.curr_dir}',\
-     params = list(id ='{params.sample}', output_path = '{output.output_path}', dm_path = '{input.dm_path}', path_to_sce_norm = '{input.path_to_sce_norm}', perplexity_list = '{params.perplexity_list}', \
-     chosen_perp = '{params.chosen_perp}', k_list = '{params.k_list}', chosen_k = '{params.chosen_k}'))\" "
-
+    "Rscript /huntsman/amunzur/scRNAseq-workflow/pipeline/dimred_cluster/dim_reduction/compute_diff_maps.R \
+       --sce_clus {input} \
+       --dm_path {output}"
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
 
 # integrate (remove batch effects) and cluster 2 sces together 
 rule combined_clustering:
