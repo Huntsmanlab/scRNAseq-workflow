@@ -144,13 +144,13 @@ rule all:
     # do_batch_correction,
     # run_seurat_integration
     
-rule process_sce: 
+rule process_qc_normalize_sce: 
   input: 
     path_to_10X
   output: 
     sce_norm
   params: 
-    id = "{id}" # wildcard here 
+    id = "{id}", # wildcard here 
     whichMethod = 'default', # to use different parameters here, just update them.
     min_features = 1000,
     mito_thresh_max = 60,
@@ -159,7 +159,7 @@ rule process_sce:
     nmads = 3,
     remove_mito_and_ribo = "yes" # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
   shell:
-      "Rscript pipeline/process_qc_normalization \
+      "Rscript pipeline/process_qc_normalization/process_qc_normalization.R \
      --path_to_10X {input} \
      --whichMethod {params.whichMethod} \
      --min_features {params.min_features} \
@@ -226,18 +226,18 @@ rule make_sce_qc:
      --remove_mito_and_ribo {params.remove_mito_and_ribo}"
 
 # normalize the sce by taking log counts and perform dim reduction at the same time
-rule normalize_sce:
-  params:
-    seed = 1756
-  input:
-    sce_qc
-  output:
-    sce_norm
-  shell:
-    "Rscript pipeline/normalization/normalize_sce.R \
-     --path_to_QCed_sce {input} \
-     --output_file_name {output} \
-     --seed {params.seed}"
+# rule normalize_sce:
+#   params:
+#     seed = 1756
+#   input:
+#     sce_qc
+#   output:
+#     sce_norm
+#   shell:
+#     "Rscript pipeline/normalization/normalize_sce.R \
+#      --path_to_QCed_sce {input} \
+#      --output_file_name {output} \
+#      --seed {params.seed}"
      
 rule dim_reduction: 
   params: 
@@ -438,7 +438,7 @@ rule find_common_dges:
 # run cell assign in a single sample, this rule uses cellassign's own markers lists 
 rule run_cellassign: 
   params: 
-    mode = 'split_epithelial' # or nosplit epithelial 
+    mode = 'split_epithelial', # or nosplit epithelial 
     user_defined_markers = 'no' # if yes, cellassign will use user's own markers, not the default markers that come with cellassign
   input: 
     sce_norm
