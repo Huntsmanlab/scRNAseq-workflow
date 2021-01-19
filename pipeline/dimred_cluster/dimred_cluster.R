@@ -42,7 +42,7 @@ if (is.null(sce@int_colData@listData[["reducedDims"]]@listData[["PCA"]]) || # th
                 k_value = args$k_value)
   
   # if all dimred are TRUE (they exist)
-} else if (!is.null(sce@int_colData@listData[["reducedDims"]]@listData[["PCA"]]) &&
+} else if (!is.null(sce@int_colData@listData[["reducedDims"]]@listData[["PCA"]]) && # this means and 
            !is.null(sce@int_colData@listData[["reducedDims"]]@listData[["TSNE"]]) &&
            !is.null(sce@int_colData@listData[["reducedDims"]]@listData[["UMAP"]])) {
   
