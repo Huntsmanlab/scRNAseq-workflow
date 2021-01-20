@@ -1,0 +1,147 @@
+---
+title: "Cell assign results for scRNAseq data "
+subtitle: '`r params$sample`'
+author: "Asli Munzur"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+
+params:
+  sample: 'DH3'
+  sce_norm: '/huntsman/amunzur/data/normalized/DH3/sce_norm.rds'
+  sce_cas: '/huntsman/amunzur/data/cellassign/DH3/sce_norm_cas.rds'
+  
+---
+
+```{r include=FALSE}
+
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'cellassign', 'create_marker_matrix.R'))
+source(here('pipeline', 'cellassign', 'assign_cell_type.R'))
+
+
+```
+
+```{r echo = FALSE, message = FALSE}
+
+# load sce qc
+sce_norm <- readRDS(params$sce_norm)
+
+# clustering 
+# Do clustering on scRNAseq data
+g <- buildSNNGraph(sce_norm, k = 8, use.dimred = 'PCA')
+clust <- igraph::cluster_walktrap(g)$membership
+sce_norm$cluster <- factor(clust)
+
+table(sce_norm$cluster) %>% 
+  knitr::kable(caption = 'Table 1: number of cells in each cluster', 
+               col.names = c('cluster', 'number of cells')) %>% 
+  kable_styling(full_width = F)
+
+
+```
+
+```{r include = FALSE}
+
+p1 <- plotReducedDim(sce_norm, dimred = 'TSNE', colour_by = 'cluster') + labs(title = paste(params$sample, 'Clustering - TSNE', sep = '-'))
+
+# markers <- findMarkers(sce_norm, sce_norm$cluster, direction = "up")
+# marker.set <- markers[["1"]]
+# head(marker.set[,1:8], 10) # only first 8 columns, for brevity
+# top.markers <- rownames(marker.set)[marker.set$Top <= 10]
+# p_heat <- plotHeatmap(sce_norm, features=top.markers, center = TRUE, order_columns_by="cluster")
+
+```
+
+```{r include = FALSE}
+
+# load cell assign result
+sce_norm_cas <- readRDS(params$sce_cas)
+
+seur_sce <- as.Seurat(sce_norm_cas)
+Idents(seur_sce) <- "cluster"
+
+p2 <- DimPlot(object = seur_sce, 
+              dims = c(1, 2), 
+              reduction = 'TSNE', 
+              group.by = 'cell_type', 
+              pt.size = 1.5) +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  scale_fill_viridis(discrete = TRUE) +
+  labs(title = paste(params$sample, 'Cell Assign for scRNAseq Cells', sep = '-'))
+
+```
+
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 14}
+
+grid.arrange(p1, p2, nrow = 1)
+
+```
+
+
+
+
+```{r, test-rgl, webgl=TRUE, message = FALSE, warning = FALSE}
+
+sce_cas <- readRDS(params$sce_norm)
+
+# 3d plots 
+library(rgl)
+
+# get tsne coordinates 
+tsne_1 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$TSNE[, 1])
+tsne_2 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$TSNE[, 2])
+tsne_3 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$TSNE[, 3])
+
+# get pca coordinates 
+pca_1 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$PCA[, 1])
+pca_2 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$PCA[, 2])
+pca_3 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$PCA[, 3])
+
+master_color_palette <- c(
+  "cyan2", # red
+  "firebrick1",
+  "green3", # purple
+  "indianred1",
+  "lightskyblue", 
+  "gold1", # lt pink
+  "lightsalmon1",
+  "plum2", 
+  "springgreen", 
+  "darkslateblue", 
+  'royalblue1',
+  'chartreuse1',
+  'mediumorchid2',
+  'khaki1', 
+  "lawngreen",
+  "darkmagenta",
+  'thistle4', 
+  'yellow4')
+
+# 
+# open3d()
+# plot3d(x = tsne_1, y = tsne_2, z = tsne_3, col = as.numeric(1:n)[as.factor(sce_cas$cell_type)], type = "s", size = 0.7)
+# 
+# rglwidget()
+
+options(rgl.printRglwidget = TRUE)
+open3d()
+rgl.open()
+rgl.bg(color = "white") # Setup the background color
+plot3d(x = pca_1, y = pca_2, z = pca_3, col = 'blue', type = "s", size = 0.7)
+rglwidget()
+
+writeWebGL(dir = "webGL", filename = file.path(dir, "index.html"))
+
+
+```
+
+
+
+
+
+
+
+
