@@ -9,8 +9,14 @@ from snakemake_helper_functions import *
 # ids = ['sample42', 'sample70_0', 'sample70_2', 'sample70_3', 'combined_sample70']
 # ids = ['DH24', 'DH8', 'DH4', 'DH7', 'DH10', 'DH3', 'DH7', 'VOA11229_CCOC', 'DH21_NEW', 'DH22_NEW', 'DH21_P5']
 
-ids = ['DH25']
+ids = ['DH10', 'DH13', 'DH17', 'DH19_unfiltered', 'DH21_P5', 'DH22_control', 'DH27_5seq_Double_mutant', 'DH3', 'DH7', 'KG1_FT', 'VOA10819UT_control', 'VOA11229_CCOC', 'DH11_DBZ', 'DH14_DBZ',
+'DH18', 'DH1_DBZ', 'DH21_P5_control', 'DH24', 'DH27_5seq_PIK3CA_PCMV', 'DH4', 'DH8', 'VOA10286UT_DBZ', 'VOA10819UT_ctr', 
+'DH11_control', 'DH14_control', 'DH19', 'DH1_control', 'DH21_control', 'DH25', 'DH27_5seq_control', 'DH5_DBZ', 'DH9_DBZ', 'VOA10286UT_control', 'VOA10835FT', 'sc58__DH-CDH1-KO2',
+'DH12_DBZ', 'DH15', 'DH21', 'DH22', 'DH25_control', 'DH2_DBZ', 'DH5_control', 'DH9_control', 'VOA10286UT_ctr', 'VOA10835UT', 'sc58__DH-CDH1-WT2', 
+'DH12_control', 'DH16', 'DH19_treatment', 'DH21_NEW', 'DH22_NEW', 'DH27_5seq_ARID1A_crispr', 'DH2_control', 'DH6', 'KG1_EM', 'VOA10819UT_DBZ', 'VOA11068_ENOC']
 # ids = "DH3"
+
+ids = ["DH25_control"]
 # pair_ids = ['DH13-DH21_control', 'DH15-DH22_control', 'DH15-DH21_control', 'DH15-DH22_control', 'DH16-DH21_control', 'DH16-DH22_control', 'VOA11068_ENOC-DH21_control', 'VOA11068_ENOC-DH22_control'] # separate the pairs with "-", no quotation marks
 pair_ids = ["VOA10286UT_control_BOTTOM-VOA10286UT_control_TOP"]
 
@@ -74,6 +80,9 @@ cellassignment_path = '../data/cellassign/{id}/cellassignment.rds',
 cellassign_report_single_sample = '../reports/cellassign/{id}/cellassign_report.html'
 sce_cas_uncorrected = '../data/integrated_cellassign/{ids_integration}/uncorrected_cas.rds'
 
+# cell assign celltypes per cell 
+cell_type_csv = '../data/cellassign/{id}/cell_types.csv'
+
 # multiple samples 
 cellassign_multiple_report = '../reports/cellassign_integrated/{ids_integration}/cellassign_integrated_report.html'
 
@@ -96,7 +105,7 @@ perform_dim_reduction = [expand(sce_red, id = ids), expand(dimRed_report, id = i
 cluster_sce = [expand(sce_clus, id = ids), expand(sce_clus_report, id = ids)]
 
 # CELL ASSIGN
-run_cell_assign_on_INDIVIDUAL_samples = [expand(sce_cas, id = ids), expand(marker_mat_path, id = ids), expand(cellassignment_path, id = ids), expand(cellassign_report_single_sample, id = ids)]
+run_cell_assign_on_INDIVIDUAL_samples = [expand(cell_type_csv, id = ids), expand(marker_mat_path, id = ids), expand(cellassignment_path, id = ids), expand(cellassign_report_single_sample, id = ids)]
 integrate_cell_assign_results = [expand(cellassign_multiple_report, ids_integration = ids_integration), expand(sce_cas_integrated, ids_integration = ids_integration), expand(sce_cas_uncorrected, ids_integration = ids_integration)]
 
 # PAIRED DGE BASIC 
@@ -135,7 +144,7 @@ rule all:
     # perform_dim_reduction,
     # cluster_sce,
     # cluster_two_samples,
-    # run_cell_assign_on_INDIVIDUAL_samples,
+    run_cell_assign_on_INDIVIDUAL_samples,
     # integrate_cell_assign_results,
     # DGE_scran,
     # find_common_dges,
@@ -370,22 +379,18 @@ rule find_common_dges:
      knit_root_dir='{params.curr_dir}', \
      params = list(pair_ids ='{params.pair_ids}', paired_dge_output = '{input.paired_dge_output}', ntop = '{params.ntop}', common_dge_outfile_name = '{output.common_dge_outfile_name}', common_dge_plot_file_name = '{output.common_dge_plot_file_name}'))\" "
 
-# run cell assign in a single sample, this rule uses cellassign's own markers lists 
+# run cell assign in a single sample 
 rule run_cellassign: 
-  params: 
-    mode = 'split_epithelial', # or nosplit epithelial 
-    user_defined_markers = 'no' # if yes, cellassign will use user's own markers, not the default markers that come with cellassign
   input: 
-    sce_norm
+    sce_clus
   output: 
-    sce_cas = sce_cas, 
+    cell_type_csv = cell_type_csv, 
     marker_mat_path = marker_mat_path, 
     cellassignment_path = cellassignment_path
   shell:
-    "Rscript pipeline/cellassign/run_cellassign.R \
-     --sce_norm {input} \
-     --mode {params.mode} \
-     --sce_cas {output.sce_cas} \
+    "Rscript pipeline/cellassign/scripts/run_cellassign.R \
+     --sce_clus {input} \
+     --cell_type_csv {output.cell_type_csv} \
      --marker_mat_path {output.marker_mat_path}\
      --cellassignment_path {output.cellassignment_path}"
      
@@ -396,8 +401,8 @@ rule cellassign_report:
     curr_dir = os.getcwd(),
     sample = ids
   input: 
-    sce_norm = sce_norm, 
-    sce_cas = sce_cas, 
+    cell_type_csv = cell_type_csv, # csv with cell type information from previous step
+    sce_clus = sce_clus, 
     dm_path = dm_path
   output:
     report = cellassign_report_single_sample
@@ -405,8 +410,7 @@ rule cellassign_report:
     "Rscript -e \"rmarkdown::render('pipeline/cellassign/cellassign_report.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
-     params = list(sample ='{params.sample}', sce_norm = '{input.sce_norm}', sce_cas = '{input.sce_cas}', dm_path = '{input.dm_path}'))\" "
-     
+     params = list(sample ='{params.sample}', sce_clus = '{input.sce_clus}', dm_path = '{input.dm_path}'))\" "
      
 rule integrate_cellassign:
   params:
