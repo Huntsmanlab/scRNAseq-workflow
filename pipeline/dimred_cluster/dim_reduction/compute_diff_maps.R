@@ -26,14 +26,9 @@ compute_diff_maps <- function(sce_clus, dm_path){
                     DC2 = eigenvectors(dm)[, 2],
                     DC3 = eigenvectors(dm)[, 3])
   
-  sce@int_colData@listData[["reducedDims"]]@listData[["DM"]] <- tmp
-  
-  
+  sce_clus@int_colData@listData[["reducedDims"]]@listData[["DM"]] <- tmp
 
-  
   }
 
 compute_diff_maps(sce_clus = args$sce_clus, 
                   dm_path = args$dm_path)
-
-
