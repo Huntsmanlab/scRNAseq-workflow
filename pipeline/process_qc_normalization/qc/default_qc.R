@@ -1,30 +1,3 @@
-library(here)
-source(here('pipeline', 'sourceFiles', 'utilities.R'))
-
-parser <- ArgumentParser(description = "perform qc on sce")
-
-parser$add_argument('--whichMethod', metavar = 'FILE', type = 'character', help = 'pick method for qc: default or quantile')
-
-parser$add_argument('--path_to_sce', metavar='FILE', type='character', help="Path raw sce")
-
-parser$add_argument('--output_file_name', metavar='FILE', type='character', help="Path to sce_qc")
-
-parser$add_argument('--mito_thresh_max', metavar='FILE', type='integer', help="Maximum pct of mito counts allowed in cells")
-
-parser$add_argument('--mito_thresh_min', metavar='FILE', type='integer', help="Minium pct of mito counts allowed in cells")
-
-parser$add_argument('--ribo_thresh_max', metavar='FILE', type='integer', help="Maximum pct of ribo counts allowed in cells")
-
-parser$add_argument('--nmads', metavar='FILE', type='integer', help="MAD threshold")
-
-parser$add_argument('--seed', metavar='FILE', type='integer', help="seed for UMAP, TNSE, PCA approximation")
-
-parser$add_argument('--min_features', metavar='FILE', type='integer', help="Minimum number of detected genes")
-
-parser$add_argument('--remove_mito_and_ribo', metavar = 'FILE', type = 'character', help = 'Do you want to remove mito and ribo genes from the sces?')
-
-args <- parser$parse_args()
-
 # this is the default_qc function from max. the method is the same but we no longer use deprecated functions, and it is a little more flexible. 
 # whichMethods can have 2 values, both must be strings: 'default' or 'quantile'. 
 # default: what we do already at the moment, only difference is we dont use a deprecated function. 
@@ -36,32 +9,33 @@ args <- parser$parse_args()
 # source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R')
 
 make_sce_qc <- function(whichMethod, 
-                        path_to_sce, 
+                        sce, 
                         output_file_name,
                         mito_thresh_max, 
                         mito_thresh_min, 
                         ribo_thresh_max, 
                         nmads, 
-                        seed, 
                         min_features, 
                         remove_mito_and_ribo){
   
+  print("Started QC.")
+  
   # set seed for reproducibility 
-  set.seed(seed)
+  set.seed(1122)
   
   # Read the raw sce 
-  sce <- readRDS(path_to_sce)
+  sce <- sce
   
   # Get mitochondrial genes for QC:
   if ( grepl("^ENSMUS", sce@rowRanges@elementMetadata@listData[["ID"]][1]) ){               # For mouse
     mt_genes <- grepl("^mt", rowData(sce)$Symbol)
     ribo_genes <- grepl("^Rp[sl][[:digit:]]", rowData(sce)$Symbol)
   } else {                                                                                  # For human
-    mt_genes <- grepl("^MT", rowData(sce)$Symbol)
+    mt_genes <- grepl("^MT-", rowData(sce)$Symbol)
     ribo_genes <- grepl("^RP[LS]", rowData(sce)$Symbol)
   }
   
-    feature_ctrls <- list(mito = rownames(sce)[mt_genes],
+  feature_ctrls <- list(mito = rownames(sce)[mt_genes],
                         ribo = rownames(sce)[ribo_genes])
   
   if (whichMethod == 'default') {
@@ -122,19 +96,11 @@ make_sce_qc <- function(whichMethod,
     sce_qc <- sce_qc[-ribo_idx, ]  } # end of if
   
   # Save sce_qc as .rds file
-  saveRDS(sce_qc, file = output_file_name)
+  # saveRDS(sce_qc, file = output_file_name)
+  
+  print("Finished QC.")
+  
+  return(sce_qc)
   
 } # end of make_sce_qc function 
-
-make_sce_qc(whichMethod = args$whichMethod, 
-            path_to_sce = args$path_to_sce, 
-            output_file_name = args$output_file_name,
-            mito_thresh_max = args$mito_thresh_max, 
-            mito_thresh_min = args$mito_thresh_min, 
-            ribo_thresh_max = args$ribo_thresh_max, 
-            nmads = args$nmads, 
-            seed = args$seed, 
-            min_features = args$min_features, 
-            remove_mito_and_ribo = args$remove_mito_and_ribo)
-
 

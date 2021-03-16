@@ -1,25 +1,6 @@
-# this script has a function that makes a sce from cell ranger output. 
-
-library(here)
-source(here('pipeline', 'sourceFiles', 'utilities.R'))
-
-##################################
-
-parser <- ArgumentParser(description = "Convert 10X output to sce")
-
-parser$add_argument('--path_to_10X', metavar='DIRECTORY', type='character',
-                    help="Path to cellranger output directory")
-
-parser$add_argument('--id', metavar='VARIABLE', type='character',
-                    help="unique id of the input dataset")
-
-parser$add_argument('--output_file_name', metavar='FILE', type='character',
-                    help="Path to raw sce")
-
-args <- parser$parse_args()
-
-
 convert_to_sces <- function(path_to_10X, id, output_file_name) {
+  
+  print("Started converting 10X output to an sce object.")
   
   # sometimes our raw data is in a directory called 'filtered_feature_bc_matrix' and sometimes it isn't. 
   # here we account for that: 
@@ -70,11 +51,10 @@ convert_to_sces <- function(path_to_10X, id, output_file_name) {
   
   sce <- addPerCellQC(sce, subsets = feature_ctrls)
   
-  saveRDS(sce, file = output_file_name) #save the sce object we made in this function 
+  print("Finished converting 10X output to an sce object.")
   
-} # end of function 
-
-convert_to_sces(path_to_10X = args$path_to_10X, 
-                output_file_name = args$output_file_name,
-                id = args$id)
-
+  # saveRDS(sce, file = output_file_name) #save the sce object we made in this function 
+  
+  return(sce) # return the sce object to be used in the next step
+  
+} # end of function

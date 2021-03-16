@@ -9,7 +9,8 @@ output:
 
 params:
   ids: 'ids'
-  sce_cas: 'sce_cas'
+  sce_clus: 'sce_clus'
+  cell_type_csv: 'cell_type_csv'
   dm_path: 'dm_path'
   
 ---
@@ -19,28 +20,30 @@ params:
 library(here)
 library(plotly)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
-source(here('pipeline', 'cellassign', 'create_marker_matrix.R'))
-source(here('pipeline', 'cellassign', 'assign_cell_type.R'))
+source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix.R'))
+source(here('pipeline', 'cellassign', 'scripts', 'assign_cell_type.R'))
 
 
 ```
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 
-# load sce qc
-sce_cas <- readRDS(params$sce_cas)
+sce_clus <- readRDS(params$sce_clus) # load sce 
+cell_type_csv <- read_csv(params$cell_type_csv) # load cell type info 
+sce_clus$cell_type <- cell_type_csv
+
 
 # in case we need to redo clustering step 
 # set.seed(12)
-# if (length(sce_cas$cluster) == 0 ) {
+# if (length(sce_clus$cluster) == 0 ) {
 #   
-#   g <- buildSNNGraph(sce_cas, k = 25, use.dimred = 'PCA')
+#   g <- buildSNNGraph(sce_clus, k = 25, use.dimred = 'PCA')
 #   clust <- igraph::cluster_walktrap(g)$membership
-#   sce_cas$cluster <- factor(clust)
+#   sce_clus$cluster <- factor(clust)
 #   
 # }
 
-table(sce_cas$cluster) %>% 
+table(sce_clus$cluster) %>% 
   knitr::kable(caption = 'Table 1: number of cells in each cluster', 
                col.names = c('cluster', 'number of cells')) %>% 
   kable_styling(full_width = F)
@@ -51,32 +54,32 @@ table(sce_cas$cluster) %>%
 ```{r test-rgl, webgl=TRUE, message = FALSE, warning = FALSE}
 
 # if dim reduction hasnt been computed, do it now: 
-# if (length(sce_cas@int_colData@listData[["reducedDims"]]$TSNE) == 0 ) {
+# if (length(sce_clus@int_colData@listData[["reducedDims"]]$TSNE) == 0 ) {
 #   
-#   sce_cas <- runPCA(sce_cas, exprs_values = "logcounts", ncomponents = 50)
-#   sce_cas <- runTSNE(sce_cas, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, perplexity = 20)
-#   sce_cas <- runUMAP(sce_cas, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, min_dist = 0.5, n_neighbors = 15, metric = "euclidean") 
+#   sce_clus <- runPCA(sce_clus, exprs_values = "logcounts", ncomponents = 50)
+#   sce_clus <- runTSNE(sce_clus, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, perplexity = 20)
+#   sce_clus <- runUMAP(sce_clus, dimred = "PCA", exprs_values = "logcounts", ncomponents = 3, min_dist = 0.5, n_neighbors = 15, metric = "euclidean") 
 #   
 # } 
 
 # get tsne coordinates 
-tsne_1 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$TSNE[, 1])
-tsne_2 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$TSNE[, 2])
-tsne_3 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$TSNE[, 3])
+tsne_1 <- as.numeric(sce_clus@int_colData@listData[["reducedDims"]]$TSNE[, 1])
+tsne_2 <- as.numeric(sce_clus@int_colData@listData[["reducedDims"]]$TSNE[, 2])
+tsne_3 <- as.numeric(sce_clus@int_colData@listData[["reducedDims"]]$TSNE[, 3])
 
 # get pca coordinates 
-pca_1 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$PCA[, 1])
-pca_2 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$PCA[, 2])
-pca_3 <- as.numeric(sce_cas@int_colData@listData[["reducedDims"]]$PCA[, 3])
+pca_1 <- as.numeric(sce_clus@int_colData@listData[["reducedDims"]]$PCA[, 1])
+pca_2 <- as.numeric(sce_clus@int_colData@listData[["reducedDims"]]$PCA[, 2])
+pca_3 <- as.numeric(sce_clus@int_colData@listData[["reducedDims"]]$PCA[, 3])
 
 df <- data.frame(tsne_1, tsne_2, tsne_3)
-df$cell_type <- as.factor(sce_cas$cell_type)
-df$cluster <- as.factor(sce_cas$cluster)
+df$cell_type <- as.factor(sce_clus$cell_type)
+df$cluster <- as.factor(sce_clus$cluster)
 
 colors_list = c(brewer.pal(n = 8, name = "Set2"), brewer.pal(n = 8, name = "Paired"))
 
 
-if (length(unique(sce_cas$cell_type)) > 8) {
+if (length(unique(sce_clus$cell_type)) > 8) {
   
   # 2d tsne plot showing cell types 
   cell_type_plot <- plot_ly(data = df,
@@ -143,7 +146,7 @@ Same information in the plots above is also presented in interactive 3d plots be
 
 ```{r, message = FALSE, warning = FALSE}
 
-if (length(unique(sce_cas$cell_type)) > 8) {
+if (length(unique(sce_clus$cell_type)) > 8) {
   
   p1 <- plot_ly(data = df,
         x = ~tsne_1, y = ~tsne_2, z = ~tsne_3,
@@ -204,9 +207,9 @@ dm <- readRDS(params$dm_path)
 tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
                   DC2 = eigenvectors(dm)[, 2],
                   DC3 = eigenvectors(dm)[, 3],
-                  cell_type = sce_cas$cell_type) # this will help color based on cluster 
+                  cell_type = sce_clus$cell_type) # this will help color based on cluster 
 
-if (length(unique(sce_cas$cell_type)) > 8) {
+if (length(unique(sce_clus$cell_type)) > 8) {
   
     # make the 2D plot 
   dm_2d <- plot_ly(data = tmp,
@@ -235,7 +238,7 @@ if (length(unique(sce_cas$cell_type)) > 8) {
 }
 
 
-if (length(unique(sce_cas$cell_type)) > 8) {
+if (length(unique(sce_clus$cell_type)) > 8) {
   
   # make the 3d plot 
   dm_3d <- plot_ly(data = tmp,
