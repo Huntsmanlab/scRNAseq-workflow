@@ -11,7 +11,7 @@ scRNAseq-workflow.Rproj
 .Rproj.user
 .gitignore
 .httr-oauth
-
+.RData
 
 __pycache__
 .Rhistory
