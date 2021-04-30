@@ -1,6 +1,6 @@
 ---
-title: "`r params$id` Clustering in separate samples"
-author: "aslı"
+title: "`r params$id` Clustering"
+author: "Asli Munzur"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
   html_document:
@@ -9,7 +9,7 @@ output:
 params:
   id: 'id'
   output_path: 'output_path' # where we save the sce with clustering data 
-  path_to_sce_norm: 'sce_norm'
+  path_to_sce_norm: 'sce_red'
   chosen_perp: 'chosen_perp'
   perplexity_list: 'perplexity_list'
   k_list: 'k_list'
@@ -73,7 +73,7 @@ Note that in the plots below, shared neighbor algorithm was used with 15 neighbo
 
 ```{r, message = FALSE, echo = FALSE}
 
-# perplexity_list <- list(5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100)
+# perplexity_list <- list(5, 10, 15, 25, 30, 40, 50, 60, 70, 80, 90, 100)
 # we will use this to dynamically change the figure height in the next chunk
 dim <- length(perplexity_list) / 3 * 4
 
@@ -118,7 +118,7 @@ After picking a t-SNE plot with a certain perplexity (`r params$chosen_perp`), n
 
 ```{r, include = FALSE}
 
-# k_list = list(5, 9, 10, 12, 15, 18)
+# k_list = list(5, 9, 10, 12, 15, 25)
 
 # we will use this to dynamically change the figure height in the next chunk
 dim <- length(k_list) / 3 * 4
@@ -168,89 +168,32 @@ sce <- sce_list_cluster[[index]]
 do.call(gridExtra::grid.arrange, c(tsne_plots, ncol = 3))
 
 ```
-### PCA  
-By inspecting the contribution of each PC to overall variance, we can get a better sense of the heterogeneity of the data.  
+
+### PCA plots  
+
 ```{r fig.width = 12, fig.height = 4}
 
-percent.var <- attr(reducedDim(sce), "percentVar")
+# By inspecting the contribution of each PC to overall variance, we can get a better sense of the heterogeneity of the data.  
 
 # visualize first 100 PCs
-if (is.null(percent.var)){
+if (is.null(attr(reducedDim(sce), "percentVar"))){
   
   message(print("Can't produce the plot for this sample. Refer to other methods below to decide how many PCs to include."))
   
-} else {plot(percent.var[1:100], xlab = "PC", ylab = "Variance explained (%)", type = "p", pch = 16, main = "contribution of top 100 PCs to variance") 
+} else {
+  
+  percent.var <- attr(reducedDim(sce), "percentVar")
+  plot(percent.var[1:100], xlab = "PC", ylab = "Variance explained (%)", type = "p", pch = 16, main = "contribution of top 100 PCs to variance") 
 
 }
 
 ```
-We can also plot the top 4 PCs together as shown below to visualize multiple PCs at the same time. Cells grouped according to the cluster they belong to. The diagonal boxes in the scatter plot matrix below show the cell density for each component.  
+
+Here we show the top 4 PCs together below to visualize multiple PCs at the same time. Cells grouped according to the cluster they belong to. The diagonal boxes in the scatter plot matrix below show the cell density for each component.  
 
 ```{r fig.width = 12, fig.height = 8}
 
 plotReducedDim(sce, dimred="PCA", ncomponents = 4, colour_by="cluster") + ggtitle("4 top PCs")
-
-```
-
-Final dimensionality reduction plots shown below with clustering information: 
-```{r fig.width = 12, fig.height = 8}
-
-p1 <- plotPCA(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', params$id, sep = '_'))
-p2 <- plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('t-SNE', params$id, sep = '_'))
-p3 <- plotUMAP(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', params$id, sep = '_'))
-
-gridExtra::grid.arrange(p1, p2, p3, ncol = 2)
-
-```
-
-### Diffusion maps  
-Diffusion maps are a non-linear dimensionality technique. It achieves dimensionality reduction by re-organising data according to parameters of its underlying geometry. This method can help us  when dealing with data that includes some sort of differentiation or transformation process because diffusion maps are good at picking up brancing in the data. This is a computationally expensive calculation, so to speed things up, it's best to limit the computation to most significant PCs. In this report, top `r params$n_PCs` were used. Results of diffusion map calculation are given in both 2 and 3 dimensional plots below.  
-
-```{r fig.width = 12, fig.height = 8, message = FALSE}
-
-# load the dm from params 
-dm <- readRDS(params$dm_path)
-
-# make df with the diffusion map coodinates, we will use this later to make the dm plot 
-tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
-                  DC2 = eigenvectors(dm)[, 2],
-                  DC3 = eigenvectors(dm)[, 3],
-                  Timepoint = sce$cluster) # this will help color based on cluster 
-
-# make the 2D plot 
-dm_2d <- plot_ly(data = tmp,
-        x = ~DC1, y = ~DC2,
-        opacity = 1,
-        color = ~Timepoint,
-        type = "scatter",
-        mode = "markers",
-        marker = list(size = 5)) %>% 
-  layout(title = '2D diffusion map showing clusters')
-
-# make the 3d plot 
-dm_3d <- plot_ly(data = tmp,
-        x = ~DC1, y = ~DC2, z = ~DC3,
-        opacity = 1,
-        color = ~Timepoint,
-        type = "scatter3d",
-        mode = "markers",
-        marker = list(size = 3))  %>% 
-  layout(title = '3D diffusion map showing clusters')
-
-
-```
-
-```{r echo = FALSE, warning = FALSE, message = FALSE}
-
-dm_2d
-dm_3d
-
-```
-
-```{r include = FALSE}
-
-# here we save the sce object with the clustering data - we only save the shared neighbor clusters 
-saveRDS(sce, file = params$output_path)
 
 ```
 
@@ -281,6 +224,13 @@ df_umap$cluster <- as.factor(sce$cluster)
 ```
 
 
+```{r echo= FALSE, message = FALSE}
+# now we make the table look nice for the report 
+
+cluster_table <- as.data.frame(cluster_table) %>% 
+  rename(cluster = Var1, number_of_cells = Freq)
+```
+
 ```{r include = FALSE}
 
 # make 2d plots according to dims we calculate before 
@@ -291,7 +241,8 @@ tsne <- plot_ly(data = df_tsne,
         type = "scatter",
         mode = "markers",
         marker = list(size = 5)) %>% 
-  layout(title = 'clusters shown in t-SNE plot')
+  layout(title = 'clusters shown in t-SNE plot', 
+         legend= list(itemsizing='constant'))
 
 umap <- plot_ly(data = df_umap,
         x = ~umap_1, y = ~umap_2,
@@ -300,7 +251,8 @@ umap <- plot_ly(data = df_umap,
         type = "scatter",
         mode = "markers",
         marker = list(size = 5)) %>% 
-  layout(title = 'clusters shown in UMAP plot')
+  layout(title = 'clusters shown in UMAP plot', 
+         legend= list(itemsizing='constant'))
 
 ```
 
@@ -314,7 +266,8 @@ tsne_3d <- plot_ly(data = df_tsne,
         type = "scatter3d",
         mode = "markers",
         marker = list(size = 4)) %>% 
-  layout(title = 'clusters shown in t-SNE plot - 3D')
+  layout(title = 'clusters shown in t-SNE plot - 3D', 
+         legend= list(itemsizing='constant'))
 
 umap_3d <- plot_ly(data = df_umap,
         x = ~umap_1, y = ~umap_2, z = ~umap_3,
@@ -323,7 +276,8 @@ umap_3d <- plot_ly(data = df_umap,
         type = "scatter3d",
         mode = "markers",
         marker = list(size = 4)) %>% 
-  layout(title = 'clusters shown in UMAP plot - 3D')
+  layout(title = 'clusters shown in UMAP plot - 3D', 
+         legend= list(itemsizing='constant'))
 
 ```
 
@@ -347,6 +301,59 @@ Same information in the plots above is also presented in interactive 3d plots be
 
 tsne_3d
 umap_3d
+
+```
+
+### Diffusion maps  
+Diffusion maps are a non-linear dimensionality technique. It achieves dimensionality reduction by re-organising data according to parameters of its underlying geometry. This method can help us  when dealing with data that includes some sort of differentiation or transformation process because diffusion maps are good at picking up brancing in the data. This is a computationally expensive calculation, so to speed things up, it's best to limit the computation to most significant PCs. In this report, top `r params$n_PCs` were used. Results of diffusion map calculation are given in both 2 and 3 dimensional plots below.  
+
+```{r fig.width = 12, fig.height = 8, message = FALSE}
+
+# load the dm from params 
+dm <- readRDS(params$dm_path)
+
+# make df with the diffusion map coodinates, we will use this later to make the dm plot 
+tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
+                  DC2 = eigenvectors(dm)[, 2],
+                  DC3 = eigenvectors(dm)[, 3],
+                  Timepoint = sce$cluster) # this will help color based on cluster 
+
+# make the 2D plot 
+dm_2d <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2,
+        opacity = 1,
+        color = ~Timepoint,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5)) %>% 
+  layout(title = '2D diffusion map showing clusters', 
+         legend= list(itemsizing='constant'))
+
+# make the 3d plot 
+dm_3d <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2, z = ~DC3,
+        opacity = 1,
+        color = ~Timepoint,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3))  %>% 
+  layout(title = '3D diffusion map showing clusters', 
+         legend= list(itemsizing='constant'))
+
+
+```
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+
+dm_2d
+dm_3d
+
+```
+
+```{r eval = FALSE, include = FALSE}
+
+# here we save the sce object with the clustering data - we only save the shared neighbor clusters 
+saveRDS(sce, file = params$output_path)
 
 ```
 

@@ -14,59 +14,232 @@ params:
   path_to_integrated:  'path_to_integrated'
 ---
 
-#### Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots before and after batch normalization through Seurat's integration method. 
-
 ```{r include = FALSE}
 
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
-```
-
-```{r include = FALSE}
-# we start with the plots for uncorrected samples 
-uncorrected <- readRDS(params$path_to_uncorrected)
-
-# some dim red plots 
-p1 <- plotReducedDim(uncorrected, "TSNE", colour_by = "id") 
-p2 <- plotReducedDim(uncorrected, "UMAP", colour_by = "id") 
+# uncorrected <- readRDS(params$path_to_uncorrected)
+combined <- readRDS(params$path_to_integrated)
 
 ```
 
-```{r include = FALSE}
-# now plots for batch corrected (integrated) samples 
-integrated <- readRDS(params$path_to_integrated)
+```{r}
 
-# some dim red plots 
-p3 <- DimPlot(integrated, reduction = 'tsne', group.by = 'id', combine = FALSE)
-p4 <- DimPlot(integrated, reduction = 'umap', group.by = 'id', combine = FALSE)
+# DEAL WITH CLUSTER COLORS 
+min_cluster <- as.numeric(min(as.vector(combined$seurat_clusters)))
+max_cluster <- max(as.numeric(as.character(combined$seurat_clusters)))
 
-p3 <- ggplotify::as.grob(p3[[1]])
-p4 <- ggplotify::as.grob(p4[[1]])
+# cluster_color_list <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494", "#B3B3B3", '#E2201C', '#1D91C0', "#E7298A", '#32A028', "green", "lightcoral", "lightgoldenrod1", "lightpink", "mediumpurple1", "navyblue")
 
-```
+# colors_list <- cluster_color_list[1:max_cluster]
 
-Samples **before** integration   
-Here we would expect samples to be separated by batch effects.  
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 10}
+colors_list <- colorRampPalette(brewer.pal(8, "Set2"))(max_cluster)
 
-gridExtra::grid.arrange(p1, p2, nrow = 1)
+# DEAL WITH ID COLORS
+sample_id <- as.vector(as.character(unique(combined$id)))
+id_colors <- colorRampPalette(brewer.pal(8, "RdYlBu"))(length(sample_id))
 
-```
-
-Samples **after** integration  
-Successful batch effect normalization should remove the batch effect. Therefore we would expect to see samples dispersed more evenly. 
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 10}
-
-gridExtra::grid.arrange(p3, p4, nrow = 1)
+combined$seurat_clusters <- as.numeric(combined$seurat_clusters)
 
 ```
 
+```{r eval = FALSE, fig.width = 12, fig.height = 8, message = FALSE}
+
+# load the dm from params 
+dm <- readRDS("/huntsman/amunzur/data/dim_reduction/DH9_control-DH11_control-DH12_control-DH14_control/dm_integrated.rds")
+
+# make df with the diffusion map coodinates, we will use this later to make the dm plot 
+tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
+                  DC2 = eigenvectors(dm)[, 2],
+                  DC3 = eigenvectors(dm)[, 3],
+                  Timepoint = as.factor(combined$seurat_clusters), 
+                  ids = combined$id) # this will help color based on cluster 
+
+# make the 2D plot 
+dm_2d_cluster <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2,
+        opacity = 1,
+        color = ~Timepoint,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5), 
+        colors = colors_list) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+# make the 3d plot 
+dm_3d_cluster <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2, z = ~DC3,
+        opacity = 1,
+        color = ~Timepoint,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3), 
+        colors = colors_list)  %>% 
+  layout(legend= list(itemsizing='constant'))
 
 
+# make the 2D plot 
+dm_2d_id <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2,
+        opacity = 1,
+        color = ~ids,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5), 
+        colors = id_colors) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+# make the 3d plot 
+dm_3d_id <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2, z = ~DC3,
+        opacity = 1,
+        color = ~ids,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3), 
+        colors = id_colors)  %>% 
+  layout(legend= list(itemsizing='constant'))
 
 
+```
+
+```{r}
+
+# PCA COORDS 
+pca_1 <- as.numeric(combined@reductions[["pca"]]@cell.embeddings[, 1])
+pca_2 <- as.numeric(combined@reductions[["pca"]]@cell.embeddings[, 2])
+pca_3 <- as.numeric(combined@reductions[["pca"]]@cell.embeddings[, 3])
+
+# TSNE COORDS
+tsne_1 <- as.numeric(combined@reductions[["tsne"]]@cell.embeddings[, 1])
+tsne_2 <- as.numeric(combined@reductions[["tsne"]]@cell.embeddings[, 2])
+tsne_3 <- as.numeric(combined@reductions[["tsne"]]@cell.embeddings[, 3])
+
+# UMAP COORDS
+umap_1 <- as.numeric(combined@reductions[["umap"]]@cell.embeddings[, 1])
+umap_2 <- as.numeric(combined@reductions[["umap"]]@cell.embeddings[, 2])
+umap_3 <- as.numeric(combined@reductions[["umap"]]@cell.embeddings[, 3])
+
+# pca df
+df_pca <- data.frame(pca_1, pca_2, pca_3)
+df_pca$id <- as.factor(combined$id) 
+df_pca$seurat_clusters <- as.factor(combined$seurat_clusters)
+
+# tsne df
+df_tsne <- data.frame(tsne_1, tsne_2, tsne_3)
+df_tsne$id <- as.factor(combined$id) 
+df_tsne$seurat_clusters <- as.factor(combined$seurat_clusters)
+
+# umap df
+df_umap <- data.frame(umap_1, umap_2, umap_3)
+df_umap$id <- as.factor(combined$id) 
+df_umap$seurat_clusters <- as.factor(combined$seurat_clusters)
+
+```
+
+```{r}
+
+make_plot <- function(df, how_many_D, color_what, given_colors){
+  
+  idx <- which(names(df) == color_what)
+  
+  if (how_many_D == 3) { # 3D plots
+    
+    plot <- plot_ly(data = df,
+                  x = ~df[, 1], y = ~df[, 2], z = ~df[, 3],
+                  opacity = 1,
+                  color = ~df[, idx],
+                  type = "scatter3d",
+                  mode = "markers",
+                  marker = list(size = 3), 
+                  colors = given_colors) %>% 
+    layout(legend= list(itemsizing='constant'))
+
+  } else {
+    
+        plot <- plot_ly(data = df,
+                  x = ~df[, 1], y = ~df[, 2],
+                  opacity = 1,
+                  color = ~df[, idx],
+                  type = "scatter",
+                  mode = "markers",
+                  marker = list(size = 3), 
+                  colors = given_colors) %>% 
+    layout(legend= list(itemsizing='constant'))
+
+  }
+
+  return(plot)
+  
+} # end of function 
+
+```
+
+```{r}
+
+pca_3d_id <- make_plot(df_pca, 3, "id", id_colors)
+pca_2d_id <- make_plot(df_pca, 2, "id", id_colors)
+
+pca_3d_cluster <- make_plot(df_pca, 3, "seurat_clusters", colors_list)
+pca_2d_cluster <- make_plot(df_pca, 3, "seurat_clusters", colors_list)
+
+tsne_3d_id <- make_plot(df_tsne, 3, "id", id_colors)
+tsne_2d_id <- make_plot(df_tsne, 2, "id", id_colors)
+
+tsne_3d_cluster <- make_plot(df_tsne, 3, "seurat_clusters", colors_list)
+tsne_2d_cluster <- make_plot(df_tsne, 3, "seurat_clusters", colors_list)
+
+umap_3d_id <- make_plot(df_umap, 3, "id", id_colors)
+umap_2d_id <- make_plot(df_umap, 2, "id", id_colors)
+
+umap_3d_cluster <- make_plot(df_umap, 3, "seurat_clusters", colors_list)
+umap_2d_cluster <- make_plot(df_umap, 3, "seurat_clusters", colors_list)
+
+```
 
 
+```{r eval = FALSE}
+
+dm_2d_cluster
+dm_3d_cluster
+
+dm_2d_id
+dm_3d_id
+
+```
+
+# PCA
+```{r}
+
+pca_2d_cluster
+pca_3d_cluster
+
+pca_2d_id
+pca_3d_id
+
+```
+
+# t-SNE
+```{r}
+
+tsne_2d_cluster
+tsne_3d_cluster
+
+tsne_2d_id
+tsne_3d_id
+
+```
+
+# UMAP
+```{r}
+
+umap_2d_cluster
+umap_3d_cluster
+
+umap_2d_id
+umap_3d_id
+
+```
 
 

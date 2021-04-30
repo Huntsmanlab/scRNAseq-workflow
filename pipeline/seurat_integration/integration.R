@@ -84,7 +84,7 @@ integrate <- function(path_to_sce_qc,
   id.features <- SelectIntegrationFeatures(object.list = seurats, nfeatures = nrow(seurats[[1]]))
   
   # make a reference list for the next step  
-  anchors <- FindIntegrationAnchors(object.list = seurats, dims = 1:30)
+  anchors <- FindIntegrationAnchors(object.list = seurats, dims = 1:30, k.filter = 60)
   
   # find the common genes 
   total.genes <- lapply(seurats, function(seurat) rownames(seurat@assays$RNA@counts))
@@ -111,8 +111,12 @@ integrate <- function(path_to_sce_qc,
   integrated <- ScaleData(integrated, verbose = FALSE)
   set.seed(1998)
   integrated <- RunPCA(integrated, verbose = FALSE)
-  integrated <- RunUMAP(integrated, dims = 1:30)
-  integrated <- RunTSNE(integrated, dims = 1:30)
+  integrated <- RunTSNE(integrated, dims = 1:30, dim.embed = 3, seed.use = 300, perplexity = 20)
+  integrated <- RunUMAP(integrated, dims = 1:30, n.components = 3L, seed.use = 1000)
+  
+  # clustering
+  integrated <- FindNeighbors(integrated, dims = 1:10)
+  integrated <- FindClusters(integrated, resolution = 0.5)
   
   # save the data
   saveRDS(integrated, file = output_file_name_integrated) # corrected data 

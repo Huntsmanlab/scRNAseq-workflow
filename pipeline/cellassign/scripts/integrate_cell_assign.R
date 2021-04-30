@@ -99,13 +99,11 @@ whatagreatfunction <- function(path_to_sce_cas,
   # add this to the metadata 
   integrated <- AddMetaData(integrated, sample_names, col.name = 'id')
   
-  # now we add the cell type info from cell assigh to the metadata, we start by extracting this info from the sces 
-  cell_types <- lapply(sces, function(sce) sce$cell_type)
-  cell_types <- as.list(c(unlist(list(cell_types))))  # prepare for rbind by putting data in a good format
-  cell_types <- do.call(rbind, cell_types)
+
   
   # add cell types to metadata 
   # integrated <- AddMetaData(integrated, cell_types, col.name = 'cell_types') # this one doesnt work for some reason, but code below does
+  Idents(integrated) <- "cluster"
   integrated$cell_types <- cell_types
   
   # the default assay is the new one 
@@ -115,23 +113,29 @@ whatagreatfunction <- function(path_to_sce_cas,
   integrated <- ScaleData(integrated, verbose = FALSE)
   set.seed(1998)
   integrated <- RunPCA(integrated, verbose = FALSE)
-  integrated <- RunUMAP(integrated, dims = 1:30)
-  integrated <- RunTSNE(integrated, dims = 1:30)
+  integrated <- RunTSNE(integrated, dims = 1:30, dim.embed = 3, seed.use = 300)
+  integrated <- RunUMAP(integrated, dims = 1:30, seed.use = 1000)
+  
+  # clustering
+  integrated <- FindNeighbors(integrated, dims = 1:10)
+  integrated <- FindClusters(integrated, resolution = 0.5)
   
   # save the data
-  saveRDS(integrated, file = integrated_object_name) # corrected data 
+  saveRDS(integrated, file = integrated_object_name) # corrected data
+  # saveRD(integrated, file = "/huntsman/amunzur/data/misc/important_data.gzip", compress = TRUE)
   
-  # compute the combined but uncorrected object 
+  # compute the combined but uncorrected object, only fix the sequencing depth 
   # load the normalized data 
   sces <- lapply(path_to_sce_cas, function(path) readRDS(path))
     
   sces <- intersect_all(sces) # subset to common genes 
+  sces <- scran_batch_norm(sces)  # only correct for sequencing depth
   combined <- do.call(combine_sces, sces) # combine the objects 
     
   # some dim reduction 
   set.seed(1564)
   combined <- runPCA(combined)
-  combined <- runTSNE(combined)
+  combined <- runTSNE(combined, ncomponents = 3)
   combined <- runUMAP(combined)
     
   # now save the object 

@@ -7,7 +7,7 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 convert_to_sces <- function(path_to_10X, ids) {
 
-    sce <- read10xCounts(samples = path_to_10X[index]) # depending on which number we are at, pick the data set from the list with the correct index 
+    sce <- read10xCounts(samples = path_to_10X) # depending on which number we are at, pick the data set from the list with the correct index 
     
     # rename reporter genes
     rowData(sce)$Symbol[rowData(sce)$ID == 'ENSG00099999996'] <- 'tdTomato' # DH21, 22, 21_control, 22_control

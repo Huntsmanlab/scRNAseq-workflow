@@ -1,14 +1,13 @@
 ---
 title: " `r params$ids` Summary stats and quality control results"
 subtitle: '`r params$pair_ids`'
-author: "Asli Munzur"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
   html_document:
     code_folding: hide
 
 params:
-  pair_ids: 'DH21_NEW-DH21_control' # to run this, write TWO ids here, separated by -
+  pair_ids: 'DH27_5seq_PIK3CA_PCMV-DH27_5seq_Double_mutant' # to run this, write TWO ids here, separated by -
 ---
 
 In this document, we show the results of quality control on the samples. The steps below encompass the standard pre-processing workflow for scRNA-seq data in Seurat. These represent the selection and filtration of cells based on QC metrics, data normalization and scaling, and the detection of highly variable features.  
@@ -283,7 +282,7 @@ all_raw <- ScaleData(all_raw)
 
 all_raw <- RunPCA(all_raw, verbose = FALSE)
 all_raw <- RunUMAP(all_raw, dims = 1:30)
-all_raw <- RunTSNE(all_raw, dims = 1:30, check_duplicates = FALSE)
+all_raw <- RunTSNE(all_raw, dims = 1:30, check_duplicates = FALSE, perplexity = 10)
 
 p1 <- DimPlot(all_raw, reduction = 'pca', group.by = 'orig.ident', combine = FALSE)
 # p2 <- DimPlot(all_raw, reduction = 'tsne', group.by = 'orig.ident', combine = FALSE, do.label = TRUE)
@@ -314,7 +313,7 @@ all_qc <- ScaleData(all_qc)
 
 all_qc <- RunPCA(all_qc, verbose = FALSE)
 all_qc <- RunUMAP(all_qc, dims = 1:30)
-all_qc <- RunTSNE(all_qc, dims = 1:30, check_duplicates = FALSE)
+all_qc <- RunTSNE(all_qc, dims = 1:30, check_duplicates = FALSE, perplexity = 10)
 
 # Plot tSNE with new legend labels for clusters
 p5 <- DimPlot(object = all_qc, 
@@ -509,7 +508,7 @@ qc_sample2 <- ScaleData(qc_sample2)
 
 qc_sample2 <- RunPCA(qc_sample2, verbose = FALSE)
 qc_sample2 <- RunUMAP(qc_sample2, dims = 1:30)
-qc_sample2 <- RunTSNE(qc_sample2, dims = 1:30, check_duplicates = FALSE)
+qc_sample2 <- RunTSNE(qc_sample2, dims = 1:30, check_duplicates = FALSE, perplexity = 10)
 
 qc_sample2 <- FindNeighbors(qc_sample2, dims = 1:10)
 qc_sample2 <- FindClusters(qc_sample2, resolution = 0.5)
