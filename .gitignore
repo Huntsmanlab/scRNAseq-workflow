@@ -11,7 +11,7 @@ scRNAseq-workflow.Rproj
 .Rproj.user
 .gitignore
 .httr-oauth
-
+.RData
 
 __pycache__
 .Rhistory
@@ -46,9 +46,6 @@ scMerge
 
 # ignore some random script i had been working on 
 comebacklater.Rmd
-
 test.txt
 velocity.md
 
-# ignore some random script i had been working on 
-comebacklater.Rmd

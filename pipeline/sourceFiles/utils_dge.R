@@ -115,7 +115,6 @@ plotDEGs <- function(degs, clusters, ntop, reporter_gene) {
   degs$Neg.Log.Adj.P <- -(degs[,2])
   degs <- degs[degs$gene_symbol != reporter_gene, ]                                          # there is no need to plot our reporter genes
   top <- head(degs, 50)
-  browser()
   p <- ggplot(degs, aes_string(x = names(degs)[3], y = names(degs)[2])) +
     geom_point(colour = 'gray') +
     geom_text_repel(data = top, aes(label = gene_symbol), colour = 'red', size = 5) +

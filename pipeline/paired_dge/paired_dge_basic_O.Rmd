@@ -7,6 +7,7 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 
 params:
   # INSTRUCTIONS: Declare the location of the samples that you need for this analysis. Separate samples by a single '-'
+
   ins: '/huntsman/harpcheng/data/cell_cycle/DH22_NEW/cell_cycle.rds-/huntsman/harpcheng/data/cell_cycle/DH22_control/cell_cycle.rds'
   # INSTRUCTIONS: List the ids of the samples from above in the same order. Could also be a name of your choosing. 
   # Separate samples by a single '-'. Then add a pipe char '|', to demarcate a comparison if doing so between samples. ex. 'DH8-|-DH6-DH7'
