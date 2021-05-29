@@ -20,7 +20,7 @@ params:
 library(here)
 library(plotly)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
-source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix.R'))
+source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix_GC.R'))
 source(here('pipeline', 'cellassign', 'scripts', 'assign_cell_type.R'))
 
 
@@ -73,7 +73,7 @@ pca_2 <- as.numeric(sce_clus@int_colData@listData[["reducedDims"]]$PCA[, 2])
 pca_3 <- as.numeric(sce_clus@int_colData@listData[["reducedDims"]]$PCA[, 3])
 
 df <- data.frame(tsne_1, tsne_2, tsne_3)
-df$cell_type <- as.factor(sce_clus$cell_type)
+df$cell_type <- as.factor(sce_clus$cell_type$cell_type)
 df$cluster <- as.factor(sce_clus$cluster)
 
 colors_list = c(brewer.pal(n = 8, name = "Set2"), brewer.pal(n = 8, name = "Paired"))
@@ -207,7 +207,7 @@ dm <- readRDS(params$dm_path)
 tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
                   DC2 = eigenvectors(dm)[, 2],
                   DC3 = eigenvectors(dm)[, 3],
-                  cell_type = sce_clus$cell_type) # this will help color based on cluster 
+                  cell_type = sce_clus$cell_type$cell_type) # this will help color based on cluster 
 
 if (length(unique(sce_clus$cell_type)) > 8) {
   
