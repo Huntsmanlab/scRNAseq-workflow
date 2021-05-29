@@ -543,7 +543,3 @@ rule seurat_to_loom:
     --path_to_loom_file {output.path_to_loom_file} \
     --path_to_barcode_tsv {output.path_to_barcode_tsv}"
   
-  
-  
-  
-  
