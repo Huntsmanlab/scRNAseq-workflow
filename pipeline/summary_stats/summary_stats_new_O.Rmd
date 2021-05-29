@@ -5,21 +5,25 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
   html_document:
     code_folding: hide
+    toc: true
+    toc_depth: 4
+    toc_float: true
 
 params:
-  pair_ids: 'DH27_5seq_PIK3CA_PCMV-DH27_5seq_Double_mutant' # to run this, write TWO ids here, separated by -
+  pair_ids: 'DH21-DH21_control' # to run this, write TWO ids here, separated by -
 ---
 
-In this document, we show the results of quality control on the samples. The steps below encompass the standard pre-processing workflow for scRNA-seq data in Seurat. These represent the selection and filtration of cells based on QC metrics, data normalization and scaling, and the detection of highly variable features.  
+In this document, we show summary statistics and results of quality control on the samples. The steps below encompass the standard pre-processing workflow for scRNA-seq data in Seurat. These represent the selection and filtration of cells based on QC metrics, data normalization and scaling, and the detection of highly variable features.  
 
 While filtering low quality cells, we consider the following:  
-- Total number of RNA reads detected in each cell  
-- The number of unique genes detected in each cell  
-Low-quality cells or empty droplets will often have very few genes while cell doublets or multiplets may exhibit an aberrantly high gene count.  
-- The percentage of reads that map to the mitochondrial genome  
-Low-quality / dying cells often exhibit extensive mitochondrial contamination. We restrict the mitochondrial content to 25% of all the reads.  
-- The percentage of reads that ribosomal RNA  
-Ribosomal content is restricted to 60% per cell.  
+
+* Total number of RNA reads detected in each cell  
+* The number of unique genes detected in each cell:  
+  + Low-quality cells or empty droplets will often have very few genes while cell doublets or multiplets may exhibit an aberrantly high gene count.  
+* The percentage of reads that map to the mitochondrial genome:  
+  + Low-quality / dying cells often exhibit extensive mitochondrial contamination. We restrict the mitochondrial content to 25% of all the reads.  
+* The percentage of reads that map to ribosomal RNA:  
+  + Ribosomal content is restricted to 60% per cell.  
 
 
 ```{css, echo=FALSE}
@@ -43,26 +47,24 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 ```{r include = FALSE}
 
 #extract the name_list from the parameters. we use the name list later on while making graphs. 
-ids <- strsplit(params$pair_ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+ids <- strsplit(params$pair_ids, "[-/ ]")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
 dh_organoid_ids <- list(ids[[1]], ids[[2]])
 
-```
-
-```{r include = FALSE}
-
-# extract some information 
+# import raw sce (from 10x) and qc'd sce
 sce_raws <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'processed', id, 'sce.rds')))
 sce_qcs <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'qc', id, 'sce_qc.rds')))
 
-# combine the sces 
-sce_raws_combined <- do.call(combine_sces, sce_raws)
-sce_qcs_combined <- do.call(combine_sces, sce_qcs)
+# combine sces without seurat
+#sce_raws_combined <- do.call(combine_sces, sce_raws)
+#sce_qcs_combined <- do.call(combine_sces, sce_qcs)
 
+# convert sce to seurat object
 seurat_raws <- lapply(sce_raws, function(sce) CreateSeuratObject(counts = counts(sce), project = sce$id))
 seurat_qc <- lapply(sce_qcs, function(sce) CreateSeuratObject(counts = counts(sce), project = sce$id))
 
+# get colData from sce and store in dataframes
 df_raws <- lapply(sce_raws, function(sce) colData(sce)) # this one has metrics before removing low quality cells 
-df_qcs <- lapply(sce_qcs, function(sce) colData(sce)) # this one has metrics after removing loq quality cells 
+df_qcs <- lapply(sce_qcs, function(sce) colData(sce)) # this one has metrics after removing low quality cells 
 
 ```
 
@@ -177,6 +179,9 @@ AFTERtable_median <- rbind(AFTERcontrolTable_median, AFTERexpTable_median)
 
 ```
 
+
+## Summary Statistics before and after quality control
+
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
 # here we just make the tables look nice and add a caption as well. 
 BEFOREtable %>% 
@@ -203,6 +208,9 @@ AFTERtable_median %>%
 ```
 
 
+
+### Violin Plots
+
 ```{r include = FALSE}
 
 all_raw <- merge(seurat_raws[[1]], seurat_raws[[2]], add.cell.ids = c(dh_organoid_ids[[1]], dh_organoid_ids[[2]]))
@@ -218,27 +226,29 @@ feats <- c("nFeature_RNA","nCount_RNA","percent_mito","percent_ribo")
 
 ```
 
-#### BEFORE QUALITY CONTROL
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 13}
+#### BEFORE quality control
+```{r echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 13}
 
 VlnPlot(all_raw, group.by= "orig.ident", features = feats, pt.size = 0.1,ncol = 4) 
 
 ```
 
 
-#### AFTER QUALITY CONTROL
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 13}
+#### AFTER quality control
+```{r echo = FALSE, message = FALSE,  warning = FALSE, fig.height = 5, fig.width = 13}
 
 VlnPlot(all_qc, group.by= "orig.ident", features = feats, pt.size = 0.1,ncol = 4)
 
 ```
 
 
+### Scatter Plots and Pearson Correlation between Features
+
 We can also look into the relationship between certain values in scatter plots. Pearson correlation between the two features is displayed above the plot. 
 
 #### BEFORE QUALITY CONTROL 
 
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 17}
+```{r echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 17}
 
 cowplot::plot_grid(ncol = 4,
   FeatureScatter(all_raw, "nCount_RNA"  , "nFeature_RNA", group.by = "orig.ident", pt.size = .5),
@@ -251,7 +261,7 @@ cowplot::plot_grid(ncol = 4,
 
 #### AFTER QUALITY CONTROL 
 
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 17}
+```{r echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 17}
 
 cowplot::plot_grid(ncol = 4,
   FeatureScatter(all_qc, "nCount_RNA"  , "nFeature_RNA", group.by = "orig.ident", pt.size = .5),
@@ -262,129 +272,83 @@ cowplot::plot_grid(ncol = 4,
 
 ```
 
-### Dimensionality reduction plots 
 
-Next we include some dimensionality reduction plots. Plots on the left are before quality control, plots on the right are after. 
+## Dimensionality Reduction Plots
 
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
+Next we include some dimensionality reduction plots (PCA, tSNE, and UMAP). Plots on the left are before quality control, plots on the right are after. 
 
-# Calculate number of cells per cluster from object@ident
-cell.num <- table(all_raw@active.ident)
+```{r echo = FALSE, message = FALSE, warning = FALSE}
 
-# Add cell number per cluster to cluster labels
-ClusterLabels = paste("Cluster", names(cell.num), paste0("(n = ", cell.num, ")"))
+dim_red_plot <- function(seurat_obj){
+  p <- list()
+  
+  seurat_obj <- FindVariableFeatures(seurat_obj)
+  seurat_obj <- ScaleData(seurat_obj)
 
-# Order legend labels in plot in the same order as 'ClusterLabels'
-ClusterBreaks = names(cell.num)
+  seurat_obj <- RunPCA(seurat_obj, verbose = FALSE)
+  seurat_obj <- RunUMAP(seurat_obj, dims = 1:30)
+  seurat_obj <- RunTSNE(seurat_obj, dims = 1:30, check_duplicates = FALSE, perplexity = 10)
 
-all_raw <- FindVariableFeatures(all_raw)
-all_raw <- ScaleData(all_raw)
+  p[[1]] <- DimPlot(seurat_obj, reduction = 'pca', group.by = 'orig.ident', combine = FALSE)
+  p[[2]] <- DimPlot(seurat_obj, reduction = 'tsne', group.by = 'orig.ident', combine = FALSE)
+  p[[3]] <- DimPlot(seurat_obj, reduction = 'umap', group.by = 'orig.ident', combine = FALSE)
+  
+  return(p)
+}
 
-all_raw <- RunPCA(all_raw, verbose = FALSE)
-all_raw <- RunUMAP(all_raw, dims = 1:30)
-all_raw <- RunTSNE(all_raw, dims = 1:30, check_duplicates = FALSE, perplexity = 10)
-
-p1 <- DimPlot(all_raw, reduction = 'pca', group.by = 'orig.ident', combine = FALSE)
-# p2 <- DimPlot(all_raw, reduction = 'tsne', group.by = 'orig.ident', combine = FALSE, do.label = TRUE)
-p3 <- DimPlot(all_raw, reduction = 'umap', group.by = 'orig.ident', combine = FALSE)
-
-# Plot tSNE with new legend labels for clusters
-p2 <- DimPlot(object = all_raw, 
-              reduction = 'tsne', 
-              do.return = T) +
-  scale_colour_discrete(breaks = ClusterBreaks, 
-                        labels = ClusterLabels) +
-  labs(x = "t-SNE 1",
-       y = "t-SNE 2")
-
-
-# Calculate number of cells per cluster from object@ident
-cell.num <- table(all_qc@active.ident)
-
-# Add cell number per cluster to cluster labels
-ClusterLabels = paste("Cluster", names(cell.num), paste0("(n = ", cell.num, ")"))
-
-# Order legend labels in plot in the same order as 'ClusterLabels'
-ClusterBreaks = names(cell.num)
-
-
-all_qc <- FindVariableFeatures(all_qc)
-all_qc <- ScaleData(all_qc)
-
-all_qc <- RunPCA(all_qc, verbose = FALSE)
-all_qc <- RunUMAP(all_qc, dims = 1:30)
-all_qc <- RunTSNE(all_qc, dims = 1:30, check_duplicates = FALSE, perplexity = 10)
-
-# Plot tSNE with new legend labels for clusters
-p5 <- DimPlot(object = all_qc, 
-              reduction = 'tsne', 
-              do.return = T) +
-  scale_colour_discrete(breaks = ClusterBreaks, 
-                        labels = ClusterLabels) +
-  labs(x = "t-SNE 1",
-       y = "t-SNE 2")
-
-
-p4 <- DimPlot(all_qc, reduction = 'pca', group.by = 'orig.ident', combine = FALSE)
-# p5 <- DimPlot(all_qc, reduction = 'tsne', group.by = 'orig.ident', combine = FALSE)
-p6 <- DimPlot(all_qc, reduction = 'umap', group.by = 'orig.ident', combine = FALSE)
+before <- dim_red_plot(all_raw)
+after <- dim_red_plot(all_qc)
 
 ```
 
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
 
-grid.arrange(ggplotify::as.grob(p1[[1]]), ggplotify::as.grob(p4[[1]]), nrow = 1)
+grid.arrange(ggplotify::as.grob(before[[1]][[1]]), ggplotify::as.grob(after[[1]][[1]]), nrow = 1)
 
 ```
 
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
 
-grid.arrange(p2, p5, nrow = 1)
+grid.arrange(ggplotify::as.grob(before[[2]][[1]]), ggplotify::as.grob(after[[2]][[1]]), nrow = 1)
 
 ```
 
 ```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
 
-grid.arrange(ggplotify::as.grob(p3[[1]]), ggplotify::as.grob(p6[[1]]), nrow = 1)
+grid.arrange(ggplotify::as.grob(before[[3]][[1]]), ggplotify::as.grob(after[[3]][[1]]), nrow = 1)
 
 ```
 
-### Most variable features  
+
+## Most variable features
+
 We next calculate a subset of features that exhibit high cell-to-cell variation in the dataset (i.e, they are highly expressed in some cells, and lowly expressed in others). Focusing on these genes in downstream analysis helps to highlight biological signal in single-cell datasets. Here we find the 3000 most variable features (genes) in two datasets **after** quality control. Datatables below have include these genes, but we label the top 15 genes for both datasets. 
 
 ```{r include = FALSE}
 
-seurat_qc[[1]] <- FindVariableFeatures(seurat_qc[[1]], selection.method = "vst", nfeatures = 3000)
-seurat_qc[[2]] <- FindVariableFeatures(seurat_qc[[2]], selection.method = "vst", nfeatures = 3000)
+most_variable_features <- function(seurat_obj, id){
+  
+  seurat_obj <- FindVariableFeatures(seurat_obj, selection.method = "vst", nfeatures = 3000)
+
+  # Identify the 15 most highly variable genes
+  top10 <- head(VariableFeatures(seurat_obj), 15)
+
+  # plot variable features with labels
+  p <- LabelPoints(plot = VariableFeaturePlot(seurat_obj), points = top10, repel = TRUE) + 
+    ggtitle(id) + theme(legend.position = "bottom")
+  
+  out <- list(seurat_obj=seurat_obj, plot=p)
+}
 
 
-# Identify the 10 most highly variable genes
-top10_1 <- head(VariableFeatures(seurat_qc[[1]]), 15)
-top10_2 <- head(VariableFeatures(seurat_qc[[2]]), 15)
-
-# all the variable genes 
-one_all <- VariableFeatures(seurat_qc[[1]])
-two_all <- VariableFeatures(seurat_qc[[2]])
-
-
-# plot variable features with labels
-plot1 <- VariableFeaturePlot(seurat_qc[[1]])
-plot2 <- LabelPoints(plot = plot1, points = top10_1, repel = TRUE)
-plot2 <- plot2 + ggtitle(paste(dh_organoid_ids[[1]])) + theme(legend.position = "bottom")
-
-
-plot3 <- VariableFeaturePlot(seurat_qc[[2]])
-plot4 <- LabelPoints(plot = plot3, points = top10_2, repel = TRUE)
-plot4 <- plot4 + ggtitle(paste(dh_organoid_ids[[2]])) + theme(legend.position = "bottom")
-
-
+mvf1 <- most_variable_features(seurat_qc[[1]], dh_organoid_ids[[1]])
+mvf2 <- most_variable_features(seurat_qc[[2]], dh_organoid_ids[[2]])
 
 ```
 
+```{r echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
 
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 10}
-
-grid.arrange(plot2, plot4, nrow = 1)
+grid.arrange(mvf1$plot, mvf2$plot, nrow = 1)
 
 ```
 
@@ -392,7 +356,7 @@ grid.arrange(plot2, plot4, nrow = 1)
 #### Most variable genes in `r paste(dh_organoid_ids[[1]])`  
 ```{r}
 
-DT::datatable(HVFInfo(seurat_qc[[1]])[VariableFeatures(seurat_qc[[1]]), ],
+DT::datatable(HVFInfo(mvf1$seurat_obj)[VariableFeatures(mvf1$seurat_obj), ],
   extensions = 'Buttons',
   options = list(dom = 'Bfrtip',
                  buttons = list("copy", "excel", "csv", "pdf")))
@@ -404,7 +368,7 @@ DT::datatable(HVFInfo(seurat_qc[[1]])[VariableFeatures(seurat_qc[[1]]), ],
 #### Most variable genes in `r paste(dh_organoid_ids[[2]])`  
 ```{r}
 
-DT::datatable(HVFInfo(seurat_qc[[2]])[VariableFeatures(seurat_qc[[2]]), ],
+DT::datatable(HVFInfo(mvf2$seurat_obj)[VariableFeatures(mvf2$seurat_obj), ],
   extensions = 'Buttons',
   options = list(dom = 'Bfrtip',
                  buttons = list("copy", "excel", "csv", "pdf")))
@@ -412,64 +376,69 @@ DT::datatable(HVFInfo(seurat_qc[[2]])[VariableFeatures(seurat_qc[[2]]), ],
 
 ```
 
+
+#### Number of highly variable genes (HVG)
+Number of HVG for both samples are given below for various gene dispersion (variance) cut offs.  
 ```{r include = FALSE}
 
-#### Number of variable features  
-# Here we find the number of variable features with various cutoffs after quality control. 
+process_seurat <- function(seurat_obj){
+  
+  # normalize count and find variable features
+  normalized <- NormalizeData(seurat_obj) %>% 
+    FindVariableFeatures(selection.method = 'dispersion', mean.cutoff = c(0.005, 1))
+  
+  # scale and run clustering
+  clustered <- ScaleData(normalized) %>% 
+    RunPCA(verbose = FALSE) %>% 
+    RunUMAP(dims = 1:30, n.components=3) %>% 
+    RunTSNE(dims = 1:30, dim.embed = 3, check_duplicates = FALSE) %>% 
+    FindNeighbors(dims = 1:10) %>% 
+    FindClusters(resolution = 0.5)
+  
+  # store normalized and clustered object in a list 
+  out <- list(normalized = normalized, clustered = clustered)
+  
+  return(out)
+}
 
-qc_sample1 <- seurat_qc[[1]]
-qc_sample2 <- seurat_qc[[2]]
-
-qc_sample1 <- NormalizeData(qc_sample1)
-qc_sample2 <- NormalizeData(qc_sample2)
-
-
-qc_sample1 <- FindVariableFeatures(qc_sample1, selection.method = 'dispersion', mean.cutoff = c(0.005, 1))
-
-qc_sample2 <- FindVariableFeatures(qc_sample2, selection.method = 'dispersion', mean.cutoff = c(0.005, 1))
 
 getNumberOfHVG <- function(object, threshold){
   
-  df <- as.data.frame(HVFInfo(object = object)) %>% 
-    dplyr::select(dispersion.scaled) %>% 
-    dplyr::filter(dispersion.scaled > threshold)
+  #### Number of variable features  
+  # Here we find the number of variable features with various cutoffs after quality control. 
+  num_hvg <- numeric()
   
-  return(nrow(df))
+  for(i in 1:length(threshold)){
+    num_hvg[i] <- as.data.frame(HVFInfo(object = object)) %>% 
+      dplyr::select(dispersion.scaled) %>% 
+      dplyr::filter(dispersion.scaled > threshold[i]) %>% 
+      nrow()
+  }
   
+  return(num_hvg)
 }
 
-a <- getNumberOfHVG(qc_sample1, 0.5)
-b <- getNumberOfHVG(qc_sample1, 1.0)
-c <- getNumberOfHVG(qc_sample1, 1.5)
-d <- getNumberOfHVG(qc_sample1, 2.0)
-e <- getNumberOfHVG(qc_sample1, 2.5)
+```
 
-f <- getNumberOfHVG(qc_sample2, 0.5)
-g <- getNumberOfHVG(qc_sample2, 1.0)
-h <- getNumberOfHVG(qc_sample2, 1.5)
-i <- getNumberOfHVG(qc_sample2, 2.0)
-j <- getNumberOfHVG(qc_sample2, 2.5)
 
-HVG_sample1 <- c(a, b, c, d, e)
-HVG_sample2 <- c(f, g, h, i, j)
+```{r include=FALSE}
+
+pro_sample1 <- process_seurat(seurat_qc[[1]])
+pro_sample2 <- process_seurat(seurat_qc[[2]])
+
+qc_sample1 <- pro_sample1$normalized
+qc_sample2 <- pro_sample2$normalized
+
+HVG_sample1 <- getNumberOfHVG(qc_sample1, c(0.5, 1.0, 1.5, 2.0, 2.5))
+HVG_sample2 <- getNumberOfHVG(qc_sample2, c(0.5, 1.0, 1.5, 2.0, 2.5))
 dispersion_cutoff <- c(0.5, 1.0, 1.5, 2.0, 2.5)
-
-df <- as.data.frame(cbind(dispersion_cutoff, HVG_sample1, HVG_sample2))
-
-col1Name <- paste('HVG', dh_organoid_ids[[1]], sep = '_')
-col2Name <- paste('HVG', dh_organoid_ids[[2]], sep = '_')
-
-
+df <- data.frame(dispersion_cutoff, HVG_sample1, HVG_sample2)
 
 # rename the columns 
 names(df)[names(df) == "HVG_sample1"] <- paste('HVG', dh_organoid_ids[[1]], sep = '_')
 names(df)[names(df) == "HVG_sample2"] <- paste('HVG', dh_organoid_ids[[2]], sep = '_')
 
-
 ```
-
-#### Number of highly variable genes (HVG)
-Number of HVG for both samples are given below for various gene dispersion (variance) cut offs.  
 
 ```{r}
 
@@ -479,96 +448,82 @@ df %>%
 
 ```
 
-#### Clustering  
+
+## Clustering
+
 Clustering cells and running a DE analysis between clusters can give an idea about different cell populations that may exist in the samples and various gene expression patterns. To better understand the composition of the clusters, we will look into these factors and show them on plots:  
-- mitochondrial content (percentage)  
-- ribosomal content (percentage)  
-- number of detected genes  
+
+* mitochondrial content (percentage)  
+* ribosomal content (percentage)  
+* number of detected genes  
+
 0.5 was chosen as a resolution. 
 
-Now let's look at the chosen resolutions in more detail. We visualize the clusters in a dimensionality reduction plots (tSNE) below. 
+Now let's look at the chosen resolution (0.5) in more detail. We visualize the clusters in a dimensionality reduction plots below. 
 
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
+#### t-SNE
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 15}
 
+qc_sample1 <- pro_sample1$clustered
+qc_sample2 <- pro_sample2$clustered
 
-# qc_sample1$seurat_clusters <- as.numeric(qc_sample1$seurat_clusters) + 1
-
-qc_sample1 <- ScaleData(qc_sample1)
-
-qc_sample1 <- RunPCA(qc_sample1, verbose = FALSE)
-qc_sample1 <- RunUMAP(qc_sample1, dims = 1:30)
-qc_sample1 <- RunTSNE(qc_sample1, dims = 1:30, check_duplicates = FALSE)
-
-qc_sample1 <- FindNeighbors(qc_sample1, dims = 1:10)
-qc_sample1 <- FindClusters(qc_sample1, resolution = 0.5)
-
-#########################
-
-qc_sample2 <- ScaleData(qc_sample2)
-
-qc_sample2 <- RunPCA(qc_sample2, verbose = FALSE)
-qc_sample2 <- RunUMAP(qc_sample2, dims = 1:30)
-qc_sample2 <- RunTSNE(qc_sample2, dims = 1:30, check_duplicates = FALSE, perplexity = 10)
-
-qc_sample2 <- FindNeighbors(qc_sample2, dims = 1:10)
-qc_sample2 <- FindClusters(qc_sample2, resolution = 0.5)
-
-
-Dimplot1 <- DimPlot(qc_sample1, reduction = "tsne") + ggtitle(paste(dh_organoid_ids[[1]]))
-Dimplot2 <- DimPlot(qc_sample2, reduction = "tsne") + ggtitle(paste(dh_organoid_ids[[2]]))
+Dimplot1 <- DimPlot(qc_sample1, reduction = "tsne") + ggtitle(dh_organoid_ids[[1]])
+Dimplot2 <- DimPlot(qc_sample2, reduction = "tsne") + ggtitle(dh_organoid_ids[[2]])
 
 grid.arrange(Dimplot1, Dimplot2, nrow = 1)
 
 ```
-Now we will look into the contents of these clusters and visualize these values in the violin plots below.  
+
+
+#### UMAP
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 15}
+Dimplot1 <- DimPlot(qc_sample1, reduction = "umap") + ggtitle(dh_organoid_ids[[1]])
+Dimplot2 <- DimPlot(qc_sample2, reduction = "umap") + ggtitle(dh_organoid_ids[[2]])
+
+grid.arrange(Dimplot1, Dimplot2, nrow = 1)
+```
+
+
+
+### Visualize Clusters with Violin PLots
+
+Now, we will look into the contents of these clusters and visualize these values in the violin plots below.  
 
 ```{r include = FALSE}
 
-# now lets compute the statistics above in plots, for that we need to add the clusters information to the sce objects 
-
-sce_sample1 <- sce_qcs[[1]]
-sce_sample2 <- sce_qcs[[2]]
+clus_violin <- function(sce, clus_seurat){
   
-# sample1
-clusters <- qc_sample1$seurat_clusters
-mito_percentage <- sce_sample1$subsets_mito_percent
-ribo_percentage <- sce_sample1$subsets_ribo_percent
-detected_genes <- sce_sample1$detected
+  # now lets compute the statistics above in plots, for that we need to add the clusters information to the sce objects 
+  sample_info_df <- data.frame(clusters=clus_seurat$seurat_clusters, mito_percentage=sce$subsets_mito_percent, 
+                               ribo_percentage=sce$subsets_ribo_percent, detected_genes=sce$detected)
+  
+  # now we make the plots 
+  plot_sample_mito <- ggplot(sample_info_df, aes(x = factor(clusters), y = mito_percentage, fill = factor(clusters))) + 
+    geom_violin() + 
+    geom_jitter(height = 0.1, width = 0.08) + 
+    theme_classic() + 
+    ggtitle('mitochondrial content')
 
-# make a df from them 
-sample1_info_df <- as.data.frame(cbind(clusters, mito_percentage, ribo_percentage, detected_genes))
+  plot_sample_ribo <- ggplot(sample_info_df, aes(x = factor(clusters), y = ribo_percentage, fill = factor(clusters))) + 
+    geom_violin() + 
+    geom_jitter(height = 0.1, width = 0.08) + 
+    theme_classic() + 
+    ggtitle('ribosomal content') + ylim(0, 40)
 
-# df makes 0 turn into 1, so subtract 1 from each row of the clusters 
-sample1_info_df$clusters <- sample1_info_df$clusters - 1
+  plot_sample_genes <- ggplot(sample_info_df, aes(x = factor(clusters), y = detected_genes, fill = factor(clusters))) + 
+    geom_violin() + 
+    geom_jitter(height = 0.1, width = 0.08) + 
+    theme_classic() + 
+    ggtitle('detected genes') + ylim(0, 10000)
+  
+  p <- list(plot_sample_mito = plot_sample_mito, plot_sample_ribo = plot_sample_ribo, plot_sample_genes = plot_sample_genes)
+  
+  return(p)
+}
 
-# now we make the plots 
-plot_sample1_mito <- ggplot(sample1_info_df, aes(x = factor(clusters), y = mito_percentage, fill = factor(clusters))) + geom_violin() + geom_jitter(height = 0.1, width = 0.08) + theme_classic() + ggtitle('mitochondrial content')
 
-plot_sample1_ribo <- ggplot(sample1_info_df, aes(x = factor(clusters), y = ribo_percentage, fill = factor(clusters))) + geom_violin() + geom_jitter(height = 0.1, width = 0.08) + theme_classic() + ggtitle('ribosomal content') + ylim(0, 40)
-
-plot_sample1_genes <- ggplot(sample1_info_df, aes(x = factor(clusters), y = detected_genes, fill = factor(clusters))) + geom_violin() + geom_jitter(height = 0.1, width = 0.08) + theme_classic() + ggtitle('detected genes') + ylim(0, 10000)
-
-##################################
-
-# sample2 (sample two)
-clusters <- qc_sample2$seurat_clusters
-mito_percentage <- sce_sample2$subsets_mito_percent
-ribo_percentage <- sce_sample2$subsets_ribo_percent
-detected_genes <- sce_sample2$detected
-
-# make a df from them 
-sample2_info_df <- as.data.frame(cbind(clusters, mito_percentage, ribo_percentage, detected_genes))
-
-# df makes 0 turn into 1, so subtract 1 from each row of the clusters 
-sample2_info_df$clusters <- sample2_info_df$clusters - 1
-
-# now we make the plots 
-plot_sample2_mito <- ggplot(sample2_info_df, aes(x = factor(clusters), y = mito_percentage, fill = factor(clusters))) + geom_violin() + geom_jitter(height = 0.1, width = 0.08) + theme_classic() + ggtitle('mitochondrial content')
-
-plot_sample2_ribo <- ggplot(sample2_info_df, aes(x = factor(clusters), y = ribo_percentage, fill = factor(clusters))) + geom_violin() + geom_jitter(height = 0.1, width = 0.08) + theme_classic() + ggtitle('ribosomal content') + ylim(0, 40)
-
-plot_sample2_genes <- ggplot(sample2_info_df, aes(x = factor(clusters), y = detected_genes, fill = factor(clusters))) + geom_violin() + geom_jitter(height = 0.1, width = 0.08) + theme_classic() + ggtitle('detected genes') + ylim(0, 10000)
-
+sample1 <- clus_violin(sce_qcs[[1]], pro_sample1$clustered)
+sample2 <- clus_violin(sce_qcs[[2]], pro_sample2$clustered)
 
 ```
 
@@ -576,9 +531,7 @@ plot_sample2_genes <- ggplot(sample2_info_df, aes(x = factor(clusters), y = dete
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 18}
 
-# now organize them
-grid.arrange(plot_sample1_mito, plot_sample1_ribo, plot_sample1_genes, nrow = 1)
-
+grid.arrange(sample1$plot_sample_mito, sample1$plot_sample_ribo, sample1$plot_sample_genes, nrow = 1)
 
 ```
 
@@ -586,9 +539,104 @@ grid.arrange(plot_sample1_mito, plot_sample1_ribo, plot_sample1_genes, nrow = 1)
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 18}
 
-# now organize them
-grid.arrange(plot_sample2_mito, plot_sample2_ribo, plot_sample2_genes, nrow = 1)
+grid.arrange(sample2$plot_sample_mito, sample2$plot_sample_ribo, sample2$plot_sample_genes, nrow = 1)
 
+```
+
+
+### Dimension Reduction showing Number of Detected Reads
+
+We can also visualize number of detected reads on a log-scale with dimension reduction plots. 
+
+```{r include=FALSE}
+
+# get pca coordinates 
+pca_1 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "pca")[,1])
+pca_2 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "pca")[,2])
+pca_3 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "pca")[,3])
+
+# get tsne coordinates 
+tsne_1 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "tsne")[,1])
+tsne_2 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "tsne")[,2])
+tsne_3 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "tsne")[,3])
+
+# get umap coordinates 
+umap_1 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "umap")[,1])
+umap_2 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "umap")[,2])
+umap_3 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "umap")[,3])
+
+# add information on number of detected reads
+umi_df <- GetAssayData(object = pro_sample1$clustered, slot = "counts") %>% colSums() %>% log()
+
+# make dfs 
+df_tsne <- data.frame(tsne_1, tsne_2, tsne_3)
+df_tsne$cluster <- as.factor(pro_sample1$clustered$seurat_clusters)
+df_tsne$reads <- umi_df
+
+df_pca <- data.frame(pca_1, pca_2, pca_3)
+df_pca$cluster <- as.factor(pro_sample1$clustered$seurat_clusters)
+df_pca$reads <- umi_df
+
+df_umap <- data.frame(umap_1, umap_2, umap_3)
+df_umap$cluster <- as.factor(pro_sample1$clustered$seurat_clusters)
+df_umap$reads <- umi_df
+
+```
+
+
+
+```{r include=FALSE}
+
+reads_plot <- function(df, dim){
+  if(dim==2){
+    p <- plot_ly(data = df,
+        x = ~df[,1], y = ~df[,2],
+        opacity = 1,
+        color = ~reads,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 3), 
+        hovertext = paste("log(Reads):", df$reads)) %>% 
+  layout(legend= list(itemsizing='constant'))
+  } else{
+    p <- plot_ly(data = df,
+        x = ~df[,1], y = ~df[,2], z = ~df[,3],
+        opacity = 1,
+        color = ~reads,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3), 
+        hovertext = paste("log(Reads):", df$reads)) %>% 
+  layout(legend= list(itemsizing='constant'))
+  }
+  return(p)
+}
+
+
+```
+
+
+#### PCA
+```{r}
+
+reads_plot(df=df_pca, dim=2)
+reads_plot(df=df_pca, dim=3)
+
+```
+
+#### t-SNE
+```{r}
+
+reads_plot(df=df_tsne, dim=2)
+reads_plot(df=df_tsne, dim=3)
+
+```
+
+#### UMAP
+```{r}
+
+reads_plot(df=df_umap, dim=2)
+reads_plot(df=df_umap, dim=3)
 
 ```
 
