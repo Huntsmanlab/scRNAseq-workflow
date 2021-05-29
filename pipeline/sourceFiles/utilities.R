@@ -29,7 +29,7 @@ suppressPackageStartupMessages({
   library(batchelor)
   library(edgeR)
   library(limma)
-  library(annotables)
+  #library(annotables)
   library(org.Hs.eg.db)
   library(EnsDb.Hsapiens.v75)
   library(AnnotationDbi)
@@ -38,7 +38,7 @@ suppressPackageStartupMessages({
   library(DT)
   library(grid)
   library(ggplotify)
-  library(EnhancedVolcano)
+  #library(EnhancedVolcano)
   library(ggrepel)
   library(glue)
   library(fgsea)
@@ -185,6 +185,16 @@ master_cell_types <- c("B cells",
                        "T cells",
                        "Vascular smooth muscle cells", 
                        "Cluster2_like")
+master_cell_types_GC <- c("granulosa_cells",
+                          "theca_cells",
+                          "mesothelial_cells",
+                          "stromal_fibroblast_cells",
+                          "endothelial_cells",
+                          "plasma_cells",
+                          "epithelial_cells",
+                          "lymphocyte_cells",
+                          "macrophage_cells",
+                          "other")
 
 master_color_palette <- c(
   "cyan2", # red

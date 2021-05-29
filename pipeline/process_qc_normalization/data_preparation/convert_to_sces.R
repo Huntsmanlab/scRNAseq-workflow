@@ -1,4 +1,4 @@
-convert_to_sces <- function(path_to_10X, id, output_file_name) {
+convert_to_sces <- function(path_to_10X, id) {
   
   print("Started converting 10X output to an sce object.")
   
@@ -34,7 +34,7 @@ convert_to_sces <- function(path_to_10X, id, output_file_name) {
   names(rowData(sce))[location] <- 'NA'
   
   # calculate the QC metrics here. this is QC metrics BEFORE eliminating any low quality cells. 
-  # we do eliminating in the qc script. 
+  # we do elimination in the qc script. 
   # regardless of the method we choose to remove the low quality cells, we need to do this step. 
   # addPerCellQC calculates the QC metrics and adds the data to the colData of our sce. 
   
@@ -52,8 +52,6 @@ convert_to_sces <- function(path_to_10X, id, output_file_name) {
   sce <- addPerCellQC(sce, subsets = feature_ctrls)
   
   print("Finished converting 10X output to an sce object.")
-  
-  # saveRDS(sce, file = output_file_name) #save the sce object we made in this function 
   
   return(sce) # return the sce object to be used in the next step
   
