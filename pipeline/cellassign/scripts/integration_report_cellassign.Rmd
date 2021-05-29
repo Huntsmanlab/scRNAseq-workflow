@@ -40,8 +40,8 @@ paths_list <- as.list(unlist(strsplit(paths, ' '))) # separate the long string i
 
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
-source(here('pipeline', 'cellassign', 'create_marker_matrix.R'))
-source(here('pipeline', 'cellassign', 'assign_cell_type.R'))
+source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix.R'))
+source(here('pipeline', 'cellassign', 'scripts', 'assign_cell_type.R'))
 ```
 
 ```{r include = FALSE}
