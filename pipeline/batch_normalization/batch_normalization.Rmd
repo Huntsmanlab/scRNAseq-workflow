@@ -6,6 +6,9 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
   html_document:
     code_folding: hide
+    toc: true
+    toc_depth: 4
+    toc_float: true
 
 params:
   ids: 'ids'
@@ -27,8 +30,8 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 ```
 
 ```{r include = FALSE, message = FALSE}
-
-# lol <- list('/huntsman/amunzur/scRNAseq-workflow/../data/clustered/sce/DH7/sce_clus.rds', '/huntsman/amunzur/scRNAseq-workflow/../data/clustered/sce/DH24/sce_clus.rds')
+# For testing purposes:
+# paths <- list('/huntsman/harpcheng/data/clustered/sce/DH21/sce_clus.rds', '/huntsman/harpcheng/data/clustered/sce/DH21_control/sce_clus.rds')
 
 # snakemake passes the input files as one string separated by a space. we need to divide them into separate lists: 
 paths <- as.list(unlist(strsplit(params$path_to_sce_clus[[1]], ' '))) 
@@ -48,13 +51,7 @@ sces <- lapply(sces, function(sce) sce[universe, ])
 sces <- do.call(multiBatchNorm, sces)
 
 # add a prefix to colnames of each sce 
-i = 1 
-while (i <= length(sces)) {
-  colnames(sces[[i]]) <- paste(unique(sces[[i]]$id), colnames(sces[[i]]), sep = ".")
-
-  i = i + 1
-  
-}
+for (i in 1:length(sces)) colnames(sces[[i]]) <- paste(unique(sces[[i]]$id), colnames(sces[[i]]), sep = ".")
 
 # find highly variable genes  
 vars <- lapply(sces, function(sce) modelGeneVar(sce))

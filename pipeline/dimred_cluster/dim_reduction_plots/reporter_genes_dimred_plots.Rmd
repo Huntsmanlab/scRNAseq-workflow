@@ -1,0 +1,139 @@
+---
+title: "UMAP showing reporter genes "
+subtitle: "DH30_GC_WTFOXL2_new"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+
+params:
+  sce_clus: '/huntsman/harpcheng/data/clustered/sce/DH30_GC_wtFOXL2_new/sce_clus.rds'
+  dm_path: 'dm_path'
+
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r include = FALSE}
+
+# source some files 
+source("/huntsman/amunzur/scRNAseq-workflow/pipeline/sourceFiles/utilities.R")
+
+```
+
+```{r}
+
+sce <- readRDS(params$sce_clus)
+
+colors_list <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494", "#B3B3B3", '#E2201C', '#1D91C0', '#6B3E9A', '#32A028', "deepskyblue", "black")
+
+min_cluster <- as.numeric(min(as.vector(sce$cluster)))
+max_cluster <- max(as.numeric(as.character(sce$cluster)))
+
+cluster_name <- min_cluster:max_cluster
+
+colors_list <- colors_list[1:max_cluster]
+
+```
+
+```{r}
+
+# get umap coordinates 
+umap_1 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["UMAP"]][, 1])
+umap_2 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["UMAP"]][, 2])
+umap_3 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["UMAP"]][, 3])
+
+# make dfs 
+df_umap <- data.frame(umap_1, umap_2, umap_3)
+df_umap$cluster <- as.factor(sce$cluster)
+
+```
+
+```{r, include=FALSE}
+
+#sce_c134w <- convert_to_sces("/huntsman/amunzur/huntsmandata/raw/DH30_GC_C134WFOXL2", ids[[1]])
+#sce_c134w_clus <- readRDS("/huntsman/amunzur/data/clustered/sce/DH30_GC_C134WFOXL2/sce_clus.rds")
+#sce_wt <- convert_to_sces("/huntsman/amunzur/huntsmandata/raw/DH30_GC_wtFOXL2", ids[[2]])
+#sce_wt_clus <- readRDS("/huntsman/amunzur/data/clustered/sce/DH30_GC_wtFOXL2/sce_clus.rds")
+#ncol(sce_wt_clus)
+
+count <- counts(sce)
+gfp_idx <- grep("egfp",rownames(count), ignore.case = TRUE)
+count_eGFP <- count[gfp_idx,]
+count_eGFP[count_eGFP!=0] %>% length()
+length(count_eGFP)
+
+sce@assays@data$counts[gfp_idx, ]
+
+labels <- ifelse(count_eGFP==0, "absent", "present") %>% as.vector()
+df_umap$reporter <- as.factor(labels)
+df_umap$reporter_count <- count_eGFP
+
+rownames(sce)[16]
+sce@colData$eGFP <- ifelse(count_eGFP==0, "eGFP_negative", "eGFP_positive")
+
+
+sce_eGFP@colData[sce_eGFP@colData$eGFP=="eGFP_positive",] 
+
+```
+
+```{r include = FALSE}
+
+# UMAP
+umap_3d <- plot_ly(data = df_umap,
+        x = ~umap_1, y = ~umap_2, z = ~umap_3,
+        opacity = 1,
+        color = ~reporter,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 4), 
+        colors = c("#66C2A5", "pink3")) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+umap_2d <- plot_ly(data = df_umap,
+        x = ~umap_1, y = ~umap_2,
+        opacity = 1,
+        color = ~reporter,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 6), 
+        colors =  c("#66C2A5", "pink3")) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+umap_3d_count <- plot_ly(data = df_umap,
+        x = ~umap_1, y = ~umap_2, z = ~umap_3,
+        opacity = 1,
+        color = ~reporter_count,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 4)) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+umap_2d_count <- plot_ly(data = df_umap,
+        x = ~umap_1, y = ~umap_2,
+        opacity = 1,
+        color = ~reporter_count,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 6)) %>% 
+  layout(legend= list(itemsizing='constant'))
+
+```
+
+# UMAP
+```{r}
+
+umap_2d
+umap_3d
+umap_2d_count
+umap_3d_count
+
+```
+
+
+
+
+
+
+
+
+
+

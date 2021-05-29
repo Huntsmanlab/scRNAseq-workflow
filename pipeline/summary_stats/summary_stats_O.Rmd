@@ -31,7 +31,7 @@ source(here('pipeline', 'summary_stats', 'qcPlots.R')) # has summary stats speci
 ```{r include = FALSE}
 
 #extract the name_list from the parameters. we use the name list later on while making graphs. 
-ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+ids <- strsplit(params$ids, "[-/ ]")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
 dh_organoid_ids <- list(ids[[1]], ids[[2]])
 ```
 

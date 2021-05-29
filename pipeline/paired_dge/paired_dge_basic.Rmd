@@ -111,7 +111,7 @@ outputs <- plot_markers(paths, ntop = 50, negative_control = FALSE)
 
 colnames(outputs$markers_all)[5] <- "logFC"
 
-saveRDS(outputs, file = params$output_path_paired)
+#saveRDS(outputs, file = params$output_path_paired)
 
 ```
 

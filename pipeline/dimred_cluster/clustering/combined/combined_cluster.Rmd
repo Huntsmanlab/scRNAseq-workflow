@@ -22,7 +22,7 @@ When we have this data for both samples, we follow these steps:
 
 1. find integration anchors, these are cells that have similar biological state  
 across samples  
-2. integrate the the samples into one larger sample  
+2. integrate samples into one larger sample  
 3. run dimension reduction analyses on the larger sample as well as a new clustering analysis  
 (best number of clusters is again decided by seurat)
 
@@ -44,9 +44,9 @@ dh_organoid_ids <- list(ids[[1]], ids[[2]])
 ```
 
 ```{r include = FALSE}
-
 # snakemake passes the paths as one long string separated by spaces. take care of that here: 
 sce_clus_paths <- as.list(unlist(strsplit(params$path_to_sce_clus_list, ' '))) 
+
 # load the sce objects we will be working on 
 sce_list <- lapply(sce_clus_paths, function(some_path) readRDS(some_path))
 
@@ -55,21 +55,22 @@ names(sce_list) <- dh_organoid_ids
 ```
 
 ### We fist visualize the reduced dim plots (tsne and umap) separately for each sample.   
-#### First data set 
+
 
 ```{r include = FALSE}
-
+#### First data set 
 a <- plotTSNE(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', dh_organoid_ids[[1]], sep = '_'))
 b <- plotUMAP(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', dh_organoid_ids[[1]], sep = '_'))
 
 # plotPCA(sce_list[[1]], colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', dh_organoid_ids[[1]], sep = '_'))
 ```
 
-#### Second data set  
-```{r include = FALSE}
 
+```{r include = FALSE}
+#### Second data set  
 c <- plotTSNE(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', dh_organoid_ids[[2]], sep = '_'))
 d <- plotUMAP(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('UMAP', dh_organoid_ids[[2]], sep = '_'))
+
 # plotPCA(sce_list[[2]], colour_by="cluster", text_by="cluster") + ggtitle(paste('PCA', dh_organoid_ids[[2]], sep = '_'))
 ```
 
@@ -81,7 +82,7 @@ gridExtra::grid.arrange(a, b, c, d, nrow = 2)
 
 Frequency table: 
 This table shows the frequency of cell id types in each sample.
-```{r echo = FALSE, message = FALSE}
+```{r echo = FALSE, message = FALSE, warning=FALSE}
 
 # find the common genes between the sces 
 universal <- Reduce(intersect, list(rownames(sce_list[[1]]), rownames(sce_list[[2]])))
@@ -117,6 +118,9 @@ if (dim(DH.combined)[[2]] > 200) {
   # seurat uses those samples to normalize the data. 
   # when we have less than 200 cells, we will use other normalization methods for batch normalization 
   samples.anchors <- FindIntegrationAnchors(object.list = reference.list, dims = 1:30, anchor.features = 3000 )
+  # NOTE: If receive errors for dataset containing small number of cells: Error in nn2(data = cn.data2[nn.cells2, ], query = cn.data1[nn.cells1,  :
+  # Cannot find more nearest neighbours than there are points
+  # add an extra argument 'k.filter=NA' to FindIntegrationAnchors().
   
   # integrate the two data sets 
   samples.integrated <- IntegrateData(anchorset = samples.anchors, dims = 1:30, features.to.integrate = rownames(DH.combined))

@@ -28,6 +28,11 @@ args <- parser$parse_args()
 
 
 ############################################################################################################################
+#path_to_sce_cas=list("/huntsman/harpcheng/aGCT/data/DH30_GC_wtFOXL2_new/sce_cas.rds", 
+#                     "/huntsman/harpcheng/aGCT/data/DH30_GC_C134WFOXL2_new/sce_cas.rds")
+#path_to_combined_sce="/huntsman/harpcheng/aGCT/data/combined/uncorrected.rds"
+#integrated_object_name="/huntsman/harpcheng/aGCT/data/combined/corrected.rds"
+#ids_integration="DH30_GC_wtFOXL2_new-DH30_GC_C134WFOXL2_new"
 
 
 whatagreatfunction <- function(path_to_sce_cas, 
@@ -67,7 +72,7 @@ whatagreatfunction <- function(path_to_sce_cas,
   }
   
   # convert them all to seurat objects 
-  seurats <- lapply(sces, function(sce) CreateSeuratObject(counts = counts(sce), min.cells = 3, min.features = 200)) 
+  seurats <- lapply(sces, function(sce) CreateSeuratObject(counts = counts(sce)))#, min.cells = 3, min.features = 200)) 
   
   # normalize each sample using seurat's methods
   seurats <- lapply(seurats, function(seurat) NormalizeData(seurat, verbose = FALSE))
@@ -79,7 +84,7 @@ whatagreatfunction <- function(path_to_sce_cas,
   id.features <- SelectIntegrationFeatures(object.list = seurats, nfeatures = nrow(seurats[[1]]))
   
   # make a reference list for the next step  
-  anchors <- FindIntegrationAnchors(object.list = seurats, dims = 1:30)
+  anchors <- FindIntegrationAnchors(object.list = seurats, dims = 1:30, k.filter = NA)
   
   # find the common genes 
   total.genes <- lapply(seurats, function(seurat) rownames(seurat@assays$RNA@counts))
@@ -103,8 +108,12 @@ whatagreatfunction <- function(path_to_sce_cas,
   
   # add cell types to metadata 
   # integrated <- AddMetaData(integrated, cell_types, col.name = 'cell_types') # this one doesnt work for some reason, but code below does
+  celltype1 <- sces[[1]]$cell_type
+  celltype2 <- sces[[2]]$cell_type
+  combined_celltypes <- c(celltype1, celltype2)
+  
   Idents(integrated) <- "cluster"
-  integrated$cell_types <- cell_types
+  integrated$cell_types <- combined_celltypes
   
   # the default assay is the new one 
   DefaultAssay(integrated) <- "integrated"
