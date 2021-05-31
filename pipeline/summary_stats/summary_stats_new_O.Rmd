@@ -546,7 +546,7 @@ grid.arrange(sample2$plot_sample_mito, sample2$plot_sample_ribo, sample2$plot_sa
 
 ### Dimension Reduction showing Number of Detected Reads
 
-We can also visualize number of detected reads on a log-scale with dimension reduction plots. 
+We can also visualize total number of detected reads on a log-scale with dimension reduction plots. 
 
 ```{r include=FALSE}
 

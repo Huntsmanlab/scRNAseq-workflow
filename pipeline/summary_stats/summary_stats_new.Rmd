@@ -492,7 +492,7 @@ grid.arrange(Dimplot1, Dimplot2, nrow = 1)
 
 
 
-## Visualize Clusters with Violin PLots
+## Visualize Clusters with Violin Plots
 
 Now, we will look into the contents of these clusters and visualize these values in the violin plots below.  
 
