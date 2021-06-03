@@ -35,8 +35,8 @@ ids <- strsplit(params$ids, "-")[[1]] %>% as.list(c(unlist(ids)))
 # save sce corrected for cell cycle in 'cycle_corrected' slot.
 
 # load sce with cell cycle information if object already exists; otherwise, run cyclone
-sce_cell_cycle <- lapply(ids, function(id) readRDS(here('..', 'data', 'cell_cycle', id, 'cell_cycle_label.rds')))
-sce_cell_cycle_corrected <-  lapply(ids, function(id) readRDS(here('..', 'data', 'cell_cycle', id, 'cell_cycle_corrected.rds')))
+sce_cell_cycle <- lapply(ids, function(id) here('..', 'data', 'cell_cycle', id, 'cell_cycle_label.rds'))
+sce_cell_cycle_corrected <-  lapply(ids, function(id) here('..', 'data', 'cell_cycle', id, 'cell_cycle_corrected.rds'))
 
 sces <- list()
 for(i in 1:length(ids)){
