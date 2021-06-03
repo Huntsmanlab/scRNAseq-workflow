@@ -154,14 +154,6 @@ theme_amunzur <- theme(
 
 
 
-
-
-
-
-
-
-
-
 # CELL ASSIGN COLORS
 library(RColorBrewer)
 n <- 20
@@ -169,7 +161,7 @@ qual_col_pals <-  brewer.pal.info[brewer.pal.info$category == 'qual',]
 most_distinct_color_palette <- unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
 
 # 14 colors, one color for each cell type. cell types given in alphabetical order 
-master_cell_types <- c("B cells",
+master_cell_types_old <- c("B cells",
                        "Cytotoxic T cells",
                        "Endometrial stem cells",
                        "Endothelial cells",            
@@ -185,36 +177,40 @@ master_cell_types <- c("B cells",
                        "T cells",
                        "Vascular smooth muscle cells", 
                        "Cluster2_like")
-master_cell_types_GC <- c("granulosa_cells",
-                          "theca_cells",
-                          "mesothelial_cells",
-                          "stromal_fibroblast_cells",
-                          "endothelial_cells",
-                          "plasma_cells",
+
+master_cell_types <- c("endothelial_cells",
+                       "epithelial_cells",
+                       "lymphocyte_cells",
+                       "macrophage_cells",
+                       "other",
+                       "plasma_cells",
+                       "stromal_fibroblast_cells")
+
+
+master_cell_types_GC <- c("endothelial_cells",
                           "epithelial_cells",
+                          "granulosa_cells",
                           "lymphocyte_cells",
                           "macrophage_cells",
-                          "other")
+                          "mesothelial_cells",
+                          "other",
+                          "plasma_cells",
+                          "stromal_fibroblast_cells",
+                          "theca_cells")
 
-master_color_palette <- c(
-  "cyan2", # red
-  "firebrick1",
-  "green3", # purple
-  "indianred1",
-  "lightskyblue",
-  "gold1", # lt pink
-  "plum2",
-  "springgreen",
-  "darkslateblue",
-  'royalblue1',
-  'chartreuse1',
-  'mediumorchid2',
-  'khaki1',
-  "lawngreen",
-  "darkmagenta",
-  'thistle4')
+master_color_palette <- c("gold1", 
+                          "lightskyblue",
+                          "darkslateblue",
+                          'thistle4',
+                          'mediumorchid2',
+                          "indianred1",
+                          "plum2",
+                          "springgreen",
+                          'royalblue1',
+                          'chartreuse1',
+                          "darkmagenta")
 
-master_color_palette <- colorRampPalette(brewer.pal(8, "Set2"))(20)
+# master_color_palette <- colorRampPalette(brewer.pal(8, "Set1"))(20)
 
 # to visualize these colors 
 # pie(rep(1, 15), col = master_color_palette)
@@ -223,7 +219,7 @@ master_color_palette <- colorRampPalette(brewer.pal(8, "Set2"))(20)
 visualize_cellassign <- function(seurat_object, reduction_type, group_by, master_color_palette, master_cell_types){
   
   # find cell types present in the seurat object, sort them alphabetically
-  unique_cell_types <- as.vector(sort(unique(seurat_object$cell_types)))
+  unique_cell_types <- as.vector(sort(unique(seurat_object$cell_type)))
   
   # find common cell types between our lists and the master cell type list 
   common <- intersect(unique_cell_types, master_cell_types)
@@ -778,3 +774,108 @@ fMarkersSampling <- function(sce, pivot_cluster, target_group, randomSubsets) {
   
   return(U)                                                                       # Return a matrix of gene ranks in order of p-value by sample
 }
+
+########################################################################################################################
+
+# integrate samples with seurat integration; returns integrated sce and combined sce without batch normalization
+
+seurat_integrate <- function(path_to_sce_clus, 
+                             ids_integration) {
+  
+  id.list <- ids_integration
+  
+  id.list <- strsplit(id.list, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+  id.list <- as.list(c(unlist(list(id.list))))
+  id.list <- do.call(list, id.list)  
+  
+  id.orig <- id.list
+  
+  # lets start! 
+  # load the data
+  sces <- lapply(path_to_sce_clus, function(path) readRDS(path))
+  
+  # subset to common genes across a group of sces 
+  sces <- intersect_all(sces)
+  
+  # add the id number in front of cell barcodes
+  repeated <- lapply(sces, function(sce) dim(sce)[[2]]) # extract cell numbers from each sce
+  id.list <- mapply(rep, id.list, repeated) # repeat the cell ids as many times as the cell number 
+  
+  # sometimes different samples use same barcodes, we will append the id name in front of the barcodes to avoid that 
+  # we use a period to separate the id and the barcode because some ids use '_' already 
+  for (i in 1:length(sces)) {
+    colnames(sces[[i]]) <- paste(id.list[[i]], colnames(sces[[i]]), sep = '.')
+  }
+  
+  # convert them all to seurat objects 
+  # note that we aren't using the normalized data since we will use seurat's normalization method 
+  # counts(sce) gives raw counts
+  seurats <- lapply(sces, function(sce) CreateSeuratObject(counts = counts(sce), min.cells = 3, min.features = 200)) 
+  
+  # normalize each sample using seurat's methods
+  seurats <- lapply(seurats, function(seurat) NormalizeData(seurat, verbose = FALSE))
+  
+  # find variable features for each of our seurat objects 
+  seurats <- lapply(seurats, function(seurat) FindVariableFeatures(seurat, selection.method = "vst", nfeatures = 2000))
+  
+  # select the number of features to integrate 
+  id.features <- SelectIntegrationFeatures(object.list = seurats, nfeatures = nrow(seurats[[1]]))
+  
+  # make a reference list for the next step  
+  anchors <- FindIntegrationAnchors(object.list = seurats, dims = 1:30, k.filter = NA)
+  
+  # find the common genes 
+  total.genes <- lapply(seurats, function(seurat) rownames(seurat@assays$RNA@counts))
+  common.genes <- Reduce(f = intersect, x = total.genes)
+  
+  # now merge the data, passing the common genes help us only integrate those and disregard the other genes 
+  integrated <- IntegrateData(anchorset = anchors, dims = 1:30, features.to.integrate = common.genes)
+  
+  # now we will add the sample ids each sample is associated with 
+  sample_names <- strsplit(colnames(integrated), '.', fixed = TRUE)
+  sample_names <- lapply(sample_names, function(element) as.list(element))
+  sample_names <- lapply(sample_names, function(element) element[[1]])
+  
+  sample_names <- do.call(rbind, sample_names)
+  rownames(sample_names) <- colnames(integrated)
+  
+  # add this to the metadata 
+  integrated <- AddMetaData(integrated, sample_names, col.name = 'id')
+  
+  # the default assay is the new one 
+  DefaultAssay(integrated) <- "integrated"
+  
+  # then some standard workflow for visualization and dim reduction 
+  integrated <- ScaleData(integrated, verbose = FALSE)
+  set.seed(1998)
+  integrated <- RunPCA(integrated, verbose = FALSE)
+  integrated <- RunTSNE(integrated, dims = 1:30, dim.embed = 3, seed.use = 300, perplexity = 20)
+  integrated <- RunUMAP(integrated, dims = 1:30, n.components = 3L, seed.use = 1000)
+  
+  # clustering
+  integrated <- FindNeighbors(integrated, dims = 1:10)
+  integrated <- FindClusters(integrated, resolution = 0.5)
+  
+  
+  # UNCORRECTED DATA
+  # here we do the combined but uncorrected sample, with the batch effects
+  # load the normalized data 
+  sces_norm <- lapply(path_to_sce_clus, function(path) readRDS(path))
+  
+  sces_norm <- intersect_all(sces_norm) # subset to common genes 
+  combined <- do.call(combine_sces, sces_norm) # combine the objects by doing a simple r bind 
+  
+  # some dim reduction 
+  set.seed(1564)
+  combined <- runPCA(combined)
+  combined <- runTSNE(combined)
+  combined <- runUMAP(combined)
+  
+  out <- list(corrected = integrated, uncorrected = combined)
+  return(out)
+  
+} # end of function 
+
+
+
+

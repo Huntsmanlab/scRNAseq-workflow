@@ -3,8 +3,7 @@
 # running a clustering analysis on the combined sample 
 # run dim reduction plots on combined plots 
 # run DGE analysis across samples, we will need to remove batch effects for that. we can integrate data sets first here, then split if needed. 
-# data here is saved into the data/integrated folder/<name of integrated samples>
-# this is the version integrated into snakemake 
+
 
 # load a few necessary things 
 library(here)
@@ -28,12 +27,6 @@ args <- parser$parse_args()
 
 
 ############################################################################################################################
-#path_to_sce_cas=list("/huntsman/harpcheng/aGCT/data/DH30_GC_wtFOXL2_new/sce_cas.rds", 
-#                     "/huntsman/harpcheng/aGCT/data/DH30_GC_C134WFOXL2_new/sce_cas.rds")
-#path_to_combined_sce="/huntsman/harpcheng/aGCT/data/combined/uncorrected.rds"
-#integrated_object_name="/huntsman/harpcheng/aGCT/data/combined/corrected.rds"
-#ids_integration="DH30_GC_wtFOXL2_new-DH30_GC_C134WFOXL2_new"
-
 
 whatagreatfunction <- function(path_to_sce_cas, 
                                path_to_combined_sce, 
@@ -72,7 +65,7 @@ whatagreatfunction <- function(path_to_sce_cas,
   }
   
   # convert them all to seurat objects 
-  seurats <- lapply(sces, function(sce) CreateSeuratObject(counts = counts(sce)))#, min.cells = 3, min.features = 200)) 
+  seurats <- lapply(sces, function(sce) CreateSeuratObject(counts = counts(sce), min.cells = 3, min.features = 200))
   
   # normalize each sample using seurat's methods
   seurats <- lapply(seurats, function(seurat) NormalizeData(seurat, verbose = FALSE))
@@ -104,10 +97,7 @@ whatagreatfunction <- function(path_to_sce_cas,
   # add this to the metadata 
   integrated <- AddMetaData(integrated, sample_names, col.name = 'id')
   
-
-  
   # add cell types to metadata 
-  # integrated <- AddMetaData(integrated, cell_types, col.name = 'cell_types') # this one doesnt work for some reason, but code below does
   celltype1 <- sces[[1]]$cell_type
   celltype2 <- sces[[2]]$cell_type
   combined_celltypes <- c(celltype1, celltype2)
@@ -131,8 +121,9 @@ whatagreatfunction <- function(path_to_sce_cas,
   
   # save the data
   saveRDS(integrated, file = integrated_object_name) # corrected data
-  # saveRD(integrated, file = "/huntsman/amunzur/data/misc/important_data.gzip", compress = TRUE)
+
   
+  # UNCORRECTED DATA
   # compute the combined but uncorrected object, only fix the sequencing depth 
   # load the normalized data 
   sces <- lapply(path_to_sce_cas, function(path) readRDS(path))

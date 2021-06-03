@@ -6,104 +6,104 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
   html_document:
     code_folding: hide
+    toc: true
+    toc_depth: 4
 
 params:
   ids_integration: 'ids_integration' # write here the ids you want to integrate, separate by '-'
   id_type: 'id_type' # here you can write a quick summary of what these ids_integration are, like tissue types etc. 
-  sce_cas_list: 'sce_cas_list'
-  uncorrected_object: 'uncorrected_object'
-  integrated_object: 'integrated_object'
+  sample_type: 'sample_type'  # if granulosa samples, change to "GC"; if .. samples, change to ..
+  sce_clus: 'sce_clus'
+  cell_type_csv: 'cell_type_csv'
+  sce_cas_path: 'sce_cas_path'
+  seurat_corrected: 'seurat_corrected'
 
 ---
 
-#### In this report we show the results of cell assign runs on the samples. We include some dim reduction plots with cell types and clustering information. We first show results of cell assign run on integrated sample, then we give the plots for individual tumours.   
+In this report we show the results of cell assign runs on individual samples as well as on integrated and batch corrected samples. We include some dim reduction plots with cell types and clustering information. We first show results of cell assign run on individual samples, then we give the plots for integrated samples.   
 
 **Cell assign is able to detect the following cell types:**  
-* Blymphocyte  
-* Tlymphocyte  
-* CytotoxicT  
-* Monocyte  
-* Epithelial  
-* Myofibroblast  
-* Vascular Smooth Muscle  
-* Endothelial  
-* PlasmaB  
-* Epithelial Ciliated  s
-* Endometrial Stem  
-* Mesenchymal Stem  
-* Mesenchymal cells  
+* mesothelial_cell
+* stromal_fibroblast_cells
+* endothelial_cells
+* plasma_cells
+* epithelial_cells
+* lymphocyte_cells
+* macrophage_cells
+* other
 
 ```{r include = FALSE, message = FALSE}
 
-paths <- params$sce_cas_list
-paths_list <- as.list(unlist(strsplit(paths, ' '))) # separate the long string into individual paths 
-
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'cellassign', 'scripts', 'run_cellassign.R'))
 source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix.R'))
-source(here('pipeline', 'cellassign', 'scripts', 'assign_cell_type.R'))
+
 ```
+
 
 ```{r include = FALSE}
 
-# get separate ids from the params$ids_integration
+# get separate ids 
 id.list <- strsplit(params$ids_integration, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
 id.list <- as.list(c(unlist(list(id.list))))
 
+# snakemake passes the input files as one string separated by a space. we need to divide them into separate lists: 
+sce_clus <- as.list(unlist(strsplit(params$sce_clus[[1]], ' '))) 
+cell_type_csv <-  as.list(unlist(strsplit(params$cell_type_csv[[1]], ' '))) 
+sce_cas_path <- as.list(unlist(strsplit(params$sce_cas_path[[1]], ' '))) 
+
+# load sce_cas if object already exists; or run cellassign
+sce_cas <- list()
+for(i in 1:length(id.list)){
+  if(file.exists(sce_cas_path[[i]])==TRUE){
+    sce_cas[[i]] <- readRDS(sce_cas_path[[i]])
+  } else {
+    # run cell assign and get sce with cell type information
+    sce_cas[[i]] <- run_cellassign(sce_clus[[i]], params$sample_type, cell_type_csv[[i]], sce_cas_path[[i]])
+  }
+}
+
+
+# load seurat batch corrected objects
+integrated <- readRDS(params$seurat_corrected)
+
+# get marker matrix and sort 
+marker_mat <- create_marker_mat("other")
+master_cell_types <- colnames(marker_mat) %>% str_sort()
 ```
 
+
+## Individual samples  
+
+### Clustering
+Number of cells in each cluster is summarized in the tables below.
+
+```{r, results='asis'}
+
+t <- list()
+for(i in 1:length(sce_cas)){
+  t[[i]] <- table(sce_cas[[i]]$cluster) %>% 
+    knitr::kable(caption = paste(id.list[[i]], ': Number of cells in each cluster'), 
+                 col.names = c('cluster', 'number of cells')) %>% 
+    kable_styling(full_width = F)
+  
+  print(t[[i]])
+}
+
+```
+
+
+### Dim reduction plots
+Running a clustering algorithm on individual samples can help better understand possible sub cell populations in these samples. 0.5 was chosen for resolution. We show cell type and clustering results side by side. Clustering plots are given on the left side and cell assign results are given on the right side for each sample.  
 
 ```{r include = FALSE}
-# we start with the plots for uncorrected samples  
-
-uncorrected <- readRDS(params$uncorrected_object)
-
-# some dim red plots 
-p1 <- plotReducedDim(uncorrected, "TSNE", colour_by = "id") 
-p2 <- plotReducedDim(uncorrected, "UMAP", colour_by = "id") 
-
-```
-
-```{r include = FALSE}
-# now plots for batch corrected (integrated) samples 
-integrated <- readRDS(params$integrated_object)
-
-# some dim red plots, start by preparing the colors we will use 
-
-p3 <- DimPlot(integrated, reduction = 'tsne', group.by = 'id', combine = TRUE) + 
-  ggtitle(paste(params$ids_integration, 'tsne showing sample ids', sep = '/'))
-
-p4 <- visualize_cellassign(integrated, 'tsne', 'cell_types', master_color_palette, master_cell_types) + 
-  ggtitle(paste(params$ids_integration, 'tsne showing cell types', sep = '/'))
-
-p5 <- DimPlot(integrated, reduction = 'umap', group.by = 'id', combine = TRUE) + 
-  ggtitle(paste(params$ids_integration, 'umap showing sample ids', sep = '/'))
-          
-p6 <- visualize_cellassign(integrated, 'umap', 'cell_types', master_color_palette, master_cell_types) + 
-    ggtitle(paste(params$ids_integration, 'umap showing cell types', sep = '/'))
-
-
-```
-
-### Samples **before** integration, tsne and umap  
-In this plots we plot the samples together without any correction on the tsne plot to see how they are positioned. This is helpful visualizing the extent of batch effects.   
-```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 10}
-
-gridExtra::grid.arrange(p1, p2, nrow = 1)
-
-```
-
-```{r include = FALSE}
-
-# load cell assign result
-sce_norm_cas_list <- lapply(paths_list, function(some_path) readRDS(some_path))
 
 # make seurat objects 
-seur_sce_list <- lapply(sce_norm_cas_list, function(sce) as.Seurat(sce)) # make a seurat object 
+seur_sce_list <- lapply(sce_cas, function(sce) as.Seurat(sce)) 
 
 # run clustering and dim reduction analysis
 seur_sce_list <- lapply(seur_sce_list, function(seurat_object) ScaleData(seurat_object))
-
 seur_sce_list <- lapply(seur_sce_list, function(seurat_object) FindVariableFeatures(seurat_object)) 
 
 seur_sce_list <- lapply(seur_sce_list, function(seurat_object) RunPCA(seurat_object, verbose = FALSE))
@@ -113,11 +113,13 @@ seur_sce_list <- lapply(seur_sce_list, function(seurat_object) RunUMAP(seurat_ob
 seur_sce_list <- lapply(seur_sce_list, function(seurat_object) FindNeighbors(seurat_object, dims = 1:10))
 seur_sce_list <- lapply(seur_sce_list, function(seurat_object) FindClusters(seurat_object, resolution = 0.5))
 
-# TO DO LATER 
-# save the seurat objects with the clustering information
 
 # make clustering plots
-clustering_plots_tsne <- lapply(seur_sce_list, function(seurat_object) DimPlot(seurat_object, reduction = "tsne") + ggtitle(paste(unique(seurat_object$id), 'clusters', sep = ' - ')))
+clustering_plots_tsne <- lapply(seur_sce_list, function(seurat_object) DimPlot(seurat_object, reduction = "tsne") + 
+                                  ggtitle(paste(unique(seurat_object$id), 'tSNE: clustering', sep = ' - ')))
+
+clustering_plots_umap <- lapply(seur_sce_list, function(seurat_object) DimPlot(seurat_object, reduction = "umap") + 
+                                  ggtitle(paste(unique(seurat_object$id), 'UMAP: clustering', sep = ' - ')))
 
 # make cell assign plots
 # find which cell types we have, sort them alphabetically 
@@ -133,75 +135,147 @@ idx_list <- lapply(common_list, function(some_list) match(some_list, master_cell
 colors_chosen_list <- lapply(idx_list, function(idx) master_color_palette[idx]) 
 
 # make cell assign plots
-plots_list <- list()
-i <- 1 
-
-while (i <= length(seur_sce_list)){
-  
-  plot <- DimPlot(object = seur_sce_list[[i]],
+plots_list_tsne <- list()
+plots_list_umap <- list()
+for(i in 1:length(seur_sce_list)){
+  plots_list_tsne[[i]] <- DimPlot(object = seur_sce_list[[i]],
               dims = c(1, 2),
               reduction = 'tsne',
               group.by = 'cell_type',
               pt.size = 1.5) +
   scale_color_manual(values = colors_chosen_list[[i]]) +
-  labs(title = paste(unique(seur_sce_list[[i]]$id), 'Cell Assign for scRNAseq Cells', sep = '-'))
-
-  plots_list[[paste(i)]] <- plot # save the plot to the plots list
+  labs(title = paste(unique(seur_sce_list[[i]]$id), 'tSNE: Cell Assign for scRNAseq Cells', sep = ' - '))
   
-  i <- i + 1
-  
+    plots_list_umap[[i]] <- DimPlot(object = seur_sce_list[[i]],
+              dims = c(1, 2),
+              reduction = 'umap',
+              group.by = 'cell_type',
+              pt.size = 1.5) +
+  scale_color_manual(values = colors_chosen_list[[i]]) +
+  labs(title = paste(unique(seur_sce_list[[i]]$id), 'UMAP: Cell Assign for scRNAseq Cells', sep = ' - '))
 }
 
 ```
 
-### Samples **after** integration and cell assign run  
-#### t-SNE plots  
-```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15}
-
-gridExtra::grid.arrange(p3, p4, nrow = 1)
-
-```
-
-#### umap plots  
-```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15}
-
-gridExtra::grid.arrange(p5, p6, nrow = 1)
-
-```
-
-Next we include some clustering and cell type plots. On the left, we show the tSNE plot with clustering information where each cluster is colored with a different color. On the right, cell assign results from the integrated sample is given.
-
-```{r include = FALSE}
-
-integrated <- FindNeighbors(integrated, dims = 1:10)
-integrated <- FindClusters(integrated, resolution = 0.5)
-
-clustering_plot <- DimPlot(integrated, reduction = 'tsne', group.by = 'seurat_clusters', combine = TRUE) + ggtitle(paste(params$ids_integration, 'clustering', sep = ' / '))
-
-cell_type_plot <- visualize_cellassign(integrated, 'tsne', 'cell_types', master_color_palette, master_cell_types) + ggtitle(paste(params$ids_integration, 'cell types', sep = ' / '))
-
-
-```
-
-```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15}
-
-grid.arrange(clustering_plot, cell_type_plot, nrow = 1)
-
-```
-
-### Individual samples  
-
-#### Clustering  
-Running a clustering algorithm on individual samples can help better understand possible sub cell populations in these samples. 0.5 was chosen for resolution. We show cell type and clustering results side by side. Clustering plots (tsne) are given on the left side and cell assign results are given on the right side for each separate sample given.  
-
-```{r echo = FALSE, fig.height = 3.2 * length(plots_list), fig.width = 15, fig.show = 'hold'}
+#### tSNE plots
+```{r echo = FALSE, fig.width = 15, fig.show = 'hold'}
 
 # now we visualize the results based on the number of samples analyzed
 
 for (i in 1:length(clustering_plots_tsne)) {
-  
-  grid.arrange(clustering_plots_tsne[[i]], plots_list[[i]], nrow = 1)
-  
+  grid.arrange(clustering_plots_tsne[[i]], plots_list_tsne[[i]], nrow = 1)
 }
 
 ```
+
+
+#### UMAP plots
+```{r echo = FALSE, fig.width = 15, fig.show = 'hold'}
+
+for (i in 1:length(clustering_plots_tsne)) {
+  grid.arrange(clustering_plots_umap[[i]], plots_list_umap[[i]], nrow = 1)
+}
+
+```
+
+
+
+## Integrated sample
+
+Next, we include some clustering and cell type plots. On the left, we show dim reduction plot with clustering information where each cluster is colored with a different color. On the right, cell assign results from the integrated sample is given.
+
+### Seurat integrated sample
+Below are tsne and umap plots showing cell assignment results for sample integrated and corrected with seurat.
+
+```{r include = FALSE, warning=FALSE}
+# subset to common genes across a group of sces 
+sce_cas <- intersect_all(sce_cas)
+
+# append the id name in front of the barcodes
+for (i in 1:length(sce_cas)) {
+  colnames(sce_cas[[i]]) <- paste(id.list[[i]], colnames(sce_cas[[i]]), sep = '.')
+}
+
+# add cell types to the integrated object
+celltype <- lapply(sce_cas, function(sce) sce$cell_type)
+celltype_barcodes <- lapply(sce_cas, function(sce) colnames(sce))
+celltype_df <- data.frame(cell_type = unlist(celltype))
+rownames(celltype_df) <- unlist(celltype_barcodes)
+integrated <- AddMetaData(integrated, celltype_df, col.name = 'cell_type')
+
+# dim reduction plots
+clustering_plot_tsne <- DimPlot(integrated, reduction = 'tsne', group.by = 'seurat_clusters', combine = TRUE) + 
+  ggtitle(paste(params$ids_integration, 'tSNE - clustering', sep = ': '))
+
+cell_type_plot_tsne <- visualize_cellassign(integrated, 'tsne', 'cell_type', master_color_palette, master_cell_types) + 
+  ggtitle(paste(params$ids_integration, 'tSNE - cell types', sep = ': '))
+
+
+clustering_plot_umap <- DimPlot(integrated, reduction = 'umap', group.by = 'seurat_clusters', combine = TRUE) + 
+  ggtitle(paste(params$ids_integration, 'UMAP - clustering', sep = ': '))
+
+cell_type_plot_umap <- visualize_cellassign(integrated, 'umap', 'cell_type', master_color_palette, master_cell_types) + 
+  ggtitle(paste(params$ids_integration, 'UMAP - cell types', sep = ': '))
+
+```
+
+#### tSNE plots
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15}
+
+grid.arrange(clustering_plot_tsne, cell_type_plot_tsne, nrow = 1)
+
+```
+
+
+#### UMAP plots
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15}
+
+grid.arrange(clustering_plot_umap, cell_type_plot_umap, nrow = 1)
+
+```
+
+
+### Scran combined sample
+Below are tsne and umap plots showing clustering and cell assignment results for sample integrated and corrected with scran
+
+```{r include = FALSE, warning=FALSE}
+
+# add cell type information to combined object
+scran$cell_type <- celltype_df$cell_type
+
+# set color palette
+unique_cell_types <- as.vector(sort(unique(scran$cell_type)))
+common_list <- intersect(unique_cell_types, master_cell_types)
+idx_list <- match(common_list, master_cell_types)
+colors_chosen <- master_color_palette[idx_list]
+
+# dim reduction plots
+clustering_plot_tsne <- plotTSNE(scran, colour_by="cluster") + ggtitle(paste(params$ids_integration, 'TSNE - clustering', sep = ': '))
+cell_type_plot_tsne <- plotTSNE(scran, colour_by="cell_type") + ggtitle(paste(params$ids_integration, 'TSNE - cell type', sep = ': ')) +
+    scale_fill_manual(values = colors_chosen)
+
+clustering_plot_umap <- plotUMAP(scran, colour_by="cluster") + ggtitle(paste(params$ids_integration, 'UMAP - clustering', sep = ': '))
+cell_type_plot_umap <- plotUMAP(scran, colour_by="cell_type") + ggtitle(paste(params$ids_integration, 'UMAP - cell type', sep = ': '))  +
+    scale_fill_manual(values = colors_chosen)
+
+```
+
+#### tSNE plots
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15}
+
+grid.arrange(clustering_plot_tsne, cell_type_plot_tsne, nrow = 1)
+
+```
+
+#### UMAP plots
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15}
+
+grid.arrange(clustering_plot_umap, cell_type_plot_umap, nrow = 1)
+
+```
+
+
+
+
+
+
