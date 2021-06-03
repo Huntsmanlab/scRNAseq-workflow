@@ -1,14 +1,21 @@
 ---
 title: Correct for cell cycle effect
+subtitle: '`r params$pair_ids`'
 author: "Harper Cheng"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
   html_document:
     code_folding: hide
+    toc: true
+    toc_depth: 4
     
 params:
   pair_ids: 'pair_ids'
+  sce_clus: 'sce_clus'
+  cell_cycle_species: 'cell_cycle_species'
   sce_cell_cycle: 'sce_cell_cycle'
+  sce_cell_cycle_corrected: 'sce_cell_cycle_corrected'
+  
 ---
 
 
@@ -17,20 +24,40 @@ params:
 scRNA-seq suffers from systematic bias caused by biological noises which could distort real biological signals. One of the major sources of biological noise is the cell cycle. Cells of the same cell type but are in different cell cycle may exhibit different expression profile. This will likely undermine the performance of clustering for cell type detection, e.g., cells might cluster by both cell type and cell cycle status. We will first assign cell cycle status to each cell and visualize the distribution. If PCA shows clusterings based on cell cycle status, we will then correct for the cell cycle effect. 
 
 
-```{r setup, include=FALSE}
+```{r, include=FALSE}
 
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'cell_cycle', 'assign_cell_cycle.R'))
+
 set.seed(123)
 
-# snakemake passes the input files as one string separated by a space. we need to divide them into separate lists: 
-paths <- as.list(unlist(strsplit(params$sce_cell_cycle[[1]], ' '))) 
-
-# load cell_cycle sce:
-sces <- lapply(paths, function(some_path) readRDS(some_path)) 
-
+# get ids:
 ids <- strsplit(params$pair_ids, "-")[[1]] %>% as.list(c(unlist(ids)))
 
+# snakemake passes the input files as one string separated by a space. we need to divide them into separate lists: 
+sce_clus <- as.list(unlist(strsplit(params$sce_clus[[1]], ' '))) 
+sce_cell_cycle <- as.list(unlist(strsplit(params$sce_cell_cycle[[1]], ' '))) 
+sce_cell_cycle_corrected <- as.list(unlist(strsplit(params$sce_cell_cycle_corrected[[1]], ' '))) 
+
+# run cyclone to assign cell cycles: 
+# save sce with cell cycle gene label information in 'cycle_gene_label' slot;
+# save sce corrected for cell cycle in 'cycle_corrected' slot.
+
+# load sce with cell cycle information if object already exists; otherwise, run cyclone
+sces <- list()
+for(i in 1:length(ids)){
+  if(file.exists(sce_cell_cycle[[i]])==TRUE){
+    sces[[i]] <- readRDS(sce_cell_cycle[[i]])
+  } else {
+    sces[[i]] <- assign_cell_cycle(path_to_sce = sce_clus[[i]], 
+                                  species = params$cell_cycle_species, 
+                                  output_path = sce_cell_cycle[[i]],
+                                  corrected_path = sce_cell_cycle_corrected[[i]])
+  }
+}
+
+  
 ```
 
 

@@ -1,12 +1,14 @@
-
-## Assign cell cycle phases to clustered sce and save the new sce object as cell_cycle.rds.
-## The function we use is cyclone from scran.
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 suppressPackageStartupMessages({
   library(SingleCellExperiment)
   library(scran)
 })
 
+
+## Assign cell cycle phases to clustered sce and save the new sce object as cell_cycle.rds.
+## The function we use is cyclone from scran.
 
 assign_cell_cycle <- function(path_to_sce, species, output_path, corrected_path){
   
@@ -24,16 +26,16 @@ assign_cell_cycle <- function(path_to_sce, species, output_path, corrected_path)
   sce$cell_cycle <- assignments[[1]]
   
   
-  
   # for each gene, get the percentage of variance explained by cell cycle; keep those genes with %variance explained less than 5%
   diff <- getVarianceExplained(sce, DataFrame(sce$cell_cycle))
   discard <- diff > 5
 
   # label identified cell cycle genes as TRUE in the cell_cycle_gene column of sce rowData:
+  # we can use this column to filter out cell cycle related genes when performing DGE analysis
   rowData(sce)$cell_cycle_gene <- as.logical(discard)
   rowData(sce)$cell_cycle_gene[is.na(rowData(sce)$cell_cycle_gene)] <- FALSE
   
-  # save sce with cell cycle information
+  # save sce with cell cycle gene label information
   saveRDS(sce, file=output_path)
   
   
@@ -43,6 +45,9 @@ assign_cell_cycle <- function(path_to_sce, species, output_path, corrected_path)
   # save sce with batch (cell cycle) corrected log-counts
   saveRDS(corrected, file=corrected_path)
 
+  out <- list(cycle_gene_label = sce, cycle_corrected = corrected)
+  
+  return(out)
   
 }
   

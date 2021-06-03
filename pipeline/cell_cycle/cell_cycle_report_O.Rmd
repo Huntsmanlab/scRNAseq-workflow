@@ -132,13 +132,13 @@ for(i in 1:length(sces)){
     plotPCA(reg.nocycle, colour_by="batch") + ggtitle(paste0(ids[[i]], ": After")),
     ncol=2)
   
-  # tSNE showing clustering
+  # tSNE 
   tsne[[i]] <- arrangeGrob(
     plotTSNE(sces[[i]], colour_by=I(sces[[i]]$cell_cycle)) + ggtitle(paste0(ids[[i]], ": Before")),
     plotTSNE(reg.nocycle, colour_by="batch") + ggtitle(paste0(ids[[i]], ": After")),
     ncol=2)
     
-  # UMAP showing clustering
+  # UMAP 
   umap[[i]] <- arrangeGrob(
     plotUMAP(sces[[i]], colour_by=I(sces[[i]]$cell_cycle)) + ggtitle(paste0(ids[[i]], ": Before")),
     plotUMAP(reg.nocycle, colour_by="batch") + ggtitle(paste0(ids[[i]], ": After")),
