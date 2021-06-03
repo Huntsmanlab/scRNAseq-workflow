@@ -6,6 +6,8 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
   html_document:
     code_folding: hide
+    toc: true
+    toc_depth: 4
     
 params:
   ids: 'DH22_NEW-DH22_control'
@@ -21,11 +23,33 @@ scRNA-seq suffers from systematic bias caused by biological noises which could d
 
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'cell_cycle', 'assign_cell_cycle.R'))
 set.seed(123)
 
-# load cellassign sce:
+# get ids:
 ids <- strsplit(params$ids, "-")[[1]] %>% as.list(c(unlist(ids)))
-sces <- lapply(ids, function(id) readRDS(paste0('/huntsman/harpcheng/data/cell_cycle/', id, '/cell_cycle.rds')))
+
+
+# run cyclone to assign cell cycles: 
+# save sce with cell cycle gene label information in 'cycle_gene_label' slot;
+# save sce corrected for cell cycle in 'cycle_corrected' slot.
+
+# load sce with cell cycle information if object already exists; otherwise, run cyclone
+sce_cell_cycle <- lapply(ids, function(id) readRDS(here('..', 'data', 'cell_cycle', id, 'cell_cycle_label.rds')))
+sce_cell_cycle_corrected <-  lapply(ids, function(id) readRDS(here('..', 'data', 'cell_cycle', id, 'cell_cycle_corrected.rds')))
+
+sces <- list()
+for(i in 1:length(ids)){
+  if(file.exists(sce_cell_cycle[[i]])==TRUE){
+    sces[[i]] <- readRDS(sce_cell_cycle[[i]])
+  } else {
+    sces[[i]] <- assign_cell_cycle(path_to_sce = sce_clus[[i]], 
+                                  species = params$cell_cycle_species, 
+                                  output_path = sce_cell_cycle[[i]],
+                                  corrected_path = sce_cell_cycle_corrected[[i]])
+  }
+}
+
 
 ```
 
@@ -201,7 +225,7 @@ plot_grid(umap[[1]], umap[[2]], nrow=2)
 ```
 
 
-### UMAP showing cell cycle clustering and cell clustering before cell cycle correction
+## UMAP showing cell cycle clustering and cell clustering before cell cycle correction
 
 ```{r}
 clustering <- cycle <- list()
