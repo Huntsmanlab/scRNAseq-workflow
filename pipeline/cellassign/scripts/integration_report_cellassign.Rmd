@@ -17,6 +17,7 @@ params:
   cell_type_csv: 'cell_type_csv'
   sce_cas_path: 'sce_cas_path'
   seurat_corrected: 'seurat_corrected'
+  scran_corrected: 'scran_corrected'
 
 ---
 
@@ -64,9 +65,11 @@ for(i in 1:length(id.list)){
   }
 }
 
-
-# load seurat batch corrected objects
+# load seurat batch corrected object
 integrated <- readRDS(params$seurat_corrected)
+
+# load scran object
+scran <- readRDS(params$scran_corrected)
 
 # get marker matrix and sort 
 marker_mat <- create_marker_mat("other")
