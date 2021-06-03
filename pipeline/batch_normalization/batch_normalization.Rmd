@@ -13,7 +13,8 @@ output:
 params:
   ids: 'ids'
   path_to_sce_clus: 'path_to_sce_clus'
-  path_to_sce_qc: 'path_to_sce_qc'
+  output_corrected: 'output_corrected'
+  output_integrated: 'output_integrated'
   id_type: 'id_type'
   
 ---
@@ -28,7 +29,6 @@ Cells should not cluster by their source/orgin (i.e., sampleID) if the batch eff
 
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
-source(here('pipeline', 'batch_normalization', 'integration.R'))
 
 ```
 
@@ -77,6 +77,12 @@ p2 <- plotUMAP(combined, colour_by = "id")
 # batch correction! 
 batch_removed <- fastMNN(combined, batch = combined$id, subset.row = chosen.hvgs)
 
+print("Started clustering the sce.")  
+snn.gr <- buildSNNGraph(batch_removed, use.dimred="corrected")
+clusters <- igraph::cluster_walktrap(snn.gr)$membership
+batch_removed$cluster <- factor(clusters)
+print("Finished clustering sce.")
+
 batch_removed <- runTSNE(batch_removed, dimred = "corrected")
 batch_removed <- runUMAP(batch_removed, dimred = "corrected")
 
@@ -109,13 +115,11 @@ We can integrate samples using Seurat integration. Seurat first finds integratio
 ```{r include = FALSE}
 
 # snakemake passes the input files as one string separated by a space. we need to divide them into separate lists: 
-path_to_sce_qc <- as.list(unlist(strsplit(params$path_to_sce_qc[[1]], ' '))) 
 path_to_sce_clus <- as.list(unlist(strsplit(params$path_to_sce_clus[[1]], ' '))) 
 
 # perform seurat integration and batch correction
-out <- integrate(path_to_sce_qc = path_to_sce_qc, 
-                 path_to_sce_clus = path_to_sce_clus, 
-                 ids_integration = params$ids)
+out <- seurat_integrate(path_to_sce_clus = path_to_sce_clus, 
+                        ids_integration = params$ids)
 
 # we start with the plots for uncorrected samples  
 uncorrected <- out$uncorrected
@@ -152,4 +156,13 @@ gridExtra::grid.arrange(p3, p4, nrow = 1)
 ```
 
 
+```{r}
+# save the integrated objects:
+# scran batch corrected
+saveRDS(batch_removed, file = params$output_corrected)
+
+# seurat batch corrected
+saveRDS(integrated, file = params$output_integrated)
+
+```
 

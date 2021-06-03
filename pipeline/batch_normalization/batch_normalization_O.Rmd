@@ -24,7 +24,6 @@ Cells should not cluster by their source/orgin (i.e., sampleID) if the batch eff
 
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
-source(here('pipeline', 'batch_normalization', 'integration.R'))
 
 ```
 
@@ -72,6 +71,12 @@ p2 <- plotUMAP(combined, colour_by = "id")
 # batch correction! 
 batch_removed <- fastMNN(combined, batch = combined$id, subset.row = chosen.hvgs)
 
+print("Started clustering the sce.")  
+snn.gr <- buildSNNGraph(batch_removed, use.dimred="corrected")
+clusters <- igraph::cluster_walktrap(snn.gr)$membership
+batch_removed$cluster <- factor(clusters)
+print("Finished clustering sce.")
+
 batch_removed <- runTSNE(batch_removed, dimred="corrected")
 batch_removed <- runUMAP(batch_removed, dimred="corrected")
 
@@ -104,13 +109,11 @@ We can integrate samples using Seurat integration. Seurat first finds integratio
 # perform seurat integration: 
 # combined sample without batch correction is stored in the 'uncorrected' slot;
 # batch corrected sample is stored in the 'corrected' slot.
-path_to_sce_qc <- lapply(dh_organoid_ids, function(id) here('..', 'data', 'qc', id, 'sce_qc.rds'))
 path_to_sce_clus <- lapply(dh_organoid_ids, function(id) here('..', 'data', 'clustered', 'sce', id, 'sce_clus.rds'))
 
 # perform seurat integration and batch correction
-out <- integrate(path_to_sce_qc = path_to_sce_qc, 
-                 path_to_sce_clus = path_to_sce_clus, 
-                 ids_integration = params$ids)
+out <- seurat_integrate(path_to_sce_clus = path_to_sce_clus, 
+                        ids_integration = params$ids)
   
 
 # we start with the plots for uncorrected samples  
@@ -147,6 +150,15 @@ gridExtra::grid.arrange(p3, p4, nrow = 1)
 
 ```
 
+
+```{r}
+# save the integrated objects:
+# scran batch corrected
+saveRDS(batch_removed, file = here('..', 'data', 'batch_corrected', ids, 'scran_corrected.rds'))
+
+# seurat batch corrected
+saveRDS(integrated, file = here('..', 'data', 'batch_corrected', ids, 'seurat_corrected.rds'))
+```
 
 
 
