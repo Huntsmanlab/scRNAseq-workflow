@@ -3,15 +3,16 @@
 > This repository contains the code used by the Huntsman Lab at BCCRC for single cell RNA sequencing analysis from 10x experiments.
 
 **The steps of the pipeline are as follows:**  
-1. Make a SingleCellExperiment object from filtered counts  
-2. Perform quality control to further filter cells with low reads and/or high mitochondrial content  
-3. Visualize the results of quality control in summary stats  
-4. Log normalize  
-5. Do dimensionality reduction (PCA, tSNE and UMAP)  
-6. Perform unsupervised clustering  
-7. Do batch correction and integration, if needed  
-8. Calculate the differentially expressed genes and visualize the analysis  
-9. Annotate cell types using cell assign 
+1. make_sce: Make a SingleCellExperiment object from filtered counts  
+2. do_qc: Perform quality control to further filter cells with low reads and/or high mitochondrial content  
+3. run_summary_stats: Visualize the results of quality control 
+4. process_qc_normalization: a combination of step 1 and 2 with an additional step of normalization. We can run this rule directly to get the qc'd and normalized sce object
+6. dimred_cluster: Do dimensionality reduction (PCA, tSNE and UMAP). Perform unsupervised clustering. 
+7. do_batch_correction: Do batch correction and integration using seurat and scran, if needed  
+8. DGE_scran, DGE_edgeR_TWO_samples, DGE_edgeR_MULTIPLE_samples: Calculate the differentially expressed genes using scran (two paired samples) or edgeR (multiple samples), visualize the result with volcano plots, and perform enrichment analysis to find upregulated pathways
+9. integrate_cell_assign_results: Annotate cell types using cell assign and visulize cell clustering and cell type with dimension reduction plots
+10. run_cell_cycle_report: Assign cell cycle phases using cyclone and visualize cell cycle phases with dimension reduction plots and bar plots
+11. seurat_to_loom: convert sce with cell type information to seurat and then to a loom file in preparation for velocity analyses
 
 For workflow management, we use Snakemake. For details on how to install and use it, refer <a href="https://snakemake.readthedocs.io/en/stable/" target="_blank">here</a>. More detailed instructions on how to run the pipeline through Snakemake are given in the Snakefile, and in the snakefile help document as well. 
 
@@ -20,20 +21,25 @@ Lists that we use as wildcards are given at the top of the Snakefile. When you h
 ```
 rule all:  
   input:  
-    # make_sce,  
-    # do_qc,  
-    # normalize_sce,  
-    # perform_dim_reduction,  
-    # cluster_sce,  
-    # cluster_two_samples,  
-    # run_cell_assign_ONE_sample,  
-    # integrate_cell_assign_results,  
-    DGE_scran,  
-    # DGE_edgeR_TWO_samples,  
-    # DGE_edgeR_MULTIPLE_samples,  
-    run_summary_stats,
-    # do_batch_correction,  
-    # run_seurat_integration
+    # process_qc_normalization,
+    # run_summary_stats,
+    # dimred_cluster,
+    # compute_diff_map,
+    # do_batch_correction,
+    # integrate_cell_assign_results,
+    run_cell_cycle_report,
+    
+    # DGE_scran,
+    # DGE_edgeR_TWO_samples,
+    # DGE_edgeR_MULTIPLE_samples,
+    # seurat_to_loom
+    
+    ## make_sce,
+    ## do_qc,
+    ## perform_dim_reduction, # determine number of PCs to use
+    ## cluster_sce, #clustering on dividual sample
+    ## cluster_two_samples, #clustering on integrated sample
+    ## find_common_dges, # common differentially expressed genes in a paired sample
 ```  
 
 User should uncomment the name of the analyses they wish to do to, there is not a limit on the number of analyses that can be done. In the given example above, Snakemake would do DGE analysis with scran and run summary stats. Once the above steps are completed, pipeline can be run with the `snakemake` command. This command should be typed to the terminal window in RStudio.   
@@ -116,23 +122,26 @@ After viewing t-SNE plots with various perplexities, user is expected to pick a 
 **k_list:** a list of any length, including only positive integers  
 This list will be used during clustering to vary number of nearest neighbors.  You can supply any numbers, but the suggested values range between 5 and 30. Default values supplied in the pipeline are `k_list = [5, 9, 10, 12, 15, 18]`.  
   
-**chosen_k:**one single number, taken from the k_list given above  
+**chosen_k:** one single number, taken from the k_list given above  
 After viewing the clustering plots with various k values, the user is expected to choose a k value to continue downstream analysis. After inspecting the report once, you can pick a certain k value to store in the sce object for further downstream analysis. Default value is 15.  
+
+**sample_type:** this is where we specify the type of sample for running cell assign. The pipeline will assemble a marker gene matrix corresponding to the sample type. Pass "GC" if running granulosa cell samples; ".." if running .. cell samples.
+
+**cell_cycle_species:** cyclone has a built-in reference cell cycle gene list on human and mouse, respectively, for determining and assigning cell cycle phases. If running human samples, pass "human"; otherwise pass "mouse".
   
 > To run the pipeline using snakemake, change the name of the snakefile from 'sample_snakefile' to 'Snakefile' on your local machine after pulling from master.  
 
 ### Analyses including multiple data sets  
 
- - **Seurat integration**  
-Integrate two or more data sets and show findings in a report.  
-At the moment, we use Seurat's integration techniques to remove batch effects between replicates. It's possible that integration causes subpopulation diversity to be eliminated as well. Run the pipeline with caution. If any of your samples have less than 200 cells, Seurat integration techniques won't work. In that case, you can try using batch correction, explained in more detail in the next step. Indicate ids you wish to integrate in `ids_integration` list. 
+ - **Summary statistics**  
+Show summary statistics for two datasets in a report. To run this, write the ids you wish to compare in the pair_ids list in the Snakefile. You can supply more than one pair of ids; summary stats will be computed for each pair separately.   
 
- - **Batch correction**  
+ - **Batch normalization**  
 Remove batch effects in two or more datasets, save the corrected samples and show findings in a report.  
 To run this analysis, write down the sample names to ids_integration list shown at the beginning of the Snakefile. Separate the samples with a dash (-). Do one group of ids at a time. You also have the option to write a short explanatory message to be shown in the title of the integration report. This was designed to help readers to get a quick idea about what the report is about. You have the option to leave it blank. Write your message as a string to 'id_type' list in the Snakefile. These batch corrected data hasn't been implemented for downstream analysis.  
 
- - **Summary statistics**  
-Show summary statistics for two datasets in a report. To run this, write the ids you wish to compare in the pair_ids list in the Snakefile. You can supply more than one pair of ids; summary stats will be computed for each pair separately.   
+We use two integration methods: combine and remove batch effect using scran; integrate with seurat.
+We use Seurat's integration techniques to remove batch effects between replicates. It's possible that integration causes subpopulation diversity to be eliminated as well. Run the pipeline with caution. If any of your samples have less than 200 cells, Seurat integration techniques won't work. In that case, you can try using scran batch correction, explained in more detail in the next step. Indicate ids you wish to integrate in `ids_integration` list. 
 
  - **DE analysis with edgeR**  
 Perform DE analysis in two groups, groups can have as many replicates as you wish. Write the groups you wish to compare to 'ids_dge' list in the Snakefile. Separate replicates that belong to the same group with a '-'; separate different groups with '='. Depending on the number of samples you have, you will need to follow different paths. If you have only two or three  samples, edgeR needs to run on two samples only. You can do that by uncommenting `DGE_edgeR_TWO_samples` from the `rule all` section. If you have at least two replicates for each treatment (4 samples at least in total), uncomment `DGE_edgeR_MULTIPLE_samples` from `rule all`. Remember that second if you supply wilk compared to the first id. For example, if you supply `ids_dge = [DH1-DH2=DH3-DH4]`, DH3 and DH4 will be compared to DH1 and DH2.     
@@ -141,15 +150,12 @@ Perform DE analysis in two groups, groups can have as many replicates as you wis
 Perform DE analysis between two ids using t tests. Write the ids to the 'pair_ids' list in the Snakefile and separate the samples with a '-'. First sample should be transduced, and second sample should be the control. Note that this DE analysis will compare the first sample to the second sample. If you have more than two samples for each to compare, it is recommended that you use the edgeR DGE method, explained below.  
 
  - **Cell type assignment**  
-For information about how to install cell assign, refer to <a href="https://shahlab.ca/projects/cellassign/" target="_blank">shahlab.ca/projects/cellassign</a>. We recommend that you use a virtual environment to install Tensorflow. Once the installation is complete, prior to using cell assign, activate the virtual environment by running `source ~/venv/bin/activate` in the Rstudio terminal. Snakemake rule for running cell assign doesnt use any wildcards other than ids, so writing the cell ids you wish to annotate is sufficient. Cell assign run will output a few files that can be used in downstream analysis. Note that cell types will be computed individually for all the ids you supply.  
+For information about how to install cell assign, refer to <a href="https://shahlab.ca/projects/cellassign/" target="_blank">shahlab.ca/projects/cellassign</a>. We recommend that you use a virtual environment to install Tensorflow. Once the installation is complete, prior to using cell assign, activate the virtual environment by running `source ~/venv/bin/activate` in the Rstudio terminal. Snakemake rule for running cell assign doesn't use any wildcards other than ids, so writing the cell ids you wish to annotate is sufficient. Cell assign run will output a few files that can be used in downstream analysis. Note that cell types will be computed individually for all the ids you supply.  
 
- - **Integrating cell assign results**  
+ - **Integrating and visualizing cell assign results**  
 At this step, a special rule other than Seurat integration has been designed. After computing cell types, write the samples you wish to integrate to the integration_ids list at the top of the Snakefile and separate distinct samples with "-", as shown:  
 `ids_integration = ['DH4-DH17-DH10']`  
-You can integrate as many samples as you wish.  
-
- - **Visualizing cell assign results**  
-There a two options for visualizing cell assign outputs. You can either choose to visualize one sample or multiple samples together. Reports are automatically generated when you run cell assign. Reports for individual samples are in `/reports/cellassign`, and integrated sample reports can be found in `/reports/cellassign_integrated`.  
+You can integrate as many samples as you wish. We previously integrated/combined samples with scran and seurat. Sce objects from both methods are loaded and visualized. Cell assign reports provide visualization on cell clustering and cell type clustering on individual samples and integrated samples with dimention reduction plots. Reports are automatically generated when you run cell assign. Reports for individual samples are in `/reports/cellassign`, and integrated sample reports can be found in `/reports/cellassign_integrated`.  
 
 Moreover, each of these steps have two types of files: one off scripts and scripts that have been integrated to the pipeline. One off scripts end with '_O.Rmd'. If you need to repeat a specific step isolated from the Snakemake workflow, you can use the one off scripts where you can specify the ids you wish to analyze.  
 
