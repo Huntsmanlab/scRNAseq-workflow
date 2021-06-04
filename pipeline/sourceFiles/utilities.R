@@ -83,6 +83,7 @@ theme_amunzur <- theme(
 # find_and_bind() ----- find common rows in two or more data frames, subset and cbind the common rows 
 # find_reporter_genes()
 # intersect_all()
+# seurat_integrate()
 
 # # from max's utilities folder: 
 # combine_sces()
