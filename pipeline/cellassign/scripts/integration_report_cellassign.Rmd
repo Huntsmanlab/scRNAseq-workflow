@@ -15,7 +15,6 @@ params:
   sample_type: 'sample_type'  # if granulosa samples, change to "GC"; if .. samples, change to ..
   sce_clus: 'sce_clus'
   cell_type_csv: 'cell_type_csv'
-  sce_cas_path: 'sce_cas_path'
   seurat_corrected: 'seurat_corrected'
   scran_corrected: 'scran_corrected'
 
@@ -23,15 +22,6 @@ params:
 
 In this report we show the results of cell assign runs on individual samples as well as on integrated and batch corrected samples. We include some dim reduction plots with cell types and clustering information. We first show results of cell assign run on individual samples, then we give the plots for integrated samples.   
 
-**Cell assign is able to detect the following cell types:**  
-* mesothelial_cell
-* stromal_fibroblast_cells
-* endothelial_cells
-* plasma_cells
-* epithelial_cells
-* lymphocyte_cells
-* macrophage_cells
-* other
 
 ```{r include = FALSE, message = FALSE}
 
@@ -52,16 +42,19 @@ id.list <- as.list(c(unlist(list(id.list))))
 # snakemake passes the input files as one string separated by a space. we need to divide them into separate lists: 
 sce_clus <- as.list(unlist(strsplit(params$sce_clus[[1]], ' '))) 
 cell_type_csv <-  as.list(unlist(strsplit(params$cell_type_csv[[1]], ' '))) 
-sce_cas_path <- as.list(unlist(strsplit(params$sce_cas_path[[1]], ' '))) 
 
-# load sce_cas if object already exists; or run cellassign
+# load cell_type_csv if object already exists; or run cellassign
 sce_cas <- list()
+cell_type <- list()
 for(i in 1:length(id.list)){
-  if(file.exists(sce_cas_path[[i]])==TRUE){
-    sce_cas[[i]] <- readRDS(sce_cas_path[[i]])
+  if(file.exists(cell_type_csv[[i]])==TRUE){
+    sce_cas[[i]] <- readRDS(sce_clus[[i]])
+    cell_type[[i]] <- read_csv(cell_type_csv[[i]])
+    # add cell type information to sce_cas:
+    sce_cas[[i]]$cell_type <- cell_type[[i]]$cell_type
   } else {
     # run cell assign and get sce with cell type information
-    sce_cas[[i]] <- run_cellassign(sce_clus[[i]], params$sample_type, cell_type_csv[[i]], sce_cas_path[[i]])
+    sce_cas[[i]] <- run_cellassign(sce_clus[[i]], params$sample_type, cell_type_csv[[i]])
   }
 }
 
@@ -73,8 +66,15 @@ scran <- readRDS(params$scran_corrected)
 
 # get marker matrix and sort 
 marker_mat <- create_marker_mat("other")
+det_cell_type <- colnames(marker_mat)
 master_cell_types <- colnames(marker_mat) %>% str_sort()
 ```
+
+
+**Cell assign is able to detect the following cell types:**    
+
+`r det_cell_type`
+
 
 
 ## Individual samples  

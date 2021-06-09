@@ -14,7 +14,7 @@ suppressPackageStartupMessages({
 # RUN cell type assignment: save sce with cell type information, save csv with cell type information;
 # function returns sce which is used in cell assign report.
 
-run_cellassign <- function(sce_clus, sample_type, cell_type_csv, sce_cas_path){
+run_cellassign <- function(sce_clus, sample_type, cell_type_csv){
 
   # load marker gene matrix; specify the type of your sample: if granulosa cells, supply "GC"; if..., ...
   marker_mat <- create_marker_mat(sample_type) 
@@ -44,11 +44,13 @@ run_cellassign <- function(sce_clus, sample_type, cell_type_csv, sce_cas_path){
   rownames(sce) <- old_rownames
   
   # save sce with cell type information
-  saveRDS(sce, file = sce_cas_path) 
+  # saveRDS(sce, file = sce_cas_path) 
   
   # save celltype information in a csv file
+  dir.create(dirname(cell_type_csv))
   write_csv(df, cell_type_csv) 
   
+  # retuen sce with cell type information 
   return(sce)
 }
 
