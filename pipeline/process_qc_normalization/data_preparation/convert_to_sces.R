@@ -6,9 +6,7 @@ convert_to_sces <- function(path_to_10X, id) {
   # here we account for that: 
   # first check if this directory exists: 
   if(dir.exists(paste(path_to_10X, 'filtered_feature_bc_matrix', sep = '/')) == TRUE) {
-    
     path_to_10X <- paste(path_to_10X, 'filtered_feature_bc_matrix', sep = '/')
-    
   }
   
   sce <- read10xCounts(samples = path_to_10X) 

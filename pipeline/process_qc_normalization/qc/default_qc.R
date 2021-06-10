@@ -6,11 +6,8 @@
 # this function will give you two outputs: sce and qc metrics dataframe. you need to specify two separate paths to save them.
 # this function will also name things generically, so we dont need to specify the file names. 
 
-# source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/utilities.R')
-
 make_sce_qc <- function(whichMethod, 
                         sce, 
-                        output_file_name,
                         mito_thresh_max, 
                         mito_thresh_min, 
                         ribo_thresh_max, 
@@ -94,9 +91,6 @@ make_sce_qc <- function(whichMethod,
     
     # subset the sce 
     sce_qc <- sce_qc[-ribo_idx, ]  } # end of if
-  
-  # Save sce_qc as .rds file
-  # saveRDS(sce_qc, file = output_file_name)
   
   print("Finished QC.")
   

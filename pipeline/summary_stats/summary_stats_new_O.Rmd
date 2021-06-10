@@ -10,7 +10,15 @@ output:
     toc_float: true
 
 params:
-  pair_ids: 'DH21-DH21_control' # to run this, write TWO ids here, separated by -
+  pair_ids: 'YW1-DH21' # to run this, write TWO ids here, separated by -
+  whichMethod: 'default' # to use different parameters here, just update them.
+  min_features: 1000
+  mito_thresh_max: 60
+  mito_thresh_min: 1
+  ribo_thresh_max: 60 
+  nmads: 3
+  remove_mito_and_ribo: "yes" # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
+
 ---
 
 In this document, we show summary statistics and results of quality control on the samples. The steps below encompass the standard pre-processing workflow for scRNA-seq data in Seurat. These represent the selection and filtration of cells based on QC metrics, data normalization and scaling, and the detection of highly variable features.  
@@ -41,6 +49,8 @@ While filtering low quality cells, we consider the following:
 # source the files for the functions we need 
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'process_qc_normalization', 'data_preparation', 'convert_to_sces.R'))
+source(here('pipeline', 'process_qc_normalization', 'qc', 'default_qc.R'))
 
 ```
 
@@ -48,15 +58,16 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 #extract the name_list from the parameters. we use the name list later on while making graphs. 
 ids <- strsplit(params$pair_ids, "[-/ ]")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
-dh_organoid_ids <- list(ids[[1]], ids[[2]])
+dh_organoid_ids <- as.list(c(unlist(list(ids))))
+path_to_10X <- lapply(dh_organoid_ids, function(id) here('..', 'huntsmandata', 'raw', id))
 
-# import raw sce (from 10x) and qc'd sce
-sce_raws <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'processed', id, 'sce.rds')))
-sce_qcs <- lapply(dh_organoid_ids, function(id) readRDS(here('..', 'data', 'qc', id, 'sce_qc.rds')))
-
-# combine sces without seurat
-#sce_raws_combined <- do.call(combine_sces, sce_raws)
-#sce_qcs_combined <- do.call(combine_sces, sce_qcs)
+# make sce from 10x output and do qc
+sce_raws <- sce_qcs <- list()
+for(i in 1:length(dh_organoid_ids)){
+  sce_raws[[i]] <- convert_to_sces(path_to_10X = path_to_10X[[i]], id = dh_organoid_ids[[i]])
+  sce_qcs[[i]] <- make_sce_qc(params$whichMethod, sce_raws[[i]], params$mito_thresh_max, params$mito_thresh_min, params$ribo_thresh_max, 
+                              params$nmads, params$min_features, params$remove_mito_and_ribo)
+}
 
 # convert sce to seurat object
 seurat_raws <- lapply(sce_raws, function(sce) CreateSeuratObject(counts = counts(sce), project = sce$id))
@@ -148,33 +159,25 @@ makeTableMedian <- function(df, index) {
 ```
 
 ```{r echo = FALSE, warning = FALSE}
-# we gotta add some tables here before we jump into graphs. 
-# we first make a very very basic table, then make it look better. 
 
-BEFOREcontrolTable <- makeTable(df_raws[[1]], 1)
-BEFOREexpTable <- makeTable(df_raws[[2]], 2)
+BEFORETable <- AFTERTable <- BEFORETable_median <- AFTERTable_median <- data.frame()
 
-# combine data from control and treatment in one table 
-BEFOREtable <- rbind(BEFOREcontrolTable, BEFOREexpTable)
+for(i in 1:length(df_raws)){
+  # we gotta add some tables here before we jump into graphs. 
+  # we first make a very very basic table, then make it look better. 
 
-AFTERcontrolTable <- makeTable(df_qcs[[1]], 1)
-AFTERexpTable <- makeTable(df_qcs[[2]], 2)
+  before <- makeTable(df_raws[[i]], i)
+  after <- makeTable(df_qcs[[i]], i)
+  before_median <- makeTableMedian(df_raws[[i]], i)
+  after_median <- makeTableMedian(df_qcs[[i]], i)
 
-# combine data from control and treatment in one table 
-AFTERtable <- rbind(AFTERcontrolTable, AFTERexpTable)
+  # combine data from control and treatment in one table 
+  BEFORETable <- rbind(BEFORETable, before)
+  AFTERTable <- rbind(AFTERTable, after)
+  BEFORETable_median <- rbind(BEFORETable_median, before_median)
+  AFTERTable_median <- rbind(AFTERTable_median, after_median)
 
-# MEDIAN TABLE 
-BEFOREcontrolTable_median <- makeTableMedian(df_raws[[1]], 1)
-BEFOREexpTable_median <- makeTableMedian(df_raws[[2]], 2)
-
-# combine data from control and treatment in one table 
-BEFOREtable_median <- rbind(BEFOREcontrolTable_median, BEFOREexpTable_median)
-
-AFTERcontrolTable_median <- makeTableMedian(df_qcs[[1]], 1)
-AFTERexpTable_median <- makeTableMedian(df_qcs[[2]], 2)
-
-# combine data from control and treatment in one table 
-AFTERtable_median <- rbind(AFTERcontrolTable_median, AFTERexpTable_median)
+}
 
 
 ```
@@ -184,25 +187,25 @@ AFTERtable_median <- rbind(AFTERcontrolTable_median, AFTERexpTable_median)
 
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
 # here we just make the tables look nice and add a caption as well. 
-BEFOREtable %>% 
+BEFORETable %>% 
   knitr::kable(caption = 'Table 1: Summary statistics showing cell number and MEAN values per cell- BEFORE quality control') %>% 
   kable_styling(full_width = F)
 ```
 
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
-AFTERtable %>% 
+AFTERTable %>% 
   knitr::kable(caption = 'Table 2: Summary statistics showing cell number and MEAN values per cell- AFTER quality control') %>% 
   kable_styling(full_width = F)
 ```
 
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
-BEFOREtable_median %>% 
+BEFORETable_median %>% 
   knitr::kable(caption = 'Table 3: Summary statistics showing cell number and MEDIAN values per cell- BEFORE quality control') %>% 
   kable_styling(full_width = F)
 ```
 
 ```{r echo = FALSE, warning = FALSE, results = 'asis'}
-AFTERtable_median %>% 
+AFTERTable_median %>% 
   knitr::kable(caption = 'Table 4: Summary statistics showing cell number and MEDIAN values per cell- AFTER quality control') %>% 
   kable_styling(full_width = F)
 ```
@@ -213,14 +216,32 @@ AFTERtable_median %>%
 
 ```{r include = FALSE}
 
-all_raw <- merge(seurat_raws[[1]], seurat_raws[[2]], add.cell.ids = c(dh_organoid_ids[[1]], dh_organoid_ids[[2]]))
-all_qc <- merge(seurat_qc[[1]], seurat_qc[[2]], add.cell.ids = c(dh_organoid_ids[[1]], dh_organoid_ids[[2]]))
+all_raw <- seurat_raws[[1]]
+all_qc <- seurat_qc[[1]]
 
-all_raw[["percent_mito"]] <- PercentageFeatureSet(all_raw, pattern = "^MT-")
-all_qc[["percent_mito"]] <- PercentageFeatureSet(all_qc, pattern = "^MT-")
+# if there are more than 1 sample, combine them into one seurat object
+if(length(seurat_raws) > 1){
+  for(i in 2:length(seurat_raws)){
+    all_raw <- merge(all_raw, seurat_raws[[i]], add.cell.ids = c(dh_organoid_ids[[i-1]], dh_organoid_ids[[i]]))
+    all_qc <- merge(all_qc, seurat_qc[[i]], add.cell.ids = c(dh_organoid_ids[[i-1]], dh_organoid_ids[[i]]))
+  }
+}
 
-all_raw[["percent_ribo"]] <- PercentageFeatureSet(all_raw, pattern = "^RP[SL]")
-all_qc[["percent_ribo"]] <- PercentageFeatureSet(all_qc, pattern = "^RP[SL]")
+if(grepl("^ENSMUS", sce_raws[[1]]@rowRanges@elementMetadata@listData[["ID"]][1]) ){
+  # for mouse
+  all_raw[["percent_mito"]] <- PercentageFeatureSet(all_raw, pattern = "^mt-")
+  all_qc[["percent_mito"]] <- PercentageFeatureSet(all_qc, pattern = "^mt-")
+
+  all_raw[["percent_ribo"]] <- PercentageFeatureSet(all_raw, pattern = "^Rp[sl][[:digit:]]")
+  all_qc[["percent_ribo"]] <- PercentageFeatureSet(all_qc, pattern = "^Rp[sl][[:digit:]]")
+} else {
+  # for human
+  all_raw[["percent_mito"]] <- PercentageFeatureSet(all_raw, pattern = "^MT-")
+  all_qc[["percent_mito"]] <- PercentageFeatureSet(all_qc, pattern = "^MT-")
+
+  all_raw[["percent_ribo"]] <- PercentageFeatureSet(all_raw, pattern = "^RP[LS]")
+  all_qc[["percent_ribo"]] <- PercentageFeatureSet(all_qc, pattern = "^RP[LS]")
+}
 
 feats <- c("nFeature_RNA","nCount_RNA","percent_mito","percent_ribo")
 
@@ -340,45 +361,38 @@ most_variable_features <- function(seurat_obj, id){
   out <- list(seurat_obj=seurat_obj, plot=p)
 }
 
+```
 
-mvf1 <- most_variable_features(seurat_qc[[1]], dh_organoid_ids[[1]])
-mvf2 <- most_variable_features(seurat_qc[[2]], dh_organoid_ids[[2]])
+```{r echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 5}
+
+mvf <- list()
+for(i in 1:length(seurat_qc)){
+  mvf[[i]] <- most_variable_features(seurat_qc[[i]], dh_organoid_ids[[i]])
+  print(mvf[[i]]$plot)
+}
 
 ```
 
-```{r echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
 
-grid.arrange(mvf1$plot, mvf2$plot, nrow = 1)
-
-```
-
-
-#### Most variable genes in `r paste(dh_organoid_ids[[1]])`  
+#### Most variable genes  
 ```{r}
 
-DT::datatable(HVFInfo(mvf1$seurat_obj)[VariableFeatures(mvf1$seurat_obj), ],
+for(i in 1:length(mvf)){
+  print(DT::datatable(HVFInfo(mvf[[i]]$seurat_obj)[VariableFeatures(mvf[[i]]$seurat_obj), ],
   extensions = 'Buttons',
   options = list(dom = 'Bfrtip',
-                 buttons = list("copy", "excel", "csv", "pdf")))
-
+                 buttons = list("copy", "excel", "csv", "pdf")),
+  caption = paste0("Most variable genes in ", dh_organoid_ids[[i]])))
+}
 
 ```
 
-
-#### Most variable genes in `r paste(dh_organoid_ids[[2]])`  
-```{r}
-
-DT::datatable(HVFInfo(mvf2$seurat_obj)[VariableFeatures(mvf2$seurat_obj), ],
-  extensions = 'Buttons',
-  options = list(dom = 'Bfrtip',
-                 buttons = list("copy", "excel", "csv", "pdf")))
-
-
-```
 
 
 #### Number of highly variable genes (HVG)
+
 Number of HVG for both samples are given below for various gene dispersion (variance) cut offs.  
+
 ```{r include = FALSE}
 
 process_seurat <- function(seurat_obj){
@@ -423,20 +437,17 @@ getNumberOfHVG <- function(object, threshold){
 
 ```{r include=FALSE}
 
-pro_sample1 <- process_seurat(seurat_qc[[1]])
-pro_sample2 <- process_seurat(seurat_qc[[2]])
-
-qc_sample1 <- pro_sample1$normalized
-qc_sample2 <- pro_sample2$normalized
-
-HVG_sample1 <- getNumberOfHVG(qc_sample1, c(0.5, 1.0, 1.5, 2.0, 2.5))
-HVG_sample2 <- getNumberOfHVG(qc_sample2, c(0.5, 1.0, 1.5, 2.0, 2.5))
+pro_sample <- qc_sample <- HVG_sample <- list()
 dispersion_cutoff <- c(0.5, 1.0, 1.5, 2.0, 2.5)
-df <- data.frame(dispersion_cutoff, HVG_sample1, HVG_sample2)
+df <- data.frame(dispersion_cutoff)
 
-# rename the columns 
-names(df)[names(df) == "HVG_sample1"] <- paste('HVG', dh_organoid_ids[[1]], sep = '_')
-names(df)[names(df) == "HVG_sample2"] <- paste('HVG', dh_organoid_ids[[2]], sep = '_')
+for(i in 1:length(seurat_qc)){
+  pro_sample[[i]] <- process_seurat(seurat_qc[[i]])
+  qc_sample[[i]] <- pro_sample[[i]]$normalized
+  HVG_sample[[i]] <- getNumberOfHVG(qc_sample[[i]], dispersion_cutoff)
+  df <- data.frame(df, HVG_sample[[i]])
+  names(df)[i+1] <- paste('HVG', dh_organoid_ids[[i]], sep = '_')
+}
 
 ```
 
@@ -462,25 +473,24 @@ Clustering cells and running a DE analysis between clusters can give an idea abo
 Now let's look at the chosen resolution (0.5) in more detail. We visualize the clusters in a dimensionality reduction plots below. 
 
 #### t-SNE
-```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 15}
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
 
-qc_sample1 <- pro_sample1$clustered
-qc_sample2 <- pro_sample2$clustered
+for(i in 1:length(pro_sample)){
+  qc_sample[[i]] <- pro_sample[[i]]$clustered
+  print(DimPlot(qc_sample[[i]], reduction = "tsne") + ggtitle(dh_organoid_ids[[i]]))
+}
 
-Dimplot1 <- DimPlot(qc_sample1, reduction = "tsne") + ggtitle(dh_organoid_ids[[1]])
-Dimplot2 <- DimPlot(qc_sample2, reduction = "tsne") + ggtitle(dh_organoid_ids[[2]])
-
-grid.arrange(Dimplot1, Dimplot2, nrow = 1)
 
 ```
 
 
 #### UMAP
-```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 15}
-Dimplot1 <- DimPlot(qc_sample1, reduction = "umap") + ggtitle(dh_organoid_ids[[1]])
-Dimplot2 <- DimPlot(qc_sample2, reduction = "umap") + ggtitle(dh_organoid_ids[[2]])
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
 
-grid.arrange(Dimplot1, Dimplot2, nrow = 1)
+for(i in 1:length(pro_sample)){
+  print(DimPlot(qc_sample[[i]], reduction = "umap") + ggtitle(dh_organoid_ids[[i]]))
+}
+
 ```
 
 
@@ -522,24 +532,18 @@ clus_violin <- function(sce, clus_seurat){
 }
 
 
-sample1 <- clus_violin(sce_qcs[[1]], pro_sample1$clustered)
-sample2 <- clus_violin(sce_qcs[[2]], pro_sample2$clustered)
-
 ```
 
-#### `r paste(dh_organoid_ids[[1]])`
 
 ```{r echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 18}
 
-grid.arrange(sample1$plot_sample_mito, sample1$plot_sample_ribo, sample1$plot_sample_genes, nrow = 1)
+sample <- list()
 
-```
-
-#### `r paste(dh_organoid_ids[[2]])`
-
-```{r echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 18}
-
-grid.arrange(sample2$plot_sample_mito, sample2$plot_sample_ribo, sample2$plot_sample_genes, nrow = 1)
+for(i in 1:length(pro_sample)){
+  sample[[i]] <- clus_violin(sce_qcs[[i]], pro_sample[[i]]$clustered)
+  print(grid.arrange(sample[[i]]$plot_sample_mito, sample[[i]]$plot_sample_ribo, sample[[i]]$plot_sample_genes, nrow = 1,
+                     top = dh_organoid_ids[[i]]))
+}
 
 ```
 
@@ -550,36 +554,48 @@ We can also visualize total number of detected reads on a log-scale with dimensi
 
 ```{r include=FALSE}
 
-# get pca coordinates 
-pca_1 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "pca")[,1])
-pca_2 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "pca")[,2])
-pca_3 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "pca")[,3])
+dim_red_df <- function(sample){
+  
+  # get pca coordinates 
+  pca_1 <- as.numeric(Embeddings(object = sample$clustered, reduction = "pca")[,1])
+  pca_2 <- as.numeric(Embeddings(object = sample$clustered, reduction = "pca")[,2])
+  pca_3 <- as.numeric(Embeddings(object = sample$clustered, reduction = "pca")[,3])
 
-# get tsne coordinates 
-tsne_1 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "tsne")[,1])
-tsne_2 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "tsne")[,2])
-tsne_3 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "tsne")[,3])
+  # get tsne coordinates 
+  tsne_1 <- as.numeric(Embeddings(object = sample$clustered, reduction = "tsne")[,1])
+  tsne_2 <- as.numeric(Embeddings(object = sample$clustered, reduction = "tsne")[,2])
+  tsne_3 <- as.numeric(Embeddings(object = sample$clustered, reduction = "tsne")[,3])
 
-# get umap coordinates 
-umap_1 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "umap")[,1])
-umap_2 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "umap")[,2])
-umap_3 <- as.numeric(Embeddings(object = pro_sample1$clustered, reduction = "umap")[,3])
+  # get umap coordinates 
+  umap_1 <- as.numeric(Embeddings(object = sample$clustered, reduction = "umap")[,1])
+  umap_2 <- as.numeric(Embeddings(object = sample$clustered, reduction = "umap")[,2])
+  umap_3 <- as.numeric(Embeddings(object = sample$clustered, reduction = "umap")[,3])
 
-# add information on number of detected reads
-umi_df <- GetAssayData(object = pro_sample1$clustered, slot = "counts") %>% colSums() %>% log()
+  # add information on number of detected reads on a log scale
+  umi_df <- GetAssayData(object = sample$clustered, slot = "counts") %>% colSums() %>% log()
 
-# make dfs 
-df_tsne <- data.frame(tsne_1, tsne_2, tsne_3)
-df_tsne$cluster <- as.factor(pro_sample1$clustered$seurat_clusters)
-df_tsne$reads <- umi_df
+  # make dfs 
+  df_tsne <- data.frame(tsne_1, tsne_2, tsne_3)
+  df_tsne$cluster <- as.factor(sample$clustered$seurat_clusters)
+  df_tsne$reads <- umi_df
 
-df_pca <- data.frame(pca_1, pca_2, pca_3)
-df_pca$cluster <- as.factor(pro_sample1$clustered$seurat_clusters)
-df_pca$reads <- umi_df
+  df_pca <- data.frame(pca_1, pca_2, pca_3)
+  df_pca$cluster <- as.factor(sample$clustered$seurat_clusters)
+  df_pca$reads <- umi_df
 
-df_umap <- data.frame(umap_1, umap_2, umap_3)
-df_umap$cluster <- as.factor(pro_sample1$clustered$seurat_clusters)
-df_umap$reads <- umi_df
+  df_umap <- data.frame(umap_1, umap_2, umap_3)
+  df_umap$cluster <- as.factor(sample$clustered$seurat_clusters)
+  df_umap$reads <- umi_df
+  
+  df_all <- list(df_pca, df_tsne, df_umap)
+  
+  return(df_all)
+}
+
+dimred_df <- list()
+for(i in 1:length(pro_sample)){
+  dimred_df[[i]] <- dim_red_df(pro_sample[[i]])
+}
 
 ```
 
@@ -597,8 +613,8 @@ reads_plot <- function(df, dim){
         mode = "markers",
         marker = list(size = 3), 
         hovertext = paste("log(Reads):", df$reads)) %>% 
-  layout(legend= list(itemsizing='constant'))
-  } else{
+  layout(legend= list(itemsizing='constant'), title=dh_organoid_ids[[i]])
+  } else {
     p <- plot_ly(data = df,
         x = ~df[,1], y = ~df[,2], z = ~df[,3],
         opacity = 1,
@@ -607,7 +623,7 @@ reads_plot <- function(df, dim){
         mode = "markers",
         marker = list(size = 3), 
         hovertext = paste("log(Reads):", df$reads)) %>% 
-  layout(legend= list(itemsizing='constant'))
+  layout(legend= list(itemsizing='constant', title=dh_organoid_ids[[i]]))
   }
   return(p)
 }
@@ -619,25 +635,41 @@ reads_plot <- function(df, dim){
 #### PCA
 ```{r}
 
-reads_plot(df=df_pca, dim=2)
-reads_plot(df=df_pca, dim=3)
+l2 <- l3 <-  htmltools::tagList()
+for(i in 1:length(pro_sample)){
+  l2[[i]] <- reads_plot(df=dimred_df[[i]][[1]], dim=2)
+  l3[[i]] <- reads_plot(df=dimred_df[[i]][[1]], dim=3)
+}
 
+l2
+l3
 ```
 
 #### t-SNE
 ```{r}
 
-reads_plot(df=df_tsne, dim=2)
-reads_plot(df=df_tsne, dim=3)
+l2 <- l3 <-  htmltools::tagList()
+for(i in 1:length(pro_sample)){
+  l2[[i]] <- reads_plot(df=dimred_df[[i]][[2]], dim=2)
+  l3[[i]] <- reads_plot(df=dimred_df[[i]][[2]], dim=3)
+}
 
+l2
+l3
 ```
 
 #### UMAP
 ```{r}
 
-reads_plot(df=df_umap, dim=2)
-reads_plot(df=df_umap, dim=3)
+l2 <- l3 <-  htmltools::tagList()
+for(i in 1:length(pro_sample)){
+  l2[[i]] <- reads_plot(df=dimred_df[[i]][[3]], dim=2)
+  l3[[i]] <- reads_plot(df=dimred_df[[i]][[3]], dim=3)
+}
 
+l2
+l3
 ```
+
 
 
