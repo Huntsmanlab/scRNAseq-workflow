@@ -12,9 +12,7 @@ output:
 params:
   pair_ids: 'pair_ids'
   sce_clus: 'sce_clus'
-  cell_cycle_species: 'cell_cycle_species'
-  sce_cell_cycle: 'sce_cell_cycle'
-  sce_cell_cycle_corrected: 'sce_cell_cycle_corrected'
+  cell_cycle_csv: 'cell_cycle_csv'
   
 ---
 
@@ -37,23 +35,35 @@ ids <- strsplit(params$pair_ids, "-")[[1]] %>% as.list(c(unlist(ids)))
 
 # snakemake passes the input files as one string separated by a space. we need to divide them into separate lists: 
 sce_clus <- as.list(unlist(strsplit(params$sce_clus[[1]], ' '))) 
-sce_cell_cycle <- as.list(unlist(strsplit(params$sce_cell_cycle[[1]], ' '))) 
-sce_cell_cycle_corrected <- as.list(unlist(strsplit(params$sce_cell_cycle_corrected[[1]], ' '))) 
+cell_cycle_csv <- as.list(unlist(strsplit(params$cell_cycle_csv[[1]], ' '))) 
 
-# run cyclone to assign cell cycles: 
-# save sce with cell cycle gene label information in 'cycle_gene_label' slot;
-# save sce corrected for cell cycle in 'cycle_corrected' slot.
+# load cell_cycle.csv if object already exists; otherwise, run cyclone
+sces <- cell_cycle <- list()
 
-# load sce with cell cycle information if object already exists; otherwise, run cyclone
-sces <- list()
 for(i in 1:length(ids)){
-  if(file.exists(sce_cell_cycle[[i]])==TRUE){
-    sces[[i]] <- readRDS(sce_cell_cycle[[i]])
+  if(file.exists(cell_cycle_csv[[i]])==TRUE){
+    
+    # cell cycle csv exists: append to sce_clus column
+    sces[[i]] <- readRDS(sce_clus[[i]])
+    cell_cycle[[i]] <- read_csv(cell_cycle_csv[[i]])
+    
+    # add cell cycle information to sce:
+    sces[[i]]$cell_cycle <- cell_cycle[[i]]$cell_cycle
+    
+    # for each gene, get the percentage of variance explained by cell cycle; keep those genes with %variance explained less than 5%
+    diff <- getVarianceExplained(sces[[i]], DataFrame(sces[[i]]$cell_cycle))
+    discard <- diff > 5
+
+    # label identified cell cycle genes as TRUE in the cell_cycle_gene column of sce rowData:
+    # we can use this column to filter out cell cycle related genes when performing DGE analysis
+    rowData(sces[[i]])$cell_cycle_gene <- as.logical(discard)
+    rowData(sces[[i]])$cell_cycle_gene[is.na(rowData(sces[[i]])$cell_cycle_gene)] <- FALSE
+    
   } else {
-    sces[[i]] <- assign_cell_cycle(path_to_sce = sce_clus[[i]], 
-                                  species = params$cell_cycle_species, 
-                                  output_path = sce_cell_cycle[[i]],
-                                  corrected_path = sce_cell_cycle_corrected[[i]])
+    
+    # run cyclone to assign cell cycles: 
+    # save sce with cell cycle gene label information in 'cycle_gene_label' slot
+    sces[[i]] <- assign_cell_cycle(path_to_sce = sce_clus[[i]], cell_cycle_csv = cell_cycle_csv[[i]])
   }
 }
 
@@ -61,19 +71,19 @@ for(i in 1:length(ids)){
 ```
 
 
-```{r}
+```{r, echo=FALSE}
 
 ### 1. Bar plot showing the proportion of cells belonging to each cell cycle phase
 
 p <- list()
 
-for (i in 1:length(sces)){
+for (i in 1:length(ids)){
   if (is.null(sces[[i]]$cell_type)){
     
      # If no information on cell type:
      # Tabulate cell cycle results into a dataframe and plot: showing proportion of cell cycle phases within each cell type
     df <- data.frame(cell=sces[[i]]$Barcode, cell_cycle=sces[[i]]$cell_cycle)
-    df <- df %>% dplyr::group_by(cell_cycle) %>% dplyr::summarize(count=n()) %>% dplyr::mutate(prop=count/sum(count))
+    df <- df %>% group_by(cell_cycle) %>% summarize(count=n()) %>% mutate(prop=count/sum(count))
     
      # Visualize the proportion of cell cycle phases for each sample.
     p[[i]] <- df %>% ggplot(aes(fill=cell_cycle, y=prop, x=cell_cycle)) +
@@ -85,7 +95,7 @@ for (i in 1:length(sces)){
       
        # If plotting cell cycle for each cell type:
       df <- data.frame(cell=sces[[i]]$Barcode, cell_type=sces[[i]]$cell_type, cell_cycle=sces[[i]]$cell_cycle)
-      df <- df %>% dplyr::group_by(cell_type, cell_cycle) %>% dplyr::summarize(count=n()) %>% dplyr::mutate(prop=count/sum(count))
+      df <- df %>% group_by(cell_type, cell_cycle) %>% summarize(count=n()) %>% mutate(prop=count/sum(count))
   
       p[[i]] <- df %>% ggplot(aes(fill=cell_cycle, y=prop, x=cell_cycle)) +
         geom_bar(position="dodge", stat="identity") +
@@ -146,7 +156,7 @@ for(i in 1:length(sces)){
 Bar plots showing distribution of cell cycle phases for each sample.
 
 ```{r}
-plot_grid(p[[1]], p[[2]], ncol=2)
+for(i in 1:length(p)) print(p[[i]]) 
 ```
 
 
@@ -156,10 +166,10 @@ plot_grid(p[[1]], p[[2]], ncol=2)
 We can regress out the cell cycle effect and plot cells on a PCA space. One assumption for regressing out cell cycle is that the two subpopulations have similar cell cycle phase distribution. This can be examined by looking at the bar plots above.
 
 ```{r}
-plot_grid(pca[[1]], pca[[2]], nrow=2)
+for(i in 1:length(pca)) print(plot_grid(pca[[i]]))
 ```
 
-### PCA plot showing cell cycle clustering and cell clustering before cell cycle correction
+### PCA plot showing cell cycle clustering and cell clustering BEFORE cell cycle correction
 
 Next, we plot PCA with cell cycle information alongside PCA showing cell clustering. This could inform us if cells cluster by cell cycle phases.
 
@@ -171,10 +181,10 @@ for(i in 1:length(sces)){
   
   clustering[[i]] <- plotReducedDim(sces[[i]], dimred="PCA", ncomponents = 2, colour_by="cluster") + 
     ggtitle(paste0(ids[[i]], ": cell clustering (PCA)"))
+  
+  print(plot_grid(cycle[[i]], clustering[[i]], nrow=1))
 }
 
-plot_grid(cycle[[1]], clustering[[1]], nrow=1)
-plot_grid(cycle[[2]], clustering[[2]], nrow=1)
 
 ```
 
@@ -183,11 +193,11 @@ plot_grid(cycle[[2]], clustering[[2]], nrow=1)
 ## tSNE before and after correcting for cell cycle effect
 
 ```{r}
-plot_grid(tsne[[1]], tsne[[2]], nrow=2)
+for(i in 1:length(tsne)) print(plot_grid(tsne[[i]]))
 ```
 
 
-### tSNE showing cell cycle clustering and cell clustering before cell cycle correction
+### tSNE showing cell cycle clustering and cell clustering BEFORE cell cycle correction
 
 ```{r}
 clustering <- cycle <- list()
@@ -197,10 +207,10 @@ for(i in 1:length(sces)){
   
   clustering[[i]] <- plotReducedDim(sces[[i]], dimred="TSNE", ncomponents = 2, colour_by="cluster") + 
     ggtitle(paste0(ids[[i]], ": cell clustering (tSNE)"))
+  
+  print(plot_grid(cycle[[i]], clustering[[i]], nrow=1))
 }
 
-plot_grid(cycle[[1]], clustering[[1]], nrow=1)
-plot_grid(cycle[[2]], clustering[[2]], nrow=1)
 
 ```
 
@@ -209,10 +219,10 @@ plot_grid(cycle[[2]], clustering[[2]], nrow=1)
 ## UMAP before and after correting for cell cycle effect
 
 ```{r}
-plot_grid(umap[[1]], umap[[2]], nrow=2)
+for(i in 1:length(umap)) print(plot_grid(umap[[i]]))
 ```
 
-### UMAP showing cell cycle clustering and cell clustering before cell cycle correction
+### UMAP showing cell cycle clustering and cell clustering BEFORE cell cycle correction
 
 ```{r}
 clustering <- cycle <- list()
@@ -222,10 +232,10 @@ for(i in 1:length(sces)){
   
   clustering[[i]] <- plotReducedDim(sces[[i]], dimred="UMAP", ncomponents = 2, colour_by="cluster") + 
     ggtitle(paste0(ids[[i]], ": cell clustering (UMAP)"))
+  
+  print(plot_grid(cycle[[i]], clustering[[i]], nrow=1))
 }
 
-plot_grid(cycle[[1]], clustering[[1]], nrow=1)
-plot_grid(cycle[[2]], clustering[[2]], nrow=1)
 
 ```
 
@@ -247,11 +257,10 @@ for (i in 1:length(sces)){
         facet_wrap(~cluster) +
         geom_text(aes(label=round(prop,2)), size=3) +
         labs(x='Cell Cycle Phases', y='Proportion of Cells', title=paste0(ids[[i]], ": cell cycle phase distribution for each cluster"))
+      
+      print(p[[i]])
 
  }
-
-p[[1]]
-p[[2]]
 
 ```
 
