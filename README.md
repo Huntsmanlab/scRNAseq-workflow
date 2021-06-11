@@ -3,16 +3,14 @@
 > This repository contains the code used by the Huntsman Lab at BCCRC for single cell RNA sequencing analysis from 10x experiments.
 
 **The steps of the pipeline are as follows:**  
-1. make_sce: Make a SingleCellExperiment object from filtered counts  
-2. do_qc: Perform quality control to further filter cells with low reads and/or high mitochondrial content  
-3. run_summary_stats: Visualize the results of quality control 
-4. process_qc_normalization: a combination of step 1 and 2 with an additional step of normalization. We can run this rule directly to get the qc'd and normalized sce object
-6. dimred_cluster: Do dimensionality reduction (PCA, tSNE and UMAP). Perform unsupervised clustering. 
-7. do_batch_correction: Do batch correction and integration using seurat and scran, if needed  
-8. DGE_scran, DGE_edgeR_TWO_samples, DGE_edgeR_MULTIPLE_samples: Calculate the differentially expressed genes using scran (two paired samples) or edgeR (multiple samples), visualize the result with volcano plots, and perform enrichment analysis to find upregulated pathways
-9. integrate_cell_assign_results: Annotate cell types using cell assign and visulize cell clustering and cell type with dimension reduction plots
-10. run_cell_cycle_report: Assign cell cycle phases using cyclone and visualize cell cycle phases with dimension reduction plots and bar plots
-11. seurat_to_loom: convert sce with cell type information to seurat and then to a loom file in preparation for velocity analyses
+1. process_qc_normalization: Make a SingleCellExperiment object from filtered counts. Perform quality control to further filter cells with low reads and/or high mitochondrial content. We run this rule to get the normalized sce object.
+2. run_summary_stats: Visualize the results of raw data and data after quality control. We run this rule to generate a rmd report on summary statistics and dimension reduction plots.
+3. dimred_cluster: Do dimensionality reduction (PCA, tSNE and UMAP). Perform unsupervised clustering. We run this rule to get the sce object with clustering and dimension reduction information.
+4. do_batch_correction: Do batch correction and integration using seurat and scran, if needed. We run this rule to get scran corrected and seurat corrected sce objects for downstream analysis (i.e., integrated cell assign); and generate a rmd report visualizing dimension reduction and clustering plots before and after batch correction.
+5. integrate_cell_assign_results: Annotate cell types using cell assign and visulize cell clustering and cell type with dimension reduction plots. We run this rule to save a csv file on cell type information; and generate a rmd report. 
+6. run_cell_cycle_report: Assign cell cycle phases using cyclone and visualize cell cycle phases with dimension reduction plots and bar plots. We run this rule to save a csv file on cell cycle phase information; and generate a rmd report. 
+7. DGE_scran, DGE_edgeR_TWO_samples, DGE_edgeR_MULTIPLE_samples: Calculate the differentially expressed genes using scran (two paired samples) or edgeR (multiple samples), visualize the result with volcano plots, and perform enrichment analysis to find upregulated pathways
+8. seurat_to_loom: convert sce with cell type information to seurat and then to a loom file in preparation for velocity analyses
 
 For workflow management, we use Snakemake. For details on how to install and use it, refer <a href="https://snakemake.readthedocs.io/en/stable/" target="_blank">here</a>. More detailed instructions on how to run the pipeline through Snakemake are given in the Snakefile, and in the snakefile help document as well. 
 
@@ -27,15 +25,13 @@ rule all:
     # compute_diff_map,
     # do_batch_correction,
     # integrate_cell_assign_results,
-    run_cell_cycle_report,
+    # run_cell_cycle_report,
     
     # DGE_scran,
     # DGE_edgeR_TWO_samples,
     # DGE_edgeR_MULTIPLE_samples,
     # seurat_to_loom
     
-    ## make_sce,
-    ## do_qc,
     ## perform_dim_reduction, # determine number of PCs to use
     ## cluster_sce, #clustering on dividual sample
     ## cluster_two_samples, #clustering on integrated sample
@@ -56,12 +52,9 @@ sce_qc_original <- altExp(sce_qc_hvg, "original", withColData=TRUE)
 
 ### Running the pipeline through Snakemake 
 The following steps of the scRNA workflow use the same wildcards:  
-- make a SingleCellExperiment object  
-- perform quality control  
-- log normalization  
+- make a SingleCellExperiment object; perform quality control; log normalization  
+- make summary statistics report
 - dimensionality reduction  
-- individual clustering (cluster one sample)  
-- combined clustering (cluster multiple samples)  
 To perform these analyses, fill in the ids in the Snakefile as shown:  
 `ids = ['DH4', 'DH17', 'DH10', 'DH3', 'DH15', 'DH16']`  
 You can write as many as you need to; analysis steps mentioned above will be computed for each of the ids; however, some analyses may treat the ids differently. For example, quality control will be performed on each id individually, but combined clustering analysis will combine all the samples given. Note that you can only do combined clustering analysis on two samples. Individual clustering and combined clustering will generate reports, which can be found in `/reports/separate_clustering` and `/reports/combined_clustering`. Once you are done with these steps, you may move on to the next analyses which require more than one id to perfom.  
@@ -127,7 +120,6 @@ After viewing the clustering plots with various k values, the user is expected t
 
 **sample_type:** this is where we specify the type of sample for running cell assign. The pipeline will assemble a marker gene matrix corresponding to the sample type. Pass "GC" if running granulosa cell samples; ".." if running .. cell samples.
 
-**cell_cycle_species:** cyclone has a built-in reference cell cycle gene list on human and mouse, respectively, for determining and assigning cell cycle phases. If running human samples, pass "human"; otherwise pass "mouse".
   
 > To run the pipeline using snakemake, change the name of the snakefile from 'sample_snakefile' to 'Snakefile' on your local machine after pulling from master.  
 
