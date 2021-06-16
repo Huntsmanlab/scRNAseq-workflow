@@ -5,7 +5,7 @@
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
-convert_to_sces <- function(path_to_10X, ids) {
+convert_to_sces <- function(path_to_10X, id) {
 
     sce <- read10xCounts(samples = path_to_10X) # depending on which number we are at, pick the data set from the list with the correct index 
     
@@ -29,6 +29,8 @@ convert_to_sces <- function(path_to_10X, ids) {
     location <- is.na(names(rowData(sce)))
     names(rowData(sce))[location] <- 'NA'
   
-  return(results_sce) #return the list that contains all the sce objects we made in this function 
+  return(sce) #return the list that contains all the sce objects we made in this function 
   
 } # end of function 
+
+
