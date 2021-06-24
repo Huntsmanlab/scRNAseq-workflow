@@ -27,6 +27,7 @@ make_seurat_object <- function(cell_type_csv,
   sobject$cell_type <- sce$cell_type
   
   # make loom file from the sobject with cell assign info
+  if(!dir.exists(path_to_loom_file)){ dir.create(dirname(path_to_loom_file))}
   seurat_cas.loom <- as.loom(sobject, filename = path_to_loom_file, verbose = FALSE)
   
   # save barcode in tsv

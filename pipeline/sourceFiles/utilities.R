@@ -877,6 +877,19 @@ seurat_integrate <- function(path_to_sce_clus,
   
 } # end of function 
 
+########################################################################################################################
 
+#Utility function to extract the marker effect sizes as a matrix from the output of findMarkers.
+
+getMarkerEffects <- function(x, prefix="logFC", strip=TRUE) {
+  regex <- paste0("^", prefix, "\\.")
+  i <- grep(regex, colnames(x))
+  out <- as.matrix(x[,i])
+  
+  if (strip) {
+    colnames(out) <- sub(regex, "", colnames(out))
+  }
+  out
+}
 
 

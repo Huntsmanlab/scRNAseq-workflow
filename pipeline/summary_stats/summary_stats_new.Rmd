@@ -301,11 +301,12 @@ cowplot::plot_grid(ncol = 4,
 ```
 
 
+```{r echo = FALSE, message = FALSE, warning = FALSE, eval=FALSE}
+
+
 ## Dimensionality Reduction Plots
 
-Next we include some dimensionality reduction plots (PCA, tSNE, and UMAP). Plots on the left are before quality control, plots on the right are after. 
-
-```{r echo = FALSE, message = FALSE, warning = FALSE}
+#Next we include some dimensionality reduction plots (PCA, tSNE, and UMAP). Plots on the left are before quality control, plots on the right are after. 
 
 dim_red_plot <- function(seurat_obj){
   p <- list()
@@ -329,19 +330,19 @@ after <- dim_red_plot(all_qc)
 
 ```
 
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15, eval=FALSE}
 
 grid.arrange(ggplotify::as.grob(before[[1]][[1]]), ggplotify::as.grob(after[[1]][[1]]), nrow = 1)
 
 ```
 
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15, eval=FALSE}
 
 grid.arrange(ggplotify::as.grob(before[[2]][[1]]), ggplotify::as.grob(after[[2]][[1]]), nrow = 1)
 
 ```
 
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15, eval=FALSE}
 
 grid.arrange(ggplotify::as.grob(before[[3]][[1]]), ggplotify::as.grob(after[[3]][[1]]), nrow = 1)
 

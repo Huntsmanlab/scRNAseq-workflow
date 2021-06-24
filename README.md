@@ -6,11 +6,12 @@
 1. process_qc_normalization: Make a SingleCellExperiment object from filtered counts. Perform quality control to further filter cells with low reads and/or high mitochondrial content. We run this rule to get the normalized sce object.
 2. run_summary_stats: Visualize the results of raw data and data after quality control. We run this rule to generate a rmd report on summary statistics and dimension reduction plots.
 3. dimred_cluster: Do dimensionality reduction (PCA, tSNE and UMAP). Perform unsupervised clustering. We run this rule to get the sce object with clustering and dimension reduction information.
-4. do_batch_correction: Do batch correction and integration using seurat and scran, if needed. We run this rule to get scran corrected and seurat corrected sce objects for downstream analysis (i.e., integrated cell assign); and generate a rmd report visualizing dimension reduction and clustering plots before and after batch correction.
-5. integrate_cell_assign_results: Annotate cell types using cell assign and visulize cell clustering and cell type with dimension reduction plots. We run this rule to save a csv file on cell type information; and generate a rmd report. 
-6. run_cell_cycle_report: Assign cell cycle phases using cyclone and visualize cell cycle phases with dimension reduction plots and bar plots. We run this rule to save a csv file on cell cycle phase information; and generate a rmd report. 
-7. DGE_scran, DGE_edgeR_TWO_samples, DGE_edgeR_MULTIPLE_samples: Calculate the differentially expressed genes using scran (two paired samples) or edgeR (multiple samples), visualize the result with volcano plots, and perform enrichment analysis to find upregulated pathways
-8. seurat_to_loom: convert sce with cell type information to seurat and then to a loom file in preparation for velocity analyses
+4. compute_diff_map: Compute diffusion map coordinates. We run this rule to get the dm.rds for plotting diffusion map.
+5. do_batch_correction: Do batch correction and integration using seurat and scran, if needed. We run this rule to get scran corrected and seurat corrected sce objects for downstream analysis (i.e., integrated cell assign); and generate a rmd report visualizing dimension reduction and clustering plots before and after batch correction.
+6. integrate_cell_assign_results: Annotate cell types using cell assign and visulize cell clustering and cell type with dimension reduction plots. We run this rule to save a csv file on cell type information; and generate a rmd report. 
+7. run_cell_cycle_report: Assign cell cycle phases using cyclone and visualize cell cycle phases with dimension reduction plots and bar plots. We run this rule to save a csv file on cell cycle phase information; and generate a rmd report. 
+8. DGE_scran, DGE_edgeR_TWO_samples, DGE_edgeR_MULTIPLE_samples: Calculate the differentially expressed genes using scran (two paired samples) or edgeR (multiple samples), visualize the result with volcano plots, and perform enrichment analysis to find upregulated pathways.
+9. seurat_to_loom: convert sce with cell type information to seurat and then to a loom file in preparation for velocity analyses. We run thsi rule to get the loom object.
 
 For workflow management, we use Snakemake. For details on how to install and use it, refer <a href="https://snakemake.readthedocs.io/en/stable/" target="_blank">here</a>. More detailed instructions on how to run the pipeline through Snakemake are given in the Snakefile, and in the snakefile help document as well. 
 
@@ -26,12 +27,12 @@ rule all:
     # do_batch_correction,
     # integrate_cell_assign_results,
     # run_cell_cycle_report,
+    # seurat_to_loom,
     
     # DGE_scran,
     # DGE_edgeR_TWO_samples,
     # DGE_edgeR_MULTIPLE_samples,
-    # seurat_to_loom
-    
+
     ## perform_dim_reduction, # determine number of PCs to use
     ## cluster_sce, #clustering on dividual sample
     ## cluster_two_samples, #clustering on integrated sample
