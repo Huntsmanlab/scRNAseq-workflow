@@ -10,7 +10,7 @@ output:
     toc_depth: 4
 
 params:
-  pair_ids: 'DH21_NEW-DH21_control' # write here the ids you want to integrate, separate by '-'
+  pair_ids: 'DH1_DBZ-DH1_control' # write here the ids you want to integrate, separate by '-'
   id_type: 'id_type' # here you can write a quick summary of what these ids are, like tissue types etc. 
   
 ---
@@ -24,6 +24,7 @@ library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 source(here('pipeline', 'cellassign', 'scripts', 'run_cellassign.R'))
 source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix.R'))
+set.seed(1234)
 
 ```
 
@@ -35,8 +36,8 @@ id.list <- as.list(c(unlist(list(id.list))))
 
 # run cell assign and get sce with cell type information
 sample_type <- "other" # if granulosa samples, change to "GC"; if .. samples, change to ..
-sce_clus <- lapply(id.list, function(id) here('..', 'data', 'clustered', 'sce', id, 'sce_clus.rds'))
-cell_type_csv <- lapply(id.list, function(id) here('..', 'data', 'cellassign', id, 'cell_types.csv'))
+sce_clus <- lapply(id.list, function(id) here('..', '..', 'general', 'data', 'clustered', 'sce', id, 'sce_clus.rds'))
+cell_type_csv <- lapply(id.list, function(id) here('..', '..', 'general', 'data', 'cellassign', id, 'cell_types.csv'))
 
 # load cell_type_csv if object already exists; or run cellassign
 sce_cas <- list()
@@ -54,10 +55,10 @@ for(i in 1:length(id.list)){
 }
 
 # load scran batch corrected objects
-scran <- readRDS(here('..', 'data', 'batch_corrected', params$pair_ids, 'scran_corrected.rds'))
+scran <- readRDS(here('..', '..', 'general', 'data', 'batch_corrected', params$pair_ids, 'scran_corrected.rds'))
 
 # load seurat batch corrected objects
-integrated <- readRDS(here('..', 'data', 'batch_corrected', params$pair_ids, 'seurat_corrected.rds'))
+integrated <- readRDS(here('..', '..', 'general', 'data', 'batch_corrected', params$pair_ids, 'seurat_corrected.rds'))
 
 # get marker matrix and sort 
 marker_mat <- create_marker_mat("other")
