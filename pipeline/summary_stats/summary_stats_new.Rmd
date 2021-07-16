@@ -19,6 +19,7 @@ params:
   ribo_thresh_max: 'ribo_thresh_max'
   nmads: 'nmads'
   remove_mito_and_ribo: 'remove_mito_and_ribo' # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
+  dm_path: dm_path
   
 ---
 
@@ -67,6 +68,7 @@ dh_organoid_ids <- as.list(c(unlist(list(ids))))
 
 # snakemake passes paths to input files as one string where paths to individual objects are separated by spaces. now we account for that here and get the separate paths.  
 path_to_10X <- as.list(unlist(strsplit(params$path_to_10X[[1]], ' '))) 
+dm_path <- as.list(unlist(strsplit(params$dm_path[[1]], ' '))) 
 
 # make sce from 10x output and do qc
 sce_raws <- sce_qcs <- list()
@@ -301,24 +303,31 @@ cowplot::plot_grid(ncol = 4,
 ```
 
 
-```{r echo = FALSE, message = FALSE, warning = FALSE, eval=FALSE}
-
-
 ## Dimensionality Reduction Plots
 
-#Next we include some dimensionality reduction plots (PCA, tSNE, and UMAP). Plots on the left are before quality control, plots on the right are after. 
+Next we include some dimensionality reduction plots (PCA, tSNE, and UMAP). Plots on the left are before quality control, plots on the right are after. 
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
 
 dim_red_plot <- function(seurat_obj){
   p <- list()
   
+  # scale data before PCA
   seurat_obj <- FindVariableFeatures(seurat_obj)
   seurat_obj <- ScaleData(seurat_obj)
 
+  # run PCA, UMAP, and TSNE
   seurat_obj <- RunPCA(seurat_obj, verbose = FALSE)
   seurat_obj <- RunUMAP(seurat_obj, dims = 1:30)
   seurat_obj <- RunTSNE(seurat_obj, dims = 1:30, check_duplicates = FALSE, perplexity = 10)
-
-  p[[1]] <- DimPlot(seurat_obj, reduction = 'pca', group.by = 'orig.ident', combine = FALSE)
+  
+  # Get the total variance and compute variance explained by the first 2 PCs
+  total_variance <- seurat_obj[["pca"]]@misc$total.variance
+  eigValues <- (seurat_obj[["pca"]]@stdev)^2 
+  varExplained <- label_percent()(eigValues/total_variance)[1:2] 
+  
+  # dim reduction plot
+  p[[1]] <- DimPlot(seurat_obj, reduction = 'pca', group.by = 'orig.ident') + xlab(paste0("PC1: ", varExplained[1])) + ylab(paste0("PC2: ", varExplained[2]))
   p[[2]] <- DimPlot(seurat_obj, reduction = 'tsne', group.by = 'orig.ident', combine = FALSE)
   p[[3]] <- DimPlot(seurat_obj, reduction = 'umap', group.by = 'orig.ident', combine = FALSE)
   
@@ -330,23 +339,24 @@ after <- dim_red_plot(all_qc)
 
 ```
 
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15, eval=FALSE}
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
 
-grid.arrange(ggplotify::as.grob(before[[1]][[1]]), ggplotify::as.grob(after[[1]][[1]]), nrow = 1)
+grid.arrange(ggplotify::as.grob(before[[1]]), ggplotify::as.grob(after[[1]]), nrow = 1)
 
 ```
 
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15, eval=FALSE}
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
 
 grid.arrange(ggplotify::as.grob(before[[2]][[1]]), ggplotify::as.grob(after[[2]][[1]]), nrow = 1)
 
 ```
 
-```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15, eval=FALSE}
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 15}
 
 grid.arrange(ggplotify::as.grob(before[[3]][[1]]), ggplotify::as.grob(after[[3]][[1]]), nrow = 1)
 
 ```
+
 
 
 ## Most variable features
@@ -386,13 +396,14 @@ for(i in 1:length(seurat_qc)){
 
 ```{r}
 
+t <- htmltools::tagList()
 for(i in 1:length(mvf)){
-  print(DT::datatable(HVFInfo(mvf[[i]]$seurat_obj)[VariableFeatures(mvf[[i]]$seurat_obj), ],
-  extensions = 'Buttons',
-  options = list(dom = 'Bfrtip',
-                 buttons = list("copy", "excel", "csv", "pdf")),
-  caption = paste0("Most variable genes in ", dh_organoid_ids[[i]])))
+  t[[i]] <- print(DT::datatable(HVFInfo(mvf[[i]]$seurat_obj)[VariableFeatures(mvf[[i]]$seurat_obj), ],
+                                extensions = 'Buttons',
+                                options = list(dom = 'Bfrtip', buttons = list("copy", "excel", "csv", "pdf")),
+                                caption = paste0("Most variable genes in ", dh_organoid_ids[[i]])))
 }
+t
 
 ```
 
@@ -476,16 +487,57 @@ Clustering cells and running a DE analysis between clusters can give an idea abo
 * ribosomal content (percentage)  
 * number of detected genes  
 
-0.5 was chosen as a resolution. 
+0.5 was chosen as a resolution. Larger resolution gives you more clusters. The recommended resoluation range is 0.4-1.2 for dataset with ~3k cells.
 
 Now let's look at the chosen resolution (0.5) in more detail. We visualize the clusters in a dimensionality reduction plots below. 
+
+#### PCA
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
+
+for(i in 1:length(pro_sample)){
+  qc_sample[[i]] <- pro_sample[[i]]$clustered
+  
+  # Get the total variance and compute variance explained by the first 2 PCs
+  total_variance <- qc_sample[[i]][["pca"]]@misc$total.variance
+  eigValues <- (qc_sample[[i]][["pca"]]@stdev)^2 
+  varExplained <- label_percent()(eigValues/total_variance)[1:2] 
+  
+  print(DimPlot(qc_sample[[i]], reduction = "pca") + ggtitle(dh_organoid_ids[[i]]) +
+     xlab(paste0("PC1: ", varExplained[1])) + ylab(paste0("PC2: ", varExplained[2]))) 
+}
+
+
+```
+
 
 #### t-SNE
 ```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
 
 for(i in 1:length(pro_sample)){
-  qc_sample[[i]] <- pro_sample[[i]]$clustered
   print(DimPlot(qc_sample[[i]], reduction = "tsne") + ggtitle(dh_organoid_ids[[i]]))
+}
+
+
+```
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10, eval=FALSE}
+
+# change colors:
+
+colors_list <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494", "#B3B3B3", '#E2201C', '#1D91C0', '#6B3E9A', '#32A028', "deepskyblue", "black")
+
+min_cluster <- as.numeric(min(as.vector(pro_sample[[1]]$cluster$seurat_clusters)))
+max_cluster <- as.numeric(max(as.vector(pro_sample[[1]]$cluster$seurat_clusters)))
+
+cluster_name <- min_cluster:max_cluster
+colors_list <- colors_list[1:(max_cluster+1)]
+
+
+for(i in 1:length(pro_sample)){
+  qc_sample[[i]] <- pro_sample[[i]]$clustered
+  print(DimPlot(qc_sample[[i]], reduction = "tsne") + 
+          ggtitle(dh_organoid_ids[[i]]) + 
+          scale_color_manual(values=colors_list))
 }
 
 ```
@@ -500,6 +552,162 @@ for(i in 1:length(pro_sample)){
 
 ```
 
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10, eval=FALSE}
+
+for(i in 1:length(pro_sample)){
+  print(DimPlot(qc_sample[[i]], reduction = "umap") + 
+          ggtitle(dh_organoid_ids[[i]]) +
+          scale_color_manual(values=colors_list))
+}
+
+```
+
+#### Diffusion map
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
+
+PlotDiffMap <- function(dat, dm_path, dim){
+
+  logcounts <- GetAssayData(dat) %>% as.matrix  
+  
+  # compute diffusion map
+  if(!file.exists(dm_path)){
+    dm <- DiffusionMap(t(logcounts), n_pcs = 30)
+    dir.create(dirname(dm_path)) # create sample folder
+    saveRDS(dm, file=dm_path)
+  } else{
+    dm <- readRDS(dm_path)
+  }
+  
+  # make df with the diffusion map coodinates, we will use this later to make the dm plot 
+  tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
+                  DC2 = eigenvectors(dm)[, 2],
+                  DC3 = eigenvectors(dm)[, 3],
+                  Timepoint = as.factor(dat$seurat_clusters), 
+                  ids = dat$orig.ident) # this will help color based on cluster 
+
+  # remove grid from plot_ly
+  ax <- list(zeroline = FALSE, showline = TRUE, showgrid = FALSE)
+
+  if(dim==2){
+    # make the 2D plot 
+    p <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2,
+        opacity = 1,
+        color = ~Timepoint,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5)) %>% 
+      layout(legend= list(itemsizing='constant'), title=dh_organoid_ids[[i]])
+  } else {
+    # make the 3d plot 
+   p <- plot_ly(data = tmp,
+        x = ~DC1, y = ~DC2, z = ~DC3,
+        opacity = 1,
+        color = ~Timepoint,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 3))  %>% 
+      layout(legend= list(itemsizing='constant'), title=dh_organoid_ids[[i]])
+  }
+  return(p)
+}
+
+l2 <- l3 <- htmltools::tagList()
+for(i in 1:length(pro_sample)){
+  l2[[i]] <- PlotDiffMap(qc_sample[[i]], dm_path[[i]], dim=2)
+  l3[[i]] <- PlotDiffMap(qc_sample[[i]], dm_path[[i]], dim=3)
+}
+
+l2
+l3
+```
+
+
+#### 2d UMAP and tSNE showing logcounts of reporter genes (if there is any)
+
+```{r}
+# add genes of interest here:
+reporters <- c("eGFP", "dsRED", "tdTomato")
+
+PlotReporter <- function(reporters, sce){
+  
+  for(i in 1:length(reporters)){
+  if(any(grepl(reporters[i], rownames(sce), ignore.case = TRUE) == TRUE)){
+    
+    # if our sample contains one of the reporter genes:
+    count <- GetAssayData(sce) %>% as.matrix  
+    reporter_idx <- grep(reporters[i], rownames(sce), ignore.case = TRUE)
+    count_reporter <- count[reporter_idx,]
+    
+    df_umap <- cbind(sce[["umap"]]@cell.embeddings %>% as.data.frame(), sce[["tsne"]]@cell.embeddings %>% as.data.frame())
+    df_umap$logcounts <- count_reporter
+    
+  p2[[i]] <- plot_ly(data = df_umap,
+        x = ~UMAP_1, y = ~UMAP_2,
+        opacity = 1,
+        color = ~logcounts,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 4), 
+        colors = brewer.pal(6, "Reds")) %>% 
+          layout(title=paste0(reporters[[i]], "_logcount"),
+         xaxis = ax, yaxis = ax)
+  
+    p3[[i]] <- plot_ly(data = df_umap,
+        x = ~tSNE_1, y = ~tSNE_2,
+        opacity = 1,
+        color = ~logcounts,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 4), 
+        colors = brewer.pal(6, "Reds")) %>% 
+          layout(title=paste0(reporters[[i]], "_logcount"),
+         xaxis = ax, yaxis = ax)
+    
+    p[[i]] <- subplot(p2[[i]], p3[[i]]) %>% layout(title=dh_organoid_ids[[i]])
+  }
+  }
+  return(p)
+}
+
+p <- htmltools::tagList()
+for(i in 1:length(pro_sample)){
+  p[[i]] <- PlotReporter(reporters, qc_sample[[i]])
+}
+p
+
+```
+
+
+### Number of cells in each cluster
+
+```{r}
+
+MakeTableClusters <- function(dat){
+  # make a table summarizing number of cells per cluster
+  clus <- dat$seurat_clusters %>% levels() 
+  df <- matrix(NA, ncol=2, nrow=length(clus))
+  for(i in 1:length(clus)){
+    num_cell <- which(dat$seurat_clusters==clus[i]) %>% length()
+    df[i,] <- c(clus[i], num_cell)
+}
+
+  # convert matrix to dataframe and add column name
+  df <- data.frame(df)
+  colnames(df) <- c("Cluster", "Number of Cells")
+  
+  return(df)
+}
+
+df <- htmltools::tagList()
+for(i in 1:length(pro_sample)){
+  df[[i]] <- MakeTableClusters(qc_sample[[i]]) %>% 
+    datatable(caption = paste0('Number of cells per cluster in ', dh_organoid_ids[[i]]))
+}
+df
+
+```
 
 
 ## Visualize Clusters with Violin Plots
@@ -640,9 +848,9 @@ reads_plot <- function(df, dim){
 
 
 #### PCA
-```{r}
+```{r fig.height = 5, fig.width = 10}
 
-l2 <- l3 <-  htmltools::tagList()
+l2 <- l3 <- htmltools::tagList()
 for(i in 1:length(pro_sample)){
   l2[[i]] <- reads_plot(df=dimred_df[[i]][[1]], dim=2)
   l3[[i]] <- reads_plot(df=dimred_df[[i]][[1]], dim=3)
@@ -653,9 +861,9 @@ l3
 ```
 
 #### t-SNE
-```{r}
+```{r fig.height = 5, fig.width = 10}
 
-l2 <- l3 <-  htmltools::tagList()
+l2 <- l3 <- htmltools::tagList()
 for(i in 1:length(pro_sample)){
   l2[[i]] <- reads_plot(df=dimred_df[[i]][[2]], dim=2)
   l3[[i]] <- reads_plot(df=dimred_df[[i]][[2]], dim=3)
@@ -666,9 +874,9 @@ l3
 ```
 
 #### UMAP
-```{r}
+```{r fig.height = 5, fig.width = 10}
 
-l2 <- l3 <-  htmltools::tagList()
+l2 <- l3 <- htmltools::tagList()
 for(i in 1:length(pro_sample)){
   l2[[i]] <- reads_plot(df=dimred_df[[i]][[3]], dim=2)
   l3[[i]] <- reads_plot(df=dimred_df[[i]][[3]], dim=3)
@@ -677,4 +885,52 @@ for(i in 1:length(pro_sample)){
 l2
 l3
 ```
+
+## Finding differentially expressed features
+
+A heatmap of gene expression of gene markers for each cluster. Data used for plotting are centered and scaled. Yellow and purple mean high and low expression, respectively. We also include a table showing top 10 upregulated genes in each cluster. 
+
+```{r fig.height = 15, fig.width = 16, message=FALSE, echo = FALSE, warning=FALSE}
+
+hm <- d <- htmltools::tagList()
+for(i in 1:length(pro_sample)){
+  # find markers for every cluster compared to all remaining cells, report only the positive ones
+  dat.markers <- FindAllMarkers(qc_sample[[i]], only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  
+  # get top 10 DEGs and plot heatmap
+  top10 <- dat.markers %>%
+    group_by(cluster) %>%
+    top_n(n = 10, wt = avg_logFC)
+  
+  print(DoHeatmap(qc_sample[[i]], features = top10$gene) + NoLegend() + labs(title = dh_organoid_ids[[i]]))
+  
+  # make a table to show top10 upregulated genes in each cluster
+  min.clus <- as.numeric(min(as.vector(qc_sample[[i]]$seurat_clusters)))
+  max.clus <- as.numeric(max(as.vector(qc_sample[[i]]$seurat_clusters)))
+
+  ind <- min.clus:max.clus
+  df <- matrix(NA, nrow=10, ncol=length(ind))
+  for(j in 1:length(ind)){
+    temp <- top10 %>% filter(cluster==ind[j])
+    df[,j] <- temp$gene
+}
+
+  df <- data.frame(df, stringsAsFactors = FALSE)
+  colnames(df) <- paste("cluster", ind, "markers", sep=" ")
+
+  d[[i]] <- df %>% datatable(caption = paste0('Top10 upregulated genes in each cluster in ', dh_organoid_ids[[i]]))
+}
+
+d
+
+
+```
+
+
+
+
+
+
+
+
 
