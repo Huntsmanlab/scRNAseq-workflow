@@ -530,6 +530,9 @@ for(i in 1:length(pro_sample)){
 
 dm_path <- lapply(dh_organoid_ids, function(id) here('..','..','general','data','dim_reduction',id,'dm.rds'))
 
+# remove grid from plot_ly
+ax <- list(zeroline = FALSE, showline = TRUE, showgrid = FALSE)
+
 PlotDiffMap <- function(dat, dm_path, dim){
 
   logcounts <- GetAssayData(dat) %>% as.matrix  
@@ -537,7 +540,7 @@ PlotDiffMap <- function(dat, dm_path, dim){
   # compute diffusion map
   if(!file.exists(dm_path)){
     dm <- DiffusionMap(t(logcounts), n_pcs = 30)
-    dir.create(dirname(dm_path)) # create sample folder
+    if(dir.exists(dm_path)) dir.create(dirname(dm_path)) # create sample folder
     saveRDS(dm, file=dm_path)
   } else{
     dm <- readRDS(dm_path)
@@ -549,9 +552,6 @@ PlotDiffMap <- function(dat, dm_path, dim){
                   DC3 = eigenvectors(dm)[, 3],
                   Timepoint = as.factor(dat$seurat_clusters), 
                   ids = dat$orig.ident) # this will help color based on cluster 
-
-  # remove grid from plot_ly
-  ax <- list(zeroline = FALSE, showline = TRUE, showgrid = FALSE)
 
   if(dim==2){
     # make the 2D plot 
@@ -595,7 +595,7 @@ l3
 reporters <- c("eGFP", "dsRED", "tdTomato")
 
 PlotReporter <- function(reporters, sce){
-  
+  p <- list()
   for(i in 1:length(reporters)){
   if(any(grepl(reporters[i], rownames(sce), ignore.case = TRUE) == TRUE)){
     
@@ -607,7 +607,7 @@ PlotReporter <- function(reporters, sce){
     df_umap <- cbind(sce[["umap"]]@cell.embeddings %>% as.data.frame(), sce[["tsne"]]@cell.embeddings %>% as.data.frame())
     df_umap$logcounts <- count_reporter
     
-  p2[[i]] <- plot_ly(data = df_umap,
+  p2 <- plot_ly(data = df_umap,
         x = ~UMAP_1, y = ~UMAP_2,
         opacity = 1,
         color = ~logcounts,
@@ -615,10 +615,9 @@ PlotReporter <- function(reporters, sce){
         mode = "markers",
         marker = list(size = 4), 
         colors = brewer.pal(6, "Reds")) %>% 
-          layout(title=paste0(reporters[[i]], "_logcount"),
-         xaxis = ax, yaxis = ax)
+          layout(legend= list(itemsizing='constant'), xaxis = ax, yaxis = ax, showlegend=F)
   
-    p3[[i]] <- plot_ly(data = df_umap,
+    p3 <- plot_ly(data = df_umap,
         x = ~tSNE_1, y = ~tSNE_2,
         opacity = 1,
         color = ~logcounts,
@@ -626,10 +625,10 @@ PlotReporter <- function(reporters, sce){
         mode = "markers",
         marker = list(size = 4), 
         colors = brewer.pal(6, "Reds")) %>% 
-          layout(title=paste0(reporters[[i]], "_logcount"),
-         xaxis = ax, yaxis = ax)
+          layout(title=paste0(sce$orig.ident %>% unique(), ": ", reporters[[i]], "_logcount"),
+         legend= list(itemsizing='constant'), xaxis = ax, yaxis = ax, showlegend=F)
     
-    p[[i]] <- subplot(p2[[i]], p3[[i]]) %>% layout(title=dh_organoid_ids[[i]])
+    p[[i]] <- subplot(p2, p3, titleX=T, titleY=T)
   }
   }
   return(p)
@@ -642,7 +641,6 @@ for(i in 1:length(pro_sample)){
 p
 
 ```
-
 
 ### Number of cells in each cluster
 
