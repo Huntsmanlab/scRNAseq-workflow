@@ -4,7 +4,7 @@
 
 **The steps of the pipeline are as follows:**  
 1. process_qc_normalization: Make a SingleCellExperiment object from filtered counts. Perform quality control to further filter cells with low reads and/or high mitochondrial content. We run this rule to get the normalized sce object.
-2. run_summary_stats: Visualize the results of raw data and data after quality control. We run this rule to generate a rmd report on summary statistics and dimension reduction plots.
+2. run_summary_stats: Use the Seurat workflow to visualize the results of data before and after quality control. Results include summary statistics, HVGs (volcano plots), clustering and dimension reduction plots, diffusion maps, and heatmaps showing signature genes for each cluster. We run this rule to generate a rmd report on summary statistics and dimension reduction plots.
 3. dimred_cluster: Do dimensionality reduction (PCA, tSNE and UMAP). Perform unsupervised clustering. We run this rule to get the sce object with clustering and dimension reduction information.
 4. compute_diff_map: Compute diffusion map coordinates. We run this rule to get the dm.rds for plotting diffusion map.
 5. do_batch_correction: Do batch correction and integration using seurat and scran, if needed. We run this rule to get scran corrected and seurat corrected sce objects for downstream analysis (i.e., integrated cell assign); and generate a rmd report visualizing dimension reduction and clustering plots before and after batch correction.

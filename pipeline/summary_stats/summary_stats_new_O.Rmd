@@ -1,5 +1,5 @@
 ---
-title: " `r params$ids` Summary stats and quality control results"
+title: "Summary stats, dimension reduction plots, clustering, HVGs, and heatmaps from Seurat workflow"
 subtitle: '`r params$pair_ids`'
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 

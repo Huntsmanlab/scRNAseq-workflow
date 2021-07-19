@@ -1,5 +1,5 @@
 ---
-title: " `r params$ids` Summary stats and quality control results"
+title: "Summary stats, dimension reduction plots, clustering, HVGs, and heatmaps from Seurat workflow"
 subtitle: '`r params$pair_ids`'
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
@@ -85,7 +85,7 @@ seurat_qc <- lapply(sce_qcs, function(sce) CreateSeuratObject(counts = counts(sc
 
 # get colData from sce and store in dataframes
 df_raws <- lapply(sce_raws, function(sce) colData(sce)) # this one has metrics before removing low quality cells
-df_qcs <- lapply(sce_qcs, function(sce) colData(sce)) # this one has metrics after removing loq quality cells
+df_qcs <- lapply(sce_qcs, function(sce) colData(sce)) # this one has metrics after removing low quality cells
 
 ```
 
@@ -522,7 +522,7 @@ for(i in 1:length(pro_sample)){
 
 ```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10, eval=FALSE}
 
-# change colors:
+# if we want to change colors:
 
 colors_list <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494", "#B3B3B3", '#E2201C', '#1D91C0', '#6B3E9A', '#32A028', "deepskyblue", "black")
 
