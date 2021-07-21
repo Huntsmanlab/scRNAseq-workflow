@@ -1,23 +1,21 @@
 import os.path
 from snakemake_helper_functions import *
 
-# ids = "DH3"
-
 
 ids = ['DH21_NEW', 'DH21_control']
-#ids = ['DH22_NEW', 'DH22_control']
-#ids = ['DH30_GC_C134WFOXL2_new', 'DH30_GC_C134WFOXL2_new']
+ids = ['DH22_NEW', 'DH22_control']
+ids = ['DH1_DBZ', 'DH1_control']
 ids = ['YW1']
 
 # separate samples by '-'
-#pair_ids =  ['DH30_GC_wtFOXL2_new-DH30_GC_C134WFOXL2_new']
+pair_ids =  ['DH1_DBZ-DH1_control']
 pair_ids = ['DH21_NEW-DH21_control']
-#pair_ids = ['DH22_NEW-DH22_control']
+pair_ids = ['DH22_NEW-DH22_control']
 pair_ids = ['YW1']
 
 ids_integration = ['DH21_NEW-DH21_control']
 #ids_integration = ['DH22_NEW-DH22_control']
-#ids_integration = ['DH30_GC_wtFOXL2_new-DH30_GC_C134WFOXL2_new']
+#ids_integration = ['DH1_DBZ-DH1_control']
 
 ids_dge = ['VOA10819UT_control_TOP=VOA10819UT_control_BOTTOM', 'VOA10286UT_control_TOP=VOA10286UT_control_BOTTOM'] # second id will be compared to first one
 
@@ -29,60 +27,48 @@ common_dge_wildcard = make_wildcard(pair_ids)
 
 # FILE NAMES FOR RULE ALL 
 path_to_10X = '../huntsmandata/raw/{id}' # where we keep the 10X outputs
-
-sce_norm = '../data/normalized/{id}/sce_norm.rds' # normalized sce
-sce_red = '../data/dim_reduction/{id}/sce_red.rds'# sce after dim reduction
-dm_path = '../data/dim_reduction/{id}/dm.rds'# diff map coordinates  
-
-sce_clus = '../data/clustered/sce/{id}/sce_clus.rds' # clustered sce 
-sce_epith = '../data/epithelial_cells_only/{id}/sce.rds' # sce with epithelial cells only
-
+sce_norm = '../../general/data/normalized/{id}/sce_norm.rds' # normalized sce
+dm_path = '../../general/data/dim_reduction/{id}/dm.rds'# diff map coordinates  
+sce_clus = '../../general/data/clustered/sce/{id}/sce_clus.rds' # clustered sce 
+cell_type_csv = '../../general/data/cellassign/{id}/cell_types.csv' # cell assign csv
+cell_cycle_csv = '../../general/data/cell_cycle/{id}/cell_cycle.csv' # cell cycle csv
 
 # BATCH CORRECTION 
-path_to_batch_report = '../reports/batch_normalization/{ids_integration}/batch_correction.html'
-scran_corrected = '../data/batch_corrected/{ids_integration}/scran_corrected.rds'
-seurat_corrected = '../data/batch_corrected/{ids_integration}/seurat_corrected.rds'
+scran_corrected = '../../general/data/batch_corrected/{ids_integration}/scran_corrected.rds'
+seurat_corrected = '../../general/data/batch_corrected/{ids_integration}/seurat_corrected.rds'
+
+### archived rds path
+sce_red = '../../general/data/dim_reduction/{id}/sce_red.rds'# sce after dim reduction
+sce_epith = '../../general/data/epithelial_cells_only/{id}/sce.rds' # sce with epithelial cells only
+
 
 # MARKDOWN REPORTS
-summary_stats_report = '../reports/summary_stats_new/{pair_ids}/summary_stats.html'
-dimRed_report = '../reports/dim_reduction/{id}/dim_reduction.html'
-cell_cycle_report = '../reports/cell_cycle/{pair_ids}/cell_cycle_report.html'
+summary_stats_report = '../../general/reports/summary_stats_new/{pair_ids}/summary_stats.html'
+path_to_batch_report = '../../general/reports/batch_normalization/{ids_integration}/batch_correction.html'
+cell_cycle_report = '../../general/reports/cell_cycle/{pair_ids}/cell_cycle_report.html'
+cellassign_multiple_report = '../../general/reports/cellassign_integrated/{ids_integration}/cellassign_integrated_report.html'
 
-sce_clus_report = '../reports/separate_clustering/{id}/separate_clustering.html'
-combined_clustering_report = '../reports/combined_clustering/{pair_ids}/combined_clustering.html'
-combined_clustering_uncorrected = '../data/clustered/combined/{pair_ids}/uncorrected_seurat_object.rds'
-combined_clustering_integrated = '../data/clustered/combined/{pair_ids}/integrated_seurat_object.rds'
+### archived rmarkdown path
+sce_clus_report = '../../general/reports/separate_clustering/{id}/separate_clustering.html'
+dimRed_report = '../../general/reports/dim_reduction/{id}/dim_reduction.html'
+combined_clustering_report = '../../general/reports/combined_clustering/{pair_ids}/combined_clustering.html'
+combined_clustering_uncorrected = '../../general/data/clustered/combined/{pair_ids}/uncorrected_seurat_object.rds'
+combined_clustering_integrated = '../../general/data/clustered/combined/{pair_ids}/integrated_seurat_object.rds'
 
 # paired dge 
-paired_dge_output = '../data/dge/paired_dge_basic/{pair_ids}/outputsTEST.rds',
-paired_dge_basic_report = '../reports/paired_dge_basic/{pair_ids}/paired_dge_basic.html'
-edgeR_report_TWO_samples = '../reports/dge_edgeR/{ids_dge}/dge_analysis_two_samples.html'
-edgeR_report_MULTIPLE_samples = '../reports/dge_edgeR/{ids_dge}/dge_analysis_multiple_samples.html'
+paired_dge_output = '../../general/data/dge/paired_dge_basic/{pair_ids}/outputsTEST.rds',
+paired_dge_basic_report = '../../general/reports/paired_dge_basic/{pair_ids}/paired_dge_basic.html'
+edgeR_report_TWO_samples = '../../general/reports/dge_edgeR/{ids_dge}/dge_analysis_two_samples.html'
+edgeR_report_MULTIPLE_samples = '../../general/reports/dge_edgeR/{ids_dge}/dge_analysis_multiple_samples.html'
 
 # common dges 
-common_dge_report = '../reports/common_dges/' + common_dge_wildcard + '/common_dges.html'
+common_dge_report = '../../general/reports/common_dges/' + common_dge_wildcard + '/common_dges.html'
 common_dge_outfile_name = '/huntsman/amunzur/data/dge/common/' + common_dge_wildcard + '/common_top_genes.csv'
 common_dge_plot_file_name = '/huntsman/amunzur/data/dge/common/' + common_dge_wildcard + '/plots.png'
 
-# CELL ASSIGN
-sce_cas_path = '../data/cellassign/{id}/sce_norm_cas.rds'
-cell_type_csv = '../data/cellassign/{id}/cell_types.csv'
-
-#sce_cas_integrated = '../data/integrated_cellassign/{ids_integration}/integrated_cas.rds'
-#sce_cas_uncorrected = '../data/integrated_cellassign/{ids_integration}/uncorrected_cas.rds'
-
-
-# CELL CYCLE
-sce_cell_cycle = '../data/cell_cycle/{id}/cell_cycle_label.rds' # with cell cycle gene label
-sce_cell_cycle_corrected = '../data/cell_cycle/{id}/cell_cycle_corrected.rds' # corrected for cell cycle effect
-
-
-# multiple samples 
-cellassign_multiple_report = '../reports/cellassign_integrated/{ids_integration}/cellassign_integrated_report.html'
-
 # velocity: convert seurat to loom
-path_to_loom_file = '../data/loom_cas/{id}/seurat_cas.loom'
-path_to_barcode_tsv = '../data/loom_cas/{id}/filtered_barcode.tsv'
+path_to_loom_file = '../../general/data/loom_cas/{id}/seurat_cas.loom'
+#path_to_barcode_tsv = '../../general/data/loom_cas/{id}/filtered_barcode.tsv'
 
 ##########################################
 # user friendly naming 
@@ -125,7 +111,7 @@ do_batch_correction = [expand(path_to_batch_report, ids_integration = ids_integr
 cluster_two_samples = [expand(combined_clustering_report, pair_ids = pair_ids), expand(combined_clustering_uncorrected, pair_ids = pair_ids), expand(combined_clustering_integrated, pair_ids = pair_ids)]
 
 # velocity
-seurat_to_loom = [expand(sce_cas_path, id = ids), expand(path_to_loom_file, id = ids), expand(path_to_barcode_tsv, id = ids)]
+seurat_to_loom = [expand(path_to_loom_file, id = ids)]
 
 process_qc_normalization = expand(sce_norm, id = ids)
 dimred_cluster = expand(sce_clus, id = ids)
@@ -135,18 +121,19 @@ compute_diff_map = expand(dm_path, id = ids)
 
 rule all:
   input:
-    #process_qc_normalization,
+    # process_qc_normalization,
     run_summary_stats,
-    # dimred_cluster,
     # compute_diff_map,
     # do_batch_correction,
     # integrate_cell_assign_results,
     # run_cell_cycle_report,
+    # seurat_to_loom,
+    
     # DGE_scran,
     # DGE_edgeR_TWO_samples,
     # DGE_edgeR_MULTIPLE_samples,
-    # seurat_to_loom
-
+    
+    ## dimred_cluster, # we now calculate and save dm coordinates in run_summary_stats
     ## perform_dim_reduction, # determine number of PCs to use
     ## cluster_sce, #clustering on dividual sample
     ## cluster_two_samples, #clustering on integrated sample
@@ -164,11 +151,11 @@ rule process_qc_normalization:
     id = "{id}", # wildcard here 
     whichMethod = 'default', # to use different parameters here, just update them.
     min_features = 1000,
-    mito_thresh_max = 60,
+    mito_thresh_max = 25,
     mito_thresh_min = 1,
     ribo_thresh_max = 60, 
     nmads = 3,
-    remove_mito_and_ribo = "yes" # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
+    remove_mito_and_ribo = "no" # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
   shell:
       "Rscript pipeline/process_qc_normalization/process_qc_normalization.R \
      --path_to_10X {input} \
@@ -188,13 +175,15 @@ rule make_summary_stats:
     pair_ids = pair_ids,
     whichMethod = 'default', # to use different parameters here, just update them.
     min_features = 1000,
-    mito_thresh_max = 60,
+    mito_thresh_max = 25,
     mito_thresh_min = 1,
     ribo_thresh_max = 60, 
     nmads = 3,
-    remove_mito_and_ribo = "yes" # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
+    remove_mito_and_ribo = "no", # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
+    dm_path = expand(dm_path, id = ids), # !! make sure ids correspond to pair_ids
+    reporter_genes = ["eGFP", "dsRED", "tdTomato"] # all possible reporters - case-insensitive
   input:
-    path_to_10X= expand(path_to_10X, id = ids)
+    path_to_10X= expand(path_to_10X, id = ids)  # !! make sure ids correspond to pair_ids
   output:
     report = summary_stats_report
   shell:
@@ -203,7 +192,8 @@ rule make_summary_stats:
      knit_root_dir = '{params.curr_dir}',\
      params = list(pair_ids = '{params.pair_ids}', whichMethod = '{params.whichMethod}', min_features = '{params.min_features}',\
      mito_thresh_max = '{params.mito_thresh_max}', mito_thresh_min = '{params.mito_thresh_min}', ribo_thresh_max = '{params.ribo_thresh_max}',\
-     nmads = {params.nmads}, remove_mito_and_ribo = '{params.remove_mito_and_ribo}', path_to_10X = '{input.path_to_10X}'))\" "
+     nmads = {params.nmads}, remove_mito_and_ribo = '{params.remove_mito_and_ribo}', path_to_10X = '{input.path_to_10X}', dm_path = '{params.dm_path}',\
+     reporter_genes = '{params.reporter_genes}'))\" "
 
 # output clustered sce:
 rule dimred_cluster: 
@@ -216,7 +206,7 @@ rule dimred_cluster:
     HVG = "no",
     top_HVG = 20, 
     top_PCs = 200, 
-    k_value = 15
+    k_value = 15 # increase k to get fewer clusters
   shell:
     "Rscript pipeline/dimred_cluster/dimred_cluster.R \
        --path_to_sce_norm {input} \
@@ -225,17 +215,6 @@ rule dimred_cluster:
        --top_HVG {params.top_HVG} \
        --top_PCs {params.top_PCs} \
        --k_value {params.k_value}"
-       
-# output diffusion map coordinates:
-rule compute_diff_maps: 
-  input: 
-    sce_clus
-  output: 
-    dm_path
-  shell:
-    "Rscript pipeline/dimred_cluster/dim_reduction/compute_diff_maps.R \
-       --sce_clus {input} \
-       --dm_path {output}"
 
 
 # Dim reduction plots on samples before and after batch correction with scran and seurat method:
@@ -275,16 +254,16 @@ rule cellassign_report_multiple_samples:
     "Rscript -e \"rmarkdown::render('pipeline/cellassign/scripts/integration_report_cellassign.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
-     params = list(ids_integration = '{params.ids_integration}', id_type = '{params.id_type}', sample_type = '{params.sample_type}', sce_clus = '{input.sce_clus}', cell_type_csv = '{params.cell_type_csv}', seurat_corrected = '{input.seurat_corrected}', scran_corrected = '{input.scran_corrected}'))\" "
+     params = list(ids_integration = '{params.ids_integration}', id_type = '{params.id_type}', sample_type = '{params.sample_type}', \
+     sce_clus = '{input.sce_clus}', cell_type_csv = '{params.cell_type_csv}', seurat_corrected = '{input.seurat_corrected}', \
+     scran_corrected = '{input.scran_corrected}'))\" "
 
   
 rule cell_cycle_report: 
   params: 
     curr_dir = os.getcwd(),
     pair_ids = pair_ids, 
-    cell_cycle_species = "human",
-    sce_cell_cycle = expand(sce_cell_cycle, id = ids),
-    sce_cell_cycle_corrected = expand(sce_cell_cycle_corrected, id = ids)
+    cell_cycle_csv = expand(cell_cycle_csv, id = ids)
   input:
     sce_clus = expand(sce_clus, id = ids)
   output:
@@ -293,20 +272,21 @@ rule cell_cycle_report:
     "Rscript -e \"rmarkdown::render('pipeline/cell_cycle/cell_cycle_report.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
-     params = list(pair_ids ='{params.pair_ids}', cell_cycle_species = '{params.cell_cycle_species}', sce_clus = '{input.sce_clus}', sce_cell_cycle = '{params.sce_cell_cycle}', sce_cell_cycle_corrected = '{params.sce_cell_cycle_corrected}'))\" "
+     params = list(pair_ids ='{params.pair_ids}', sce_clus = '{input.sce_clus}', cell_cycle_csv = '{params.cell_cycle_csv}'))\" "
 
 
 rule seurat_to_loom:
   input: 
-    sce_cas_path
+    sce_clus
+  params: 
+    cell_type_csv
   output:
-    path_to_loom_file = path_to_loom_file,
-    path_to_barcode_tsv = path_to_barcode_tsv
+    path_to_loom_file
   shell:
     "Rscript pipeline/velocity/seurat_cas.R \
-    --sce_cas_path {input} \
-    --path_to_loom_file {output.path_to_loom_file} \
-    --path_to_barcode_tsv {output.path_to_barcode_tsv}"
+    --cell_type_csv {params} \
+    --sce_clus {input} \
+    --path_to_loom_file {output}"
     
     
 
@@ -397,3 +377,13 @@ rule combined_clustering:
 # lambda wildcards: combined_clustering_report_input_files(wildcards)
   
   
+# output diffusion map coordinates:
+rule compute_diff_maps: 
+  input: 
+    sce_clus
+  output: 
+    dm_path
+  shell:
+    "Rscript pipeline/dimred_cluster/dim_reduction/compute_diff_maps.R \
+       --sce_clus {input} \
+       --dm_path {output}"
