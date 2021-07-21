@@ -1,4 +1,5 @@
 # this script has a function that makes a sce from cell ranger output. 
+# NOTE: this is an old script and we don't really use it. Use the one called convert_to_sces.R instead.
 
 # as inputs, it needs a list of filepaths that contains all the data we need. 
 
