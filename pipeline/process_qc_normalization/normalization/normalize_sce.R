@@ -6,13 +6,16 @@ normalize_sce <- function(sce,
   # set seed for PCA, TSNE and UMAP
   set.seed(1111)
   
-  # load sce
+  # load qc'ed sce
   sce_qc <- sce
 
   min_size <- min(150, floor(dim(sce_qc)[2] * 0.3))
   max_win <- min(101, min_size + 1)
   
-  clusters <- quickCluster(sce_qc, min.size = 50, assay.type="counts", method = "igraph", use.ranks = FALSE, BSPARAM = IrlbaParam())
+  clusters <- quickCluster(sce_qc, #min.size = min_size, 
+                           # min.size specifies the minimum size of each cluster - can be changed to a smaller number for sample with low cell counts
+                           # default is 100
+                           assay.type="counts", method = "igraph", use.ranks = FALSE, BSPARAM = IrlbaParam())
   sce_qc <- computeSumFactors(sce_qc, assay.type="counts", sizes = seq(21, max_win, 5), min.mean = 0.1, clusters = clusters)
   
   # Ensure that size factors are non-zero and non-negative before normalizing 

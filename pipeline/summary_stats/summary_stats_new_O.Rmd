@@ -10,7 +10,7 @@ output:
     toc_float: true
 
 params:
-  pair_ids: 'DH1_DBZ-DH1_control' # to run this, write TWO ids here, separated by -
+  pair_ids: 'YW1' # to run this, write TWO ids here, separated by -
   whichMethod: 'default' # to use different parameters here, just update them.
   min_features: 1000
   mito_thresh_max: 25
@@ -590,12 +590,14 @@ l3
 
 #### 2d UMAP and tSNE showing logcounts of reporter genes (if there is any)
 
-```{r}
+```{r }
 # add genes of interest here:
 reporters <- c("eGFP", "dsRED", "tdTomato")
+# remove grid from plot_ly
+ax <- list(zeroline = FALSE, showline = TRUE, showgrid = FALSE)
 
 PlotReporter <- function(reporters, sce){
-  p <- list()
+  p <- htmltools::tagList()
   for(i in 1:length(reporters)){
   if(any(grepl(paste("^",reporters[i],"$", sep=""), rownames(sce), ignore.case = TRUE) == TRUE)){
     

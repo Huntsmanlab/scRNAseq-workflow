@@ -20,6 +20,7 @@ params:
   nmads: 'nmads'
   remove_mito_and_ribo: 'remove_mito_and_ribo' # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
   dm_path: dm_path
+  reporter_genes: 'reporter_genes'
   
 ---
 
@@ -631,10 +632,10 @@ l3
 
 ```{r}
 # add genes of interest here:
-reporters <- c("eGFP", "dsRED", "tdTomato")
+reporters <- strsplit(as.character(params$reporter_genes), " ")[[1]] 
 
 PlotReporter <- function(reporters, sce){
-  p <- list()
+  p <- htmltools::tagList()
   for(i in 1:length(reporters)){
   if(any(grepl(paste("^",reporters[i],"$", sep=""), rownames(sce), ignore.case = TRUE) == TRUE)){
     

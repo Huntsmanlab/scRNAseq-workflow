@@ -1,14 +1,13 @@
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
-path_to_QCed_sce <- '/huntsman/amunzur/data/qc/bgi_SCRNA10X_SA_CHIP0176_002/sce_qc.rds'
-seed <- 1243
-output_file_name <- '/huntsman/amunzur/data/normalized/bgi_SCRNA10X_SA_CHIP0176_002/sce_norm.rds'
+path_to_QCed_sce <- '/huntsman/general/data/qc/bgi_SCRNA10X_SA_CHIP0176_002/sce_qc.rds'
+output_file_name <- '/huntsman/general/data/normalized/bgi_SCRNA10X_SA_CHIP0176_002/sce_norm.rds'
 
-normalize_sce <- function(path_to_QCed_sce, output_file_name, seed) {
+normalize_sce <- function(path_to_QCed_sce, output_file_name) {
   
   # set seed for PCA, TSNE and UMAP
-  set.seed(seed)
+  set.seed(1111)
   
   # load sce
   sce_qc <- readRDS(path_to_QCed_sce)
@@ -16,7 +15,11 @@ normalize_sce <- function(path_to_QCed_sce, output_file_name, seed) {
   min_size <- min(150, floor(dim(sce_qc)[2] * 0.3))
   max_win <- min(101, min_size + 1)
   
-  clusters <- quickCluster(sce_qc, assay.type="counts", min.size = min_size, min.mean = 0.1, method = "igraph", use.ranks = FALSE, BSPARAM = IrlbaParam())
+  clusters <- quickCluster(sce_qc, assay.type="counts", 
+                           # min.size specifies the minimum size of each cluster - can be changed to a smaller number for sample with low cell counts
+                           # default is 100
+                           min.size = min_size, 
+                           min.mean = 0.1, method = "igraph", use.ranks = FALSE, BSPARAM = IrlbaParam())
   sce_qc <- computeSumFactors(sce_qc, assay.type="counts", sizes = seq(21, max_win, 5), min.mean = 0.1, clusters = clusters)
   
   # Ensure that size factors are non-zero and non-negative before normalizing 
@@ -28,10 +31,10 @@ normalize_sce <- function(path_to_QCed_sce, output_file_name, seed) {
   sce_qc <- logNormCounts(sce_qc)
   
   # Run UMAP, TSNE, PCA for visualization downstream steps: clustering, cellassign, ect. and save the data to sce 
-  sce_qc <- runPCA(sce_qc, exprs_values = "logcounts", ncomponents = 200)
-  sce_qc <- runTSNE(sce_qc, exprs_values = "logcounts", ntop = 500, ncomponents = 3)
-  sce_qc <- runUMAP(sce_qc, exprs_values = "logcounts", ntop = 500, ncomponents = 3,
-                    min_dist = 0.01, n_neighbors = 15, metric = "euclidean")
+  # sce_qc <- runPCA(sce_qc, exprs_values = "logcounts", ncomponents = 200)
+  # sce_qc <- runTSNE(sce_qc, exprs_values = "logcounts", ntop = 500, ncomponents = 3)
+  # sce_qc <- runUMAP(sce_qc, exprs_values = "logcounts", ntop = 500, ncomponents = 3,
+  #                   min_dist = 0.01, n_neighbors = 15, metric = "euclidean")
   
   # save the output 
   saveRDS(sce_qc, file = output_file_name)
