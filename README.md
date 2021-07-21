@@ -23,7 +23,6 @@ rule all:
     # process_qc_normalization,
     # run_summary_stats,
     # dimred_cluster,
-    # compute_diff_map,
     # do_batch_correction,
     # integrate_cell_assign_results,
     # run_cell_cycle_report,
@@ -33,6 +32,7 @@ rule all:
     # DGE_edgeR_TWO_samples,
     # DGE_edgeR_MULTIPLE_samples,
 
+    ## compute_diff_map, # we now compute and save dm coordinates in run_summary_stats step
     ## perform_dim_reduction, # determine number of PCs to use
     ## cluster_sce, #clustering on dividual sample
     ## cluster_two_samples, #clustering on integrated sample
