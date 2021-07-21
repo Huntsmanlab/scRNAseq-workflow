@@ -48,6 +48,7 @@ suppressPackageStartupMessages({
   library(destiny)
   library(ggbeeswarm)
   library(plotly)
+  library(scales)
 })
 
 #ADD THEME #### 
@@ -199,17 +200,22 @@ master_cell_types_GC <- c("endothelial_cells",
                           "stromal_fibroblast_cells",
                           "theca_cells")
 
-master_color_palette <- c("gold1", 
-                          "lightskyblue",
-                          "darkslateblue",
-                          'thistle4',
-                          'mediumorchid2',
-                          "indianred1",
-                          "plum2",
-                          "springgreen",
-                          'royalblue1',
-                          'chartreuse1',
-                          "darkmagenta")
+master_color_palette <- c(  "cyan2", # red
+                            "firebrick1",
+                            "green3", # purple
+                            "indianred1",
+                            "lightskyblue",
+                            "gold1", # lt pink
+                            "plum2",
+                            "springgreen",
+                            "darkslateblue",
+                            'royalblue1',
+                            'chartreuse1',
+                            'mediumorchid2',
+                            'khaki1',
+                            "lawngreen",
+                            "darkmagenta",
+                            'thistle4')
 
 # master_color_palette <- colorRampPalette(brewer.pal(8, "Set1"))(20)
 
@@ -848,7 +854,7 @@ seurat_integrate <- function(path_to_sce_clus,
   
   # then some standard workflow for visualization and dim reduction 
   integrated <- ScaleData(integrated, verbose = FALSE)
-  set.seed(1998)
+  set.seed(1998) # do not change seed - this is for reproducibility purposes
   integrated <- RunPCA(integrated, verbose = FALSE)
   integrated <- RunTSNE(integrated, dims = 1:30, dim.embed = 3, seed.use = 300, perplexity = 20)
   integrated <- RunUMAP(integrated, dims = 1:30, n.components = 3L, seed.use = 1000)
