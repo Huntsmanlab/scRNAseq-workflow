@@ -119,7 +119,7 @@ This list will be used during clustering to vary number of nearest neighbors.  Y
 **chosen_k:** one single number, taken from the k_list given above  
 After viewing the clustering plots with various k values, the user is expected to choose a k value to continue downstream analysis. After inspecting the report once, you can pick a certain k value to store in the sce object for further downstream analysis. Default value is 15.  
 
-**cell_types:** this is where we specify the type of cells you want to include for cell assign. The pipeline will assemble a marker gene matrix corresponding to cell types you specify. For a list of gene markers, refer to ./cellassign/scripts/create_marker_matrix.R. A spreadsheet with more details on these markers can be found here: https://docs.google.com/spreadsheets/d/1amSrlUxSD_N7XNDlqT3qvu3KLUyUYWTFux3lKH4Hnzw/edit#gid=0
+**cell_types:** this is where we specify the type of cells you want to include for cellassign. The pipeline will assemble a marker gene matrix corresponding to cell types you specify. For a list of gene markers, refer to ./cellassign/scripts/create_marker_matrix.R. A spreadsheet with more details on these markers can be found here: https://docs.google.com/spreadsheets/d/1amSrlUxSD_N7XNDlqT3qvu3KLUyUYWTFux3lKH4Hnzw/edit#gid=0
 
   
 > To run the pipeline using snakemake, change the name of the snakefile from 'sample_snakefile' to 'Snakefile' on your local machine after pulling from master.  
@@ -148,7 +148,7 @@ For information about how to install cell assign, refer to <a href="https://shah
  - **Integrating and visualizing cell assign results**  
 At this step, a special rule other than Seurat integration has been designed. After computing cell types, write the samples you wish to integrate to the integration_ids list at the top of the Snakefile and separate distinct samples with "-", as shown:  
 `ids_integration = ['DH4-DH17-DH10']`  
-You can integrate as many samples as you wish. We previously integrated/combined samples with scran and seurat. Sce objects from both methods are loaded and visualized. Cell assign reports provide visualization on cell clustering and cell type clustering on individual samples and integrated samples with dimention reduction plots. Reports are automatically generated when you run cell assign. Reports for individual samples are in `/reports/cellassign`, and integrated sample reports can be found in `/reports/cellassign_integrated`.  
+You can integrate as many samples as you wish. We previously integrated/combined samples with scran and seurat. Sce objects from both methods are loaded and visualized. Cell assign reports provide visualization on cell clustering and cell type clustering on individual samples and integrated samples with dimention reduction plots. Reports are automatically generated when you run cell assign. Reports for individual samples are in `/reports/cellassign` (this directory contains reports from old runs as we no longer have a separate rule for running individual sample), and integrated sample reports can be found in `/reports/cellassign_integrated` (when you run integrate_cell_assign_results, output reports are in this directory - for both individual sample and multiple samples).  
 
 Moreover, each of these steps have two types of files: one off scripts and scripts that have been integrated to the pipeline. One off scripts end with '_O.Rmd'. If you need to repeat a specific step isolated from the Snakemake workflow, you can use the one off scripts where you can specify the ids you wish to analyze.  
 

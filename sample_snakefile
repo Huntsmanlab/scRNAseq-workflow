@@ -5,17 +5,20 @@ from snakemake_helper_functions import *
 ids = ['DH21_NEW', 'DH21_control']
 ids = ['DH22_NEW', 'DH22_control']
 ids = ['DH1_DBZ', 'DH1_control']
-ids = ['YW1']
+#ids = ['YW1']
+ids = ['DH31']
 
 # separate samples by '-'
 pair_ids =  ['DH1_DBZ-DH1_control']
-pair_ids = ['DH21_NEW-DH21_control']
-pair_ids = ['DH22_NEW-DH22_control']
-pair_ids = ['YW1']
+#pair_ids = ['DH21_NEW-DH21_control']
+#pair_ids = ['DH22_NEW-DH22_control']
+#pair_ids = ['YW1']
+pair_ids = ['DH31']
 
 ids_integration = ['DH21_NEW-DH21_control']
 #ids_integration = ['DH22_NEW-DH22_control']
-#ids_integration = ['DH1_DBZ-DH1_control']
+ids_integration = ['DH1_DBZ-DH1_control']
+ids_integration = ['DH31']
 
 ids_dge = ['VOA10819UT_control_TOP=VOA10819UT_control_BOTTOM', 'VOA10286UT_control_TOP=VOA10286UT_control_BOTTOM'] # second id will be compared to first one
 
@@ -122,10 +125,10 @@ compute_diff_map = expand(dm_path, id = ids)
 rule all:
   input:
     # process_qc_normalization,
-    run_summary_stats,
-    # compute_diff_map,
+    #run_summary_stats,
+    # dimred_cluster,
     # do_batch_correction,
-    # integrate_cell_assign_results,
+    integrate_cell_assign_results, # you can change selected markers in rule cellassign_report_multiple_samples
     # run_cell_cycle_report,
     # seurat_to_loom,
     
@@ -133,7 +136,7 @@ rule all:
     # DGE_edgeR_TWO_samples,
     # DGE_edgeR_MULTIPLE_samples,
     
-    ## dimred_cluster, # we now calculate and save dm coordinates in run_summary_stats
+    ## compute_diff_map, # we now calculate and save dm coordinates in run_summary_stats
     ## perform_dim_reduction, # determine number of PCs to use
     ## cluster_sce, #clustering on dividual sample
     ## cluster_two_samples, #clustering on integrated sample
@@ -242,21 +245,21 @@ rule cellassign_report_multiple_samples:
     curr_dir = os.getcwd(),
     ids_integration = ids_integration, 
     id_type = id_type,
-    sample_type = "other",
-    cell_type_csv = expand(cell_type_csv, id = ids)
-  input:
-    sce_clus = expand(sce_clus, id = ids),
+    cell_types = ["epithelial_secretory", "epithelial_ciliated", "endothelial", "stromal_fibroblast", "vasular_smooth_muscle", "lymphocyte", "mesenchymal", "mesenchymal_stem", "endometrial_stem", "ovarian_cancer"], # markers you want to include
+    cell_type_csv = expand(cell_type_csv, id = ids),
     seurat_corrected = seurat_corrected,
     scran_corrected = scran_corrected
+  input:
+    sce_clus = expand(sce_clus, id = ids)
   output:
     report = cellassign_multiple_report
   shell:
     "Rscript -e \"rmarkdown::render('pipeline/cellassign/scripts/integration_report_cellassign.Rmd',\
      output_file='{params.curr_dir}/{output.report}', \
      knit_root_dir='{params.curr_dir}',\
-     params = list(ids_integration = '{params.ids_integration}', id_type = '{params.id_type}', sample_type = '{params.sample_type}', \
-     sce_clus = '{input.sce_clus}', cell_type_csv = '{params.cell_type_csv}', seurat_corrected = '{input.seurat_corrected}', \
-     scran_corrected = '{input.scran_corrected}'))\" "
+     params = list(ids_integration = '{params.ids_integration}', id_type = '{params.id_type}', cell_types = '{params.cell_types}', \
+     sce_clus = '{input.sce_clus}', cell_type_csv = '{params.cell_type_csv}', seurat_corrected = '{params.seurat_corrected}', \
+     scran_corrected = '{params.scran_corrected}'))\" "
 
   
 rule cell_cycle_report: 
