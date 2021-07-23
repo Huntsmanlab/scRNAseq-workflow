@@ -10,7 +10,7 @@ output:
     toc_depth: 4
 
 params:
-  pair_ids: 'DH1_DBZ-DH1_control' # write here the ids you want to integrate, separate by '-'
+  pair_ids: 'DH31' # write here the ids you want to integrate, separate by '-'
   id_type: 'id_type' # here you can write a quick summary of what these ids are, like tissue types etc. 
   
 ---
@@ -35,9 +35,9 @@ id.list <- strsplit(params$pair_ids, "-")[[1]] # split by "-" SO ID must NOT CON
 id.list <- as.list(c(unlist(list(id.list))))
 
 # run cell assign and get sce with cell type information
-sample_type <- "other" # if granulosa samples, change to "GC"; if .. samples, change to ..
 sce_clus <- lapply(id.list, function(id) here('..', '..', 'general', 'data', 'clustered', 'sce', id, 'sce_clus.rds'))
 cell_type_csv <- lapply(id.list, function(id) here('..', '..', 'general', 'data', 'cellassign', id, 'cell_types.csv'))
+cell_types <- c("epithelial_secretory", "epithelial_ciliated", "endothelial", "stromal_fibroblast", "vasular_smooth_muscle", "lymphocyte", "mesenchymal", "mesenchymal_stem", "endometrial_stem", "ovarian_cancer")
 
 # load cell_type_csv if object already exists; or run cellassign
 sce_cas <- list()
@@ -50,18 +50,26 @@ for(i in 1:length(id.list)){
     sce_cas[[i]]$cell_type <- cell_type[[i]]$cell_type
   } else {
     # run cell assign and get sce with cell type information
-    sce_cas[[i]] <- run_cellassign(sce_clus[[i]], sample_type, cell_type_csv[[i]])
+    sce_cas[[i]] <- run_cellassign(sce_clus[[i]], cell_types, cell_type_csv[[i]])
   }
 }
 
-# load scran batch corrected objects
-scran <- readRDS(here('..', '..', 'general', 'data', 'batch_corrected', params$pair_ids, 'scran_corrected.rds'))
+# chunk option: if one sample, returns FALSE
+eval_text <- FALSE
 
-# load seurat batch corrected objects
-integrated <- readRDS(here('..', '..', 'general', 'data', 'batch_corrected', params$pair_ids, 'seurat_corrected.rds'))
+if(length(id.list) > 1){
+  # load seurat batch corrected object
+  integrated <- readRDS(here('..', '..', 'general', 'data', 'batch_corrected', params$pair_ids, 'seurat_corrected.rds'))
+
+  # load scran object
+  scran <- readRDS(here('..', '..', 'general', 'data', 'batch_corrected', params$pair_ids, 'scran_corrected.rds'))
+  
+  # chunk option: if two samples, returns TRUE
+  eval_text <- TRUE
+} 
 
 # get marker matrix and sort 
-marker_mat <- create_marker_mat("other")
+marker_mat <- create_marker_mat(cell_types)
 det_cell_type <- rownames(marker_mat)
 master_cell_types <- colnames(marker_mat) %>% str_sort()
 ```
@@ -184,7 +192,7 @@ Next, we include some clustering and cell type plots. On the left, we show dim r
 ### Seurat integrated sample
 Below are tsne and umap plots showing clustering and cell assignment results for sample integrated and corrected with seurat.
 
-```{r include = FALSE, warning=FALSE}
+```{r include = FALSE, warning=FALSE, eval=eval_text}
 # subset to common genes across a group of sces 
 sce_cas <- intersect_all(sce_cas)
 
@@ -228,7 +236,7 @@ cell_type_plot_umap <- visualize_cellassign(integrated, 'umap', 'cell_type', mas
 ```
 
 #### tSNE plots
-```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15}
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15, eval=eval_text}
 
 grid.arrange(clustering_plot_tsne, cell_type_plot_tsne, nrow = 1)
 
@@ -236,7 +244,7 @@ grid.arrange(clustering_plot_tsne, cell_type_plot_tsne, nrow = 1)
 
 
 #### UMAP plots
-```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15}
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15, eval=eval_text}
 
 grid.arrange(clustering_plot_umap, cell_type_plot_umap, nrow = 1)
 
@@ -247,7 +255,7 @@ grid.arrange(clustering_plot_umap, cell_type_plot_umap, nrow = 1)
 ### Scran combined sample
 Below are tsne and umap plots showing clustering and cell assignment results for sample integrated and corrected with scran
 
-```{r include = FALSE, warning=FALSE}
+```{r include = FALSE, warning=FALSE, eval=eval_text}
 
 # add cell type information to combined object
 scran$cell_type <- celltype_df$cell_type
@@ -270,14 +278,14 @@ cell_type_plot_umap <- plotUMAP(scran, colour_by="cell_type") + ggtitle(paste(pa
 ```
 
 #### tSNE plots
-```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15}
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15, eval=eval_text}
 
 grid.arrange(clustering_plot_tsne, cell_type_plot_tsne, nrow = 1)
 
 ```
 
 #### UMAP plots
-```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15}
+```{r echo = FALSE, message = FALSE, fig.height = 6, fig.width = 15, eval=eval_text}
 
 grid.arrange(clustering_plot_umap, cell_type_plot_umap, nrow = 1)
 
