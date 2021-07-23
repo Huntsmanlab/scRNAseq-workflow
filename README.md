@@ -8,7 +8,7 @@
 3. dimred_cluster: Do dimensionality reduction (PCA, tSNE and UMAP). Perform unsupervised clustering. We run this rule to get the sce object with clustering and dimension reduction information.
 4. compute_diff_map: Compute diffusion map coordinates. We run this rule to get the dm.rds for plotting diffusion map.
 5. do_batch_correction: Do batch correction and integration using seurat and scran, if needed. We run this rule to get scran corrected and seurat corrected sce objects for downstream analysis (i.e., integrated cell assign); and generate a rmd report visualizing dimension reduction and clustering plots before and after batch correction.
-6. integrate_cell_assign_results: Annotate cell types using cell assign and visulize cell clustering and cell type with dimension reduction plots. We run this rule to save a csv file on cell type information; and generate a rmd report. 
+6. integrate_cell_assign_results: Annotate cell types using cell assign and visulize cell clustering and cell type with dimension reduction plots. Although it is called integrate_cell_assign, it can handle both one-sample (with no integration) and two-sample (with integration) cases. We run this rule to save a csv file on cell type information; and generate a rmd report. 
 7. run_cell_cycle_report: Assign cell cycle phases using cyclone and visualize cell cycle phases with dimension reduction plots and bar plots. We run this rule to save a csv file on cell cycle phase information; and generate a rmd report. 
 8. DGE_scran, DGE_edgeR_TWO_samples, DGE_edgeR_MULTIPLE_samples: Calculate the differentially expressed genes using scran (two paired samples) or edgeR (multiple samples), visualize the result with volcano plots, and perform enrichment analysis to find upregulated pathways.
 9. seurat_to_loom: convert sce with cell type information to seurat and then to a loom file in preparation for velocity analyses. We run thsi rule to get the loom object.
@@ -119,7 +119,7 @@ This list will be used during clustering to vary number of nearest neighbors.  Y
 **chosen_k:** one single number, taken from the k_list given above  
 After viewing the clustering plots with various k values, the user is expected to choose a k value to continue downstream analysis. After inspecting the report once, you can pick a certain k value to store in the sce object for further downstream analysis. Default value is 15.  
 
-**sample_type:** this is where we specify the type of sample for running cell assign. The pipeline will assemble a marker gene matrix corresponding to the sample type. Pass "GC" if running granulosa cell samples; ".." if running .. cell samples.
+**cell_types:** this is where we specify the type of cells you want to include for cell assign. The pipeline will assemble a marker gene matrix corresponding to cell types you specify. For a list of gene markers, refer to ./cellassign/scripts/create_marker_matrix.R. A spreadsheet with more details on these markers can be found here: https://docs.google.com/spreadsheets/d/1amSrlUxSD_N7XNDlqT3qvu3KLUyUYWTFux3lKH4Hnzw/edit#gid=0
 
   
 > To run the pipeline using snakemake, change the name of the snakefile from 'sample_snakefile' to 'Snakefile' on your local machine after pulling from master.  
