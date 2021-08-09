@@ -29,7 +29,7 @@ library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 source(here('pipeline', 'cellassign', 'scripts', 'run_cellassign.R'))
 source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix.R'))
-set.seed(111)
+set.seed(6666)
 
 ```
 
@@ -156,7 +156,7 @@ for(i in 1:length(seur_sce_list)){
               reduction = 'tsne',
               group.by = 'cell_type',
               pt.size = 1.5) +
-  scale_color_manual(values = colors_chosen_list[[i]]) +
+  #scale_color_manual(values = colors_chosen_list[[i]]) +
   labs(title = paste(unique(seur_sce_list[[i]]$id), 'tSNE: Cell Assign for scRNAseq Cells', sep = ' - '))
 
     plots_list_umap[[i]] <- DimPlot(object = seur_sce_list[[i]],
@@ -164,7 +164,7 @@ for(i in 1:length(seur_sce_list)){
               reduction = 'umap',
               group.by = 'cell_type',
               pt.size = 1.5) +
-  scale_color_manual(values = colors_chosen_list[[i]]) +
+  #scale_color_manual(values = colors_chosen_list[[i]]) +
   labs(title = paste(unique(seur_sce_list[[i]]$id), 'UMAP: Cell Assign for scRNAseq Cells', sep = ' - '))
 }
 

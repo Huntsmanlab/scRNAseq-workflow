@@ -49,6 +49,7 @@ suppressPackageStartupMessages({
   library(ggbeeswarm)
   library(plotly)
   library(scales)
+  library(scSorter)
 })
 
 #ADD THEME #### 

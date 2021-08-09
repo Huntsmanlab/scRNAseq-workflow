@@ -10,7 +10,7 @@ output:
     toc_depth: 4
 
 params:
-  pair_ids: 'DH31' # write here the ids you want to integrate, separate by '-'
+  pair_ids: 'DH1_DBZ' # write here the ids you want to integrate, separate by '-'
   id_type: 'id_type' # here you can write a quick summary of what these ids are, like tissue types etc. 
   
 ---
@@ -24,7 +24,8 @@ library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 source(here('pipeline', 'cellassign', 'scripts', 'run_cellassign.R'))
 source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix.R'))
-set.seed(1234)
+#set.seed(123)
+set.seed(666) # 6666 is the seed number used in integration_report_cellassign.Rmd
 
 ```
 
@@ -37,7 +38,8 @@ id.list <- as.list(c(unlist(list(id.list))))
 # run cell assign and get sce with cell type information
 sce_clus <- lapply(id.list, function(id) here('..', '..', 'general', 'data', 'clustered', 'sce', id, 'sce_clus.rds'))
 cell_type_csv <- lapply(id.list, function(id) here('..', '..', 'general', 'data', 'cellassign', id, 'cell_types.csv'))
-cell_types <- c("epithelial_secretory", "epithelial_ciliated", "endothelial", "stromal_fibroblast", "vasular_smooth_muscle", "lymphocyte", "mesenchymal", "mesenchymal_stem", "endometrial_stem", "ovarian_cancer")
+#cell_types <- c("epithelial_secretory", "epithelial_ciliated", "endothelial", "stromal_fibroblast", "vasular_smooth_muscle", "lymphocyte", "mesenchymal_stem", "endometrial_stem")
+cell_types <- c("lymphocyte", "epithelial_secretory", "epithelial_ciliated","endothelial", "macrophage_cells", "stromal_fibroblast", "MesenchymalStem", "vasular_smooth_muscle", "EndometrialStem", "Ovarian_cancer", "Mesenchymal_cells")
 
 # load cell_type_csv if object already exists; or run cellassign
 sce_cas <- list()
@@ -70,14 +72,13 @@ if(length(id.list) > 1){
 
 # get marker matrix and sort 
 marker_mat <- create_marker_mat(cell_types)
-det_cell_type <- rownames(marker_mat)
 master_cell_types <- colnames(marker_mat) %>% str_sort()
 ```
 
 
 **Cell assign is able to detect the following cell types:**    
 
-`r det_cell_type`
+`r master_cell_types`
 
 
 ## Individual samples  
@@ -149,7 +150,7 @@ for(i in 1:length(seur_sce_list)){
               reduction = 'tsne',
               group.by = 'cell_type',
               pt.size = 1.5) +
-  scale_color_manual(values = colors_chosen_list[[i]]) +
+  #scale_color_manual(values = colors_chosen_list[[i]]) +
   labs(title = paste(unique(seur_sce_list[[i]]$id), 'tSNE: Cell Assign for scRNAseq Cells', sep = ' - '))
   
     plots_list_umap[[i]] <- DimPlot(object = seur_sce_list[[i]],
@@ -157,7 +158,7 @@ for(i in 1:length(seur_sce_list)){
               reduction = 'umap',
               group.by = 'cell_type',
               pt.size = 1.5) +
-  scale_color_manual(values = colors_chosen_list[[i]]) +
+  #scale_color_manual(values = colors_chosen_list[[i]]) +
   labs(title = paste(unique(seur_sce_list[[i]]$id), 'UMAP: Cell Assign for scRNAseq Cells', sep = ' - '))
 }
 
@@ -171,6 +172,7 @@ for(i in 1:length(seur_sce_list)){
 for (i in 1:length(clustering_plots_tsne)) {
   grid.arrange(clustering_plots_tsne[[i]], plots_list_tsne[[i]], nrow = 1)
 }
+
 
 ```
 

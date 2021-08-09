@@ -10,7 +10,7 @@ output:
     toc_float: true
 
 params:
-  pair_ids: 'YW1' # to run this, write TWO ids here, separated by -
+  pair_ids: 'DH30_GC_C134WFOXL2_new-DH30_GC_wtFOXL2_new' # to run this, write TWO ids here, separated by -
   whichMethod: 'default' # to use different parameters here, just update them.
   min_features: 1000
   mito_thresh_max: 25
@@ -312,7 +312,7 @@ dim_red_plot <- function(seurat_obj){
   # run PCA, UMAP, and TSNE
   seurat_obj <- RunPCA(seurat_obj, verbose = FALSE)
   seurat_obj <- RunUMAP(seurat_obj, dims = 1:30)
-  seurat_obj <- RunTSNE(seurat_obj, dims = 1:30, check_duplicates = FALSE, perplexity = 10)
+  seurat_obj <- RunTSNE(seurat_obj, dims = 1:30, check_duplicates = FALSE, perplexity = 10) #change perplexity to a smaller number for samples with few cells
   
   # Get the total variance and compute variance explained by the first 2 PCs
   total_variance <- seurat_obj[["pca"]]@misc$total.variance
@@ -417,7 +417,7 @@ process_seurat <- function(seurat_obj){
   clustered <- ScaleData(normalized) %>% 
     RunPCA(verbose = FALSE) %>% 
     RunUMAP(dims = 1:30, n.components=3) %>% 
-    RunTSNE(dims = 1:30, dim.embed = 3, check_duplicates = FALSE) %>% 
+    RunTSNE(dims = 1:30, dim.embed = 3, check_duplicates = FALSE) %>% # change perplexity to a smaller number for samples with few cells
     FindNeighbors(dims = 1:10) %>% 
     FindClusters(resolution = 0.5) # larger resolution gives more clusters; recommended resoluation range is 0.4-1.2 for dataset with ~3k cells
   
@@ -540,7 +540,7 @@ PlotDiffMap <- function(dat, dm_path, dim){
   # compute diffusion map
   if(!file.exists(dm_path)){
     dm <- DiffusionMap(t(logcounts), n_pcs = 30)
-    if(dir.exists(dm_path)) dir.create(dirname(dm_path)) # create sample folder
+    if(!dir.exists(dm_path)) dir.create(dirname(dm_path)) # create sample folder
     saveRDS(dm, file=dm_path)
   } else{
     dm <- readRDS(dm_path)
