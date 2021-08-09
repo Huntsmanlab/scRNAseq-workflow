@@ -1,0 +1,183 @@
+---
+title: "scSorter and cellassign comparison with expression level on specified cell types"
+subtitle: '`r params$pair_ids`'
+author: "Harper Cheng"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: html_document
+
+params:
+  pair_ids: 'DH1_DBZ'
+---
+
+```{r include = FALSE}
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'cellassign', 'scripts', 'run_cellassign.R'))
+source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix.R'))
+set.seed(123)
+```
+
+```{r include = FALSE, message = FALSE,  warning = FALSE}
+
+# load clustered sce
+sce <- readRDS(here('..', '..', 'general', 'data', 'clustered', 'sce', params$pair_ids, 'sce_clus.rds'))
+
+# make a marker gene list for scSorter
+epithelial_secretory = c("EPCAM", "KRT7","KRT8","KRT18","PAX8","OVGP1", "KRT19", "LCN2",'WFDC2', 'KLF5', 'SDC4', 'UCA1', 'TACSTD2', 'LINC01541', 'ELF3', 'C1orf186', 'DSP', 'CLDN4', 'PERP', 'KRT18', 'CD9', 'USP53',"CDH1","CLDN3","CLDN4","FUT4")
+
+epithelial_ciliated = c("EPCAM", "KRT7","KRT8","KRT18","FOXJ1", "CAPS", "DYDC2", "CTH", "TP73", "SNTN","WDR16","FAM92B","C20orf85","C20orf88","TPPP3","C9orf24","FAM183A","C1orf194","PIFO","CDH1","CLDN3","CLDN4","FUT4")
+
+endothelial = c('VWF','PECAM1','MCAM','EMCN','CLEC14A','CDH5', "ADGRL4", "PCDH17", "RNASE1")
+    
+stromal_fibroblast = c("DCN","COL6A1","CRISPLD2","COL6A3","LUM","COL5A1")
+    
+vasular_smooth_muscle = c("MYLK","ACTA2","MYH11","PLN","SMTN","CNN1")
+    
+lymphocyte = c("MS4A1", 'CD79A', 'PTPRC', 'CD19', 'BANK1', 'CD24', 'IGKC', "CD4","CD2","CD3G","CD3D","CD28","CD3E", "CCL5", "STK17B", "PTPRC")
+
+macrophage_cells = c("AIF1","MS4A6A","HLA-DQA1", "CD14","IL1B","LYZ","CYBB","HLA-DQB1", "PLEK","HLA-DPA1", "HLA-DPB1", "HLA-DRB5", "HLA-DRB6")
+
+Mesenchymal_cells = c("CD44", "CDH2", "ITGA5", "VIM", "FN1", "S100A4", "TNC", "MMP2", "ACTA2", "TWIST1", "WNT5A", "SNAI2", "ZEB1", "ZEB2")
+
+MesenchymalStem = c("ENG","THY1","ALCAM","CD34","PTPRC","NT5E")
+
+Ovarian_cancer = c("PAX8", "WT1", "STMN1", "MUC16", "KL6", "KL7", "KL8")
+
+EndometrialStem = c("ABCG2","ENG","VCAM1","KIT","PROM1","CD140b","MCAM","CD166","ITGB1","PECAM1","CD34","CD44","PTPRC","ITGA4","ICAM1","NT5E","THY1","IPO13","LGR5","MSI1","NES","POU5F1","SOX2","SSEA4")
+
+Mesenchymal_cells = c("CD44", "CDH2", "ITGA5", "VIM", "FN1", "S100A4", "TNC", "MMP2", "ACTA2", "TWIST1", "WNT5A", "SNAI2", "ZEB1", "ZEB2")
+
+# a dataframe of all marker genes
+marker_genes <- data.frame(Type=c(rep("epithelial_secretory", length(epithelial_secretory)),
+                                  rep("epithelial_ciliated", length(epithelial_ciliated)),
+                                  rep("endothelial", length(endothelial)),
+                                  rep("stromal_fibroblast", length(stromal_fibroblast)),
+                                  rep("lymphocyte", length(lymphocyte)),
+                                  rep("macrophage_cells", length(macrophage_cells)),
+                                  rep("vasular_smooth_muscle",length(vasular_smooth_muscle)),
+                                  rep("MesenchymalStem", length(MesenchymalStem)),
+                                  rep("Ovarian_cancer", length(Ovarian_cancer)),
+                                  rep("EndometrialStem", length(EndometrialStem)),
+                                  rep("Mesenchymal_cells", length(Mesenchymal_cells))),
+                           Marker=c(epithelial_secretory, epithelial_ciliated, endothelial, stromal_fibroblast, 
+                                    lymphocyte, macrophage_cells, vasular_smooth_muscle, MesenchymalStem, 
+                                    Ovarian_cancer, EndometrialStem, Mesenchymal_cells),
+                           stringsAsFactors = F)
+
+# cell types we want to include 
+cell_types <- c("lymphocyte", "epithelial_secretory", "epithelial_ciliated","endothelial", "macrophage_cells", "stromal_fibroblast", "MesenchymalStem", "vasular_smooth_muscle", "EndometrialStem", "Ovarian_cancer", "Mesenchymal_cells")
+
+marker_genes <- marker_genes %>% filter(Type %in% cell_types)
+detected <- marker_genes$Type %>% as.factor() %>% levels()
+
+```
+
+This report compares cell assignment results given by two packages, scSorter and cellassign. Cell type detected are `r detected`. We also show expression levels on markers of some cell types of interest.
+
+## Cell assignment with scSorter
+
+```{r include = FALSE, message = FALSE,  warning = FALSE}
+expr_obj <- as.Seurat(sce)
+#expr_obj <- NormalizeData(expr_obj, normalization.method = "LogNormalize", scale.factor = 10000, verbose = F)
+#expr_obj <- FindVariableFeatures(expr_obj, selection.method = "vst", nfeatures = 2000, verbose = F)
+expr_obj <- ScaleData(expr_obj)
+expr_obj <- FindVariableFeatures(expr_obj)
+topgenes <- head(VariableFeatures(expr_obj), 2000)
+
+expr = GetAssayData(expr_obj)
+topgene_filter = rowSums(as.matrix(expr)[topgenes, ]!=0) > ncol(expr)*.1
+topgenes = topgenes[topgene_filter]
+
+picked_genes = unique(c(marker_genes$Marker, topgenes))
+expr = expr[rownames(expr) %in% picked_genes, ]
+
+cell_type <- scSorter(expr, marker_genes)
+expr_obj[["cell_type"]] <- cell_type$Pred_Type
+
+
+expr_obj <- RunPCA(expr_obj, verbose = FALSE)
+expr_obj <- RunTSNE(expr_obj, dims = 1:30, check_duplicates = FALSE)
+expr_obj<- RunUMAP(expr_obj, dims = 1:30)
+expr_obj <- FindNeighbors(expr_obj, dims = 1:10)
+expr_obj <- FindClusters(expr_obj, resolution = 0.5)
+
+Idents(expr_obj) <- "cell_type"
+```
+
+```{r echo=FALSE, message = FALSE,  warning = FALSE, fig.width = 15, fig.show = 'hold'}
+
+grid.arrange(DimPlot(expr_obj, reduction = "tsne", dims = c(1, 2), group.by="cell_type") + labs(title=paste0("scSorter: ", params$pair_ids)),
+             DimPlot(expr_obj, reduction = "tsne", dims = c(1, 2), group.by="cluster") + labs(title=paste0("clustering: ", params$pair_ids)),
+             nrow=1)
+
+```
+
+## Cell assignment with cellassign
+
+```{r include=FALSE}
+
+cell_type_csv <- here('..', '..', 'general', 'data', 'cellassign', params$pair_ids, 'cell_types.csv')
+
+if(file.exists(cell_type_csv)==TRUE){ # if cell_type_csv already exists
+  cell_type <- read_csv(cell_type_csv)
+  } else { # if not, run cell assign
+    sce_cas <- run_cellassign(sce, cell_types, cell_type_csv)
+    cell_type <- sce_cas$cell_type
+  }
+
+# add cell type information to seurat object
+expr_obj[["cell_type_cellassign"]] <- cell_type$cell_type
+Idents(expr_obj) <- "cell_type_cellassign"
+
+```
+
+```{r echo=FALSE, message = FALSE,  warning = FALSE, fig.width = 15, fig.show = 'hold'}
+
+grid.arrange(DimPlot(expr_obj, reduction = "tsne", dims = c(1, 2), group.by="cell_type_cellassign") + labs(title=paste0("cellassign: ", params$pair_ids)),
+             DimPlot(expr_obj, reduction = "tsne", dims = c(1, 2), group.by="cluster") + labs(title=paste0("clustering: ", params$pair_ids)),
+             nrow=1)
+
+```
+
+## Expression level
+
+```{r echo=FALSE, message = FALSE,  warning = FALSE}
+
+PlotReporter <- function(reporters, seurat_obj, col){
+  # `reporters` is a vector of marker genes you are interested in seeing the expression level; `col` is the color of dots
+  
+  # initialize a list that can be printed out in an html report
+  p3 <- htmltools::tagList()
+  # hide plot_ly grid
+  ax <- list(zeroline = FALSE, showline = TRUE, showgrid = FALSE)
+  
+  for(i in 1:length(reporters)){
+    if(any(grepl(paste("^",reporters[i],"$", sep=""), rownames(seurat_obj), ignore.case = TRUE) == TRUE)){
+    # if our sample contains one of the reporter genes: get the logcounts of this gene
+    count <- GetAssayData(seurat_obj) %>% as.matrix  
+    reporter_idx <- grep(paste("^",reporters[i],"$", sep=""), rownames(seurat_obj), ignore.case = TRUE)
+    count_reporter <- count[reporter_idx,]
+    
+    # get umap and tsne coordinates for plotting; add logcounts 
+    df_umap <- cbind(seurat_obj[["umap"]]@cell.embeddings %>% as.data.frame(), seurat_obj[["tsne"]]@cell.embeddings %>% as.data.frame())
+    df_umap$logcounts <- count_reporter
+  
+    p3[[i]] <- plot_ly(data = df_umap,
+        x = ~tSNE_1, y = ~tSNE_2,
+        opacity = 1,
+        color = ~logcounts,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 4), 
+        colors = brewer.pal(6, col)) %>% 
+          layout(title=paste0(reporters[[i]], "_logcount"),
+         legend= list(itemsizing='constant'), xaxis = ax, yaxis = ax, showlegend=F)
+  }
+  }
+  return(p3)
+}
+
+PlotReporter(reporters=epithelial_ciliated, seurat_obj=expr_obj, col="Reds")
+
+```
+
