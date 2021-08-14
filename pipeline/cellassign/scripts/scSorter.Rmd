@@ -23,7 +23,7 @@ set.seed(123)
 sce <- readRDS(here('..', '..', 'general', 'data', 'clustered', 'sce', params$pair_ids, 'sce_clus.rds'))
 
 # make a marker gene list for scSorter
-epithelial_secretory = c("EPCAM", "KRT7","KRT8","KRT18","PAX8","OVGP1", "KRT19", "LCN2",'WFDC2', 'KLF5', 'SDC4', 'UCA1', 'TACSTD2', 'LINC01541', 'ELF3', 'C1orf186', 'DSP', 'CLDN4', 'PERP', 'KRT18', 'CD9', 'USP53',"CDH1","CLDN3","CLDN4","FUT4")
+epithelial_unciliated = c("EPCAM", "KRT7","KRT8","KRT18","PAX8","OVGP1", "KRT19", "LCN2",'WFDC2', 'KLF5', 'SDC4', 'UCA1', 'TACSTD2', 'LINC01541', 'ELF3', 'C1orf186', 'DSP', 'CLDN4', 'PERP', 'KRT18', 'CD9', 'USP53',"CDH1","CLDN3","CLDN4","FUT4")
 
 epithelial_ciliated = c("EPCAM", "KRT7","KRT8","KRT18","FOXJ1", "CAPS", "DYDC2", "CTH", "TP73", "SNTN","WDR16","FAM92B","C20orf85","C20orf88","TPPP3","C9orf24","FAM183A","C1orf194","PIFO","CDH1","CLDN3","CLDN4","FUT4")
 
@@ -47,8 +47,11 @@ EndometrialStem = c("ABCG2","ENG","VCAM1","KIT","PROM1","CD140b","MCAM","CD166",
 
 Mesenchymal_cells = c("CD44", "CDH2", "ITGA5", "VIM", "FN1", "S100A4", "TNC", "MMP2", "ACTA2", "TWIST1", "WNT5A", "SNAI2", "ZEB1", "ZEB2")
 
+epithelial = c("EPCAM", "CDH1","CLDN3","CLDN4","KRT7","KRT8","KRT18","KRT19","FUT4")
+
+
 # a dataframe of all marker genes
-marker_genes <- data.frame(Type=c(rep("epithelial_secretory", length(epithelial_secretory)),
+marker_genes <- data.frame(Type=c(rep("epithelial_unciliated", length(epithelial_unciliated)),
                                   rep("epithelial_ciliated", length(epithelial_ciliated)),
                                   rep("endothelial", length(endothelial)),
                                   rep("stromal_fibroblast", length(stromal_fibroblast)),
@@ -58,51 +61,74 @@ marker_genes <- data.frame(Type=c(rep("epithelial_secretory", length(epithelial_
                                   rep("MesenchymalStem", length(MesenchymalStem)),
                                   rep("Ovarian_cancer", length(Ovarian_cancer)),
                                   rep("EndometrialStem", length(EndometrialStem)),
-                                  rep("Mesenchymal_cells", length(Mesenchymal_cells))),
-                           Marker=c(epithelial_secretory, epithelial_ciliated, endothelial, stromal_fibroblast, 
+                                  rep("Mesenchymal_cells", length(Mesenchymal_cells)),
+                                  rep("epithelial", length(epithelial))),
+                           Marker=c(epithelial_unciliated, epithelial_ciliated, endothelial, stromal_fibroblast, 
                                     lymphocyte, macrophage_cells, vasular_smooth_muscle, MesenchymalStem, 
-                                    Ovarian_cancer, EndometrialStem, Mesenchymal_cells),
+                                    Ovarian_cancer, EndometrialStem, Mesenchymal_cells, epithelial),
                            stringsAsFactors = F)
 
 # cell types we want to include 
-cell_types <- c("lymphocyte", "epithelial_secretory", "epithelial_ciliated","endothelial", "macrophage_cells", "stromal_fibroblast", "MesenchymalStem", "vasular_smooth_muscle", "EndometrialStem", "Ovarian_cancer", "Mesenchymal_cells")
+cell_types <- c("lymphocyte", "endothelial", "macrophage_cells", "stromal_fibroblast", "MesenchymalStem", "vasular_smooth_muscle", "EndometrialStem", "Ovarian_cancer", "Mesenchymal_cells", "epithelial")
 
 marker_genes <- marker_genes %>% filter(Type %in% cell_types)
 detected <- marker_genes$Type %>% as.factor() %>% levels()
+
+# convert to seurat object
+expr_obj <- as.Seurat(sce)
+expr_obj <- ScaleData(expr_obj)
+expr_obj <- FindVariableFeatures(expr_obj)
+topgenes <- head(VariableFeatures(expr_obj), 2000)
 
 ```
 
 This report compares cell assignment results given by two packages, scSorter and cellassign. Cell type detected are `r detected`. We also show expression levels on markers of some cell types of interest.
 
-## Cell assignment with scSorter
 
 ```{r include = FALSE, message = FALSE,  warning = FALSE}
-expr_obj <- as.Seurat(sce)
-#expr_obj <- NormalizeData(expr_obj, normalization.method = "LogNormalize", scale.factor = 10000, verbose = F)
-#expr_obj <- FindVariableFeatures(expr_obj, selection.method = "vst", nfeatures = 2000, verbose = F)
-expr_obj <- ScaleData(expr_obj)
-expr_obj <- FindVariableFeatures(expr_obj)
-topgenes <- head(VariableFeatures(expr_obj), 2000)
 
-expr = GetAssayData(expr_obj)
-topgene_filter = rowSums(as.matrix(expr)[topgenes, ]!=0) > ncol(expr)*.1
-topgenes = topgenes[topgene_filter]
-
-picked_genes = unique(c(marker_genes$Marker, topgenes))
-expr = expr[rownames(expr) %in% picked_genes, ]
+# scSorter
+expr <- GetAssayData(expr_obj)
+topgene_filter <- rowSums(as.matrix(expr)[topgenes, ]!=0) > ncol(expr)*.1
+topgenes <- topgenes[topgene_filter]
+picked_genes <- unique(c(marker_genes$Marker, topgenes))
+expr <- expr[rownames(expr) %in% picked_genes, ]
 
 cell_type <- scSorter(expr, marker_genes)
 expr_obj[["cell_type"]] <- cell_type$Pred_Type
+Idents(expr_obj) <- "cell_type"
+
+```
 
 
+```{r include=FALSE}
+
+# cellassign
+cell_type_csv <- here('..', '..', 'general', 'data', 'cellassign', params$pair_ids, 'cell_types.csv')
+sce_path <- here('..', '..', 'general', 'data', 'clustered', 'sce', params$pair_ids, 'sce_clus.rds')
+
+if(file.exists(cell_type_csv)==TRUE){ # if cell_type_csv already exists
+  cell_type <- read_csv(cell_type_csv)
+  # add cell type information to seurat object
+  expr_obj[["cell_type_cellassign"]] <- cell_type$cell_type
+  } else { # if not, run cell assign
+    sce_cas <- run_cellassign(sce_path, cell_types, cell_type_csv)
+    cell_type <- sce_cas$cell_type
+    expr_obj[["cell_type_cellassign"]] <- cell_type
+  }
+
+Idents(expr_obj) <- "cell_type_cellassign"
+
+# dim reduction
 expr_obj <- RunPCA(expr_obj, verbose = FALSE)
 expr_obj <- RunTSNE(expr_obj, dims = 1:30, check_duplicates = FALSE)
 expr_obj<- RunUMAP(expr_obj, dims = 1:30)
 expr_obj <- FindNeighbors(expr_obj, dims = 1:10)
 expr_obj <- FindClusters(expr_obj, resolution = 0.5)
 
-Idents(expr_obj) <- "cell_type"
 ```
+
+## Cell assignment with scSorter
 
 ```{r echo=FALSE, message = FALSE,  warning = FALSE, fig.width = 15, fig.show = 'hold'}
 
@@ -113,23 +139,6 @@ grid.arrange(DimPlot(expr_obj, reduction = "tsne", dims = c(1, 2), group.by="cel
 ```
 
 ## Cell assignment with cellassign
-
-```{r include=FALSE}
-
-cell_type_csv <- here('..', '..', 'general', 'data', 'cellassign', params$pair_ids, 'cell_types.csv')
-
-if(file.exists(cell_type_csv)==TRUE){ # if cell_type_csv already exists
-  cell_type <- read_csv(cell_type_csv)
-  } else { # if not, run cell assign
-    sce_cas <- run_cellassign(sce, cell_types, cell_type_csv)
-    cell_type <- sce_cas$cell_type
-  }
-
-# add cell type information to seurat object
-expr_obj[["cell_type_cellassign"]] <- cell_type$cell_type
-Idents(expr_obj) <- "cell_type_cellassign"
-
-```
 
 ```{r echo=FALSE, message = FALSE,  warning = FALSE, fig.width = 15, fig.show = 'hold'}
 

@@ -17,6 +17,7 @@ params:
   cell_type_csv: 'cell_type_csv'
   seurat_corrected: 'seurat_corrected'
   scran_corrected: 'scran_corrected'
+  integrate: 'integrate'
 
 ---
 
@@ -63,7 +64,7 @@ for(i in 1:length(id.list)){
 # chunk option: if one sample, returns FALSE
 eval_text <- FALSE
 
-if(length(id.list) > 1){
+if(length(id.list) > 1 & params$integrate =="yes"){
   # load seurat batch corrected object
   integrated <- readRDS(params$seurat_corrected)
 

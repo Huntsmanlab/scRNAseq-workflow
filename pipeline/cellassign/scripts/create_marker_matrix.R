@@ -15,7 +15,8 @@ suppressPackageStartupMessages({
 create_marker_mat <- function(cell_types){
 
   marker_list_all <- list(
-    # marker genes for some common cell types (i think this list is from https://www.nature.com/articles/s41591-020-1040-z#Sec1 - for endometrium tissue)
+
+    # this is an old list derived from https://www.nature.com/articles/s41591-020-1040-z#Sec1 - for endometrium tissue 
     epithelial_cells = c('CLDN3', 'KRT8', 'KRT19', 'WFDC2', 'KLF5', 'SDC4', 'UCA1', 'TACSTD2', 'LINC01541', 'ELF3', 'C1orf186', 'DSP', 'CLDN4', 'PERP', 'KRT18', 'CD9', 'USP53'),
     lymphocyte_cells = c("MS4A1", 'CD79A', 'PTPRC', 'CD19', 'BANK1', 'CD24', 'IGKC', "CD4","CD2","CD3G","CD3D","CD28","CD3E", "CCL5", "STK17B"),
     endothelial_cells = c("ADGRL4", "VWF", "PCDH17", "PECAM1", "RNASE1"),
@@ -28,7 +29,7 @@ create_marker_mat <- function(cell_types){
     theca_cells = c("CYP17A1",	"INSL3", "FBLN5",	"OGN", "RAMP2"),
     mesothelial_cells = c("FRAS1",	"RSPO1",	"MSLN",	"LRRN4",	"CALB2"),
     
-    # from allCellMarkers.csv:
+    # from allCellMarkers.csv: also an old list
     Blymphocyte = c("MS4A1", "CD79A", "PTPRC", "CD19", "BANK1", "CD24", "IGKC"),
     Tlymphocyte = c("CD4","PTPRC","CD2","CD3G","CD3D","CD28","CD3E"),
     CytotoxicT = c("PTPRC","NKG7","CD2","GZMA","CD8A","CD3G","CD3D","CD28","PRF1","CD3E"),
@@ -46,7 +47,7 @@ create_marker_mat <- function(cell_types){
     
     # new list:
     epithelial = c("EPCAM", "CDH1","CLDN3","CLDN4","KRT7","KRT8","KRT18","KRT19","FUT4"),
-    epithelial_secretory = c("EPCAM", "KRT7","KRT8","KRT18","PAX8","OVGP1", "KRT19", "LCN2",'WFDC2', 'KLF5', 'SDC4', 'UCA1', 'TACSTD2', 'LINC01541', 'ELF3', 'C1orf186', 'DSP', 'CLDN4', 'PERP', 'KRT18', 'CD9', 'USP53',"CDH1","CLDN3","CLDN4","FUT4"),
+    epithelial_unciliated = c("EPCAM", "KRT7","KRT8","KRT18","PAX8","OVGP1", "KRT19", "LCN2",'WFDC2', 'KLF5', 'SDC4', 'UCA1', 'TACSTD2', 'LINC01541', 'ELF3', 'C1orf186', 'DSP', 'CLDN4', 'PERP', 'KRT18', 'CD9', 'USP53',"CDH1","CLDN3","CLDN4","FUT4"),
     epithelial_ciliated = c("EPCAM", "KRT7","KRT8","KRT18","FOXJ1", "CAPS", "DYDC2", "CTH", "TP73", "SNTN","WDR16","FAM92B","C20orf85","C20orf88","TPPP3","C9orf24","FAM183A","C1orf194","PIFO","CDH1","CLDN3","CLDN4","FUT4"),
     endothelial = c('VWF','PECAM1','MCAM','EMCN','CLEC14A','CDH5', "ADGRL4", "PCDH17", "RNASE1"),
     stromal_fibroblast = c("DCN","COL6A1","CRISPLD2","COL6A3","LUM","COL5A1"),
