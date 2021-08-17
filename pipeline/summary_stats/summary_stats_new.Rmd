@@ -553,7 +553,7 @@ for(i in 1:length(pro_sample)){
 
 ```
 
-```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10, eval=FALSE}
 
 for(i in 1:length(pro_sample)){
   print(DimPlot(qc_sample[[i]], reduction = "umap") + 
