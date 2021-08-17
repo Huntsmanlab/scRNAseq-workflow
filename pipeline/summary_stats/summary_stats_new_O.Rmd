@@ -10,7 +10,7 @@ output:
     toc_float: true
 
 params:
-  pair_ids: 'DH30_GC_C134WFOXL2_new-DH30_GC_wtFOXL2_new' # to run this, write TWO ids here, separated by -
+  pair_ids: 'DH33-DH34' # to run this, write TWO ids here, separated by -
   whichMethod: 'default' # to use different parameters here, just update them.
   min_features: 1000
   mito_thresh_max: 25
@@ -66,7 +66,8 @@ path_to_10X <- lapply(dh_organoid_ids, function(id) here('..', 'huntsmandata', '
 sce_raws <- sce_qcs <- list()
 for(i in 1:length(dh_organoid_ids)){
   sce_raws[[i]] <- convert_to_sces(path_to_10X = path_to_10X[[i]], id = dh_organoid_ids[[i]])
-  sce_qcs[[i]] <- make_sce_qc(params$whichMethod, sce_raws[[i]], params$mito_thresh_max, params$mito_thresh_min, params$ribo_thresh_max, 
+  sce_qcs[[i]] <- make_sce_qc(params$whichMethod, sce_raws[[i]], params$mito_thresh_max, 
+                              params$mito_thresh_min, params$ribo_thresh_max, 
                               params$nmads, params$min_features, params$remove_mito_and_ribo)
 }
 
@@ -599,11 +600,13 @@ ax <- list(zeroline = FALSE, showline = TRUE, showgrid = FALSE)
 PlotReporter <- function(reporters, sce){
   p <- htmltools::tagList()
   for(i in 1:length(reporters)){
-  if(any(grepl(paste("^",reporters[i],"$", sep=""), rownames(sce), ignore.case = TRUE) == TRUE)){
+  if(any(grepl(reporters[i], rownames(sce), ignore.case = TRUE) == TRUE)){
+    #any(grepl(paste("^",reporters[i],"$", sep=""), rownames(sce), ignore.case = TRUE) == TRUE)){
     
     # if our sample contains one of the reporter genes:
     count <- GetAssayData(sce) %>% as.matrix  
-    reporter_idx <- grep(paste("^",reporters[i],"$", sep=""), rownames(sce), ignore.case = TRUE)
+    reporter_idx <- grep(reporters[i], rownames(sce), ignore.case = TRUE)
+    #reporter_idx <- grep(paste("^",reporters[i],"$", sep=""), rownames(sce), ignore.case = TRUE)
     count_reporter <- count[reporter_idx,]
     
     df_umap <- cbind(sce[["umap"]]@cell.embeddings %>% as.data.frame(), sce[["tsne"]]@cell.embeddings %>% as.data.frame())
