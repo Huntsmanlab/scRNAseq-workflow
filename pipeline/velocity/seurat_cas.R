@@ -18,13 +18,16 @@ make_seurat_object <- function(cell_type_csv,
   sce <- readRDS(sce_clus)
   cell_type <- read_csv(cell_type_csv)
   sce$cell_type <- cell_type$cell_type
+  cluster <- colData(sce)$cluster
   
   # create seurat object
   sobject = CreateSeuratObject(counts = counts(sce))
   sobject <- FindVariableFeatures(sobject)
   
-  # add cell type info 
-  sobject$cell_type <- sce$cell_type
+  # add cluster info
+  sobject$cluster <- cluster
+  # add cell type info if we have this information
+  if("cell_type" %in% (colData(sce) %>% colnames())) sobject$cell_type <- sce$cell_type
   
   # make loom file from the sobject with cell assign info
   if(!dir.exists(path_to_loom_file)){ dir.create(dirname(path_to_loom_file))}
@@ -41,9 +44,9 @@ make_seurat_object(cell_type_csv = args$cell_type_csv,
                    path_to_loom_file = args$path_to_loom_file) 
 
 
-# cell_type_csv = '../data/cellassign/DH21_NEW/cell_types.csv'
-# sce_clus = '../data/clustered/sce/DH21_NEW/sce_clus.rds'
-# path_to_loom_file = '../data/loom_cas/DH21_NEW/seurat_cas.loom'
-# make_seurat_object(cell_type_csv = cell_type_csv, 
+#cell_type_csv = '../../general/data/cellassign/DH2_control/cell_types.csv'
+#sce_clus = '../../general/data/clustered/sce/DH2_control/sce_clus.rds'
+#path_to_loom_file = '../../general/data/loom_cas/DH2_control/seurat_cas.loom'
+#make_seurat_object(cell_type_csv = cell_type_csv, 
 #                    sce_clus = sce_clus,
 #                    path_to_loom_file = path_to_loom_file) 

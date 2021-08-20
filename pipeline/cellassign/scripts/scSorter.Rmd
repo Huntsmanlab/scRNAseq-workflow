@@ -80,7 +80,7 @@ marker_genes <- data.frame(Type=c(rep("epithelial_unciliated", length(epithelial
                            stringsAsFactors = F)
 
 # cell types we want to include 
-cell_types <- c("lymphocyte", "endothelial", "macrophage_cells", "stromal_fibroblast", "MesenchymalStem", "vasular_smooth_muscle", "EndometrialStem", "Ovarian_cancer", "Mesenchymal_cells", "epithelial_unciliated", "epithelial_ciliated")
+cell_types <- c("lymphocyte", "endothelial", "macrophage_cells", "stromal_fibroblast", "MesenchymalStem", "vasular_smooth_muscle", "EndometrialStem", "Ovarian_cancer", "Mesenchymal_cells", "epithelial")
 
 marker_genes <- marker_genes %>% filter(Type %in% cell_types)
 detected <- marker_genes$Type %>% as.factor() %>% levels()
@@ -175,16 +175,17 @@ PlotReporter <- function(reporters, seurat_obj, col, id){
   
   for(i in 1:length(reporters)){
     if(any(grepl(paste("^",reporters[i],"$", sep=""), rownames(seurat_obj), ignore.case = TRUE) == TRUE)){
-    # if our sample contains one of the reporter genes: get the logcounts of this gene
-    count <- GetAssayData(seurat_obj) %>% as.matrix  
-    reporter_idx <- grep(paste("^",reporters[i],"$", sep=""), rownames(seurat_obj), ignore.case = TRUE)
-    count_reporter <- count[reporter_idx,]
+      for(j in 1:length(seurat_obj)){
+        # if our sample contains one of the reporter genes: get the logcounts of this gene
+      count <- GetAssayData(seurat_obj[[j]]) %>% as.matrix  
+      reporter_idx <- grep(paste("^",reporters[i],"$", sep=""), rownames(seurat_obj[[j]]), ignore.case = TRUE)
+      count_reporter <- count[reporter_idx,]
     
-    # get umap and tsne coordinates for plotting; add logcounts 
-    df_umap <- cbind(seurat_obj[["TSNE"]]@cell.embeddings %>% as.data.frame(), seurat_obj[["UMAP"]]@cell.embeddings %>% as.data.frame())
-    df_umap$logcounts <- count_reporter
+      # get umap and tsne coordinates for plotting; add logcounts 
+      df_umap <- cbind(seurat_obj[[j]][["TSNE"]]@cell.embeddings %>% as.data.frame(), seurat_obj[[j]][["UMAP"]]@cell.embeddings %>% as.data.frame())
+      df_umap$logcounts <- count_reporter
   
-    p3[[i]] <- plot_ly(data = df_umap,
+      p3[[i]][[j]] <- plot_ly(data = df_umap,
         x = ~tSNE_1, y = ~tSNE_2,
         opacity = 1,
         color = ~logcounts,
@@ -194,14 +195,15 @@ PlotReporter <- function(reporters, seurat_obj, col, id){
         colors = brewer.pal(6, col)) %>% 
           layout(title=paste0(id, ": ",reporters[[i]], "_logcount"),
          legend= list(itemsizing='constant'), xaxis = ax, yaxis = ax, showlegend=F)
-  }
+      }
+    }
   }
   return(p3)
 }
 
-for(i in 1:length(expr_obj)){
-  PlotReporter(reporters=epithelial_ciliated, seurat_obj=expr_obj[[i]], col="Reds", id=id.list[[i]])
-}
+
+PlotReporter(reporters=epithelial_ciliated, seurat_obj=expr_obj, col="Reds", id=id.list)
+
 
 ```
 

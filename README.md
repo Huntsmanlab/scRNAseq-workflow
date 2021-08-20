@@ -3,15 +3,15 @@
 > This repository contains the code used by the Huntsman Lab at BCCRC for single cell RNA sequencing analysis from 10x experiments.
 
 **The steps of the pipeline are as follows:**  
-1. process_qc_normalization: Make a SingleCellExperiment object from filtered counts. Perform quality control to further filter cells with low reads and/or high mitochondrial content. We run this rule to get the normalized sce object.
+1. process_qc_normalization: Make a SingleCellExperiment object from filtered counts. Perform quality control to further filter cells with low reads and/or high mitochondrial content. FInally, we perform normalization. We run this rule to get the normalized sce object.
 2. run_summary_stats: Use the Seurat workflow to visualize the results of data before and after quality control. Results include summary statistics, HVGs (volcano plots), clustering and dimension reduction plots, diffusion maps, and heatmaps showing signature genes for each cluster. We run this rule to generate a rmd report on summary statistics and dimension reduction plots.
-3. dimred_cluster: Do dimensionality reduction (PCA, tSNE and UMAP). Perform unsupervised clustering. We run this rule to get the sce object with clustering and dimension reduction information.
-4. compute_diff_map: Compute diffusion map coordinates. We run this rule to get the dm.rds for plotting diffusion map.
-5. do_batch_correction: Do batch correction and integration using seurat and scran, if needed. We run this rule to get scran corrected and seurat corrected sce objects for downstream analysis (i.e., integrated cell assign); and generate a rmd report visualizing dimension reduction and clustering plots before and after batch correction.
-6. integrate_cell_assign_results: Annotate cell types using cell assign and visulize cell clustering and cell type with dimension reduction plots. Although it is called integrate_cell_assign, it can handle both one-sample (with no integration) and two-sample (with integration) cases. We run this rule to save a csv file on cell type information; and generate a rmd report. 
+3. dimred_cluster: Do dimensionality reduction (PCA, tSNE and UMAP). Perform unsupervised clustering with scran/scater. We run this rule to get the sce object with clustering and dimension reduction information.
+4. compute_diff_map: Compute diffusion map coordinates. We no longer run this rule - instead, we compute diffusion map coordinates and do the visualization in run_summary_stats rule.
+5. do_batch_correction: Do batch correction and integration using seurat and scran if we have more than one sample. We run this rule to get scran corrected and seurat corrected objects for downstream analyses (i.e., integrated cell assign); and generate a rmd report visualizing dimension reduction and clustering plots before and after batch correction. 
+6. integrate_cell_assign_results: Annotate cell types using cell assign and visulize cell clustering and cell type with dimension reduction plots. Although it is called integrate_cell_assign, it can handle both one-sample (with no integration) and two-sample (with integration) cases. Supply the argument `cell_type` with cell types you want to include for your sample. Choose "no" for `integration` if you don't want to perform the integration step (e.g., if running one sample). We run this rule to save a csv file on cell type information; and generate a rmd report. 
 7. run_cell_cycle_report: Assign cell cycle phases using cyclone and visualize cell cycle phases with dimension reduction plots and bar plots. We run this rule to save a csv file on cell cycle phase information; and generate a rmd report. 
 8. DGE_scran, DGE_edgeR_TWO_samples, DGE_edgeR_MULTIPLE_samples: Calculate the differentially expressed genes using scran (two paired samples) or edgeR (multiple samples), visualize the result with volcano plots, and perform enrichment analysis to find upregulated pathways.
-9. seurat_to_loom: convert sce with cell type information to seurat and then to a loom file in preparation for velocity analyses. We run thsi rule to get the loom object.
+9. seurat_to_loom: convert sce with cell type information to seurat and then to a loom file in preparation for velocity analyses. We run thsi rule to get a loom object.
 
 For workflow management, we use Snakemake. For details on how to install and use it, refer <a href="https://snakemake.readthedocs.io/en/stable/" target="_blank">here</a>. More detailed instructions on how to run the pipeline through Snakemake are given in the Snakefile, and in the snakefile help document as well. 
 
@@ -39,13 +39,13 @@ rule all:
     ## find_common_dges, # common differentially expressed genes in a paired sample
 ```  
 
-User should uncomment the name of the analyses they wish to do to, there is not a limit on the number of analyses that can be done. In the given example above, Snakemake would do DGE analysis with scran and run summary stats. Once the above steps are completed, pipeline can be run with the `snakemake` command. This command should be typed to the terminal window in RStudio.   
+User should uncomment the name of the analyses they wish to do to, there is not a limit on the number of analyses that can be done. Pipeline can be run with the `snakemake` command. This command should be typed to the terminal window in RStudio.   
 
 **Removing mitochondrial and ribosomal genes**  
-When doing quality control, you have the option to remove mitochondrial and ribosomal genes. If you wish to remove them, navigate to the "make_sce_qc" rule in the Snakefile and set the "remove_mito_and_ribo" parameter to "yes". If you write "no", mitochondrial and ribosomal genes will be retained.  
+When doing quality control, you have the option to remove mitochondrial and ribosomal genes. If you wish to remove them, navigate to the "process_qc_normalization" rule and "run_summary_stats" rule in the Snakefile and set the "remove_mito_and_ribo" parameter to "yes". If you write "no", mitochondrial and ribosomal genes will be retained.  
 
 **Subsetting the SCE object to HVG**  
-In the dim  step, you also have the option to subset the sces to highly variable genes (HVG). If you set the "HVG" parameter in the "normalize_sce" rule, you also need to need to indicate a percentage in the "top_HVG" parameter. The percentage you write here will be used to determine the percentage of genes with highest biological components. Note that pipeline will give an error if you write a fraction here, you must supply an integer. Default number provided is 20. SCE object will subsetted to HVG, but original count matrix will be retained as well as an alternate expression named "original". You can execute the following code to get the original counts with all the genes present:  
+In the dim step, you also have the option to subset the sces to highly variable genes (HVG). If you set the "HVG" parameter in the "dim_cluster" rule, you also need to need to indicate a percentage in the "top_HVG" parameter. The percentage you write here will be used to determine the percentage of genes with highest biological components. Note that pipeline will give an error if you write a fraction here, you must supply an integer. Default number provided is 20. SCE object will subsetted to HVG, but original count matrix will be retained as well as an alternate expression named "original". You can execute the following code to get the original counts with all the genes present:  
 ```
 # to recover original counts 
 sce_qc_original <- altExp(sce_qc_hvg, "original", withColData=TRUE)

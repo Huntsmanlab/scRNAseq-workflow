@@ -30,7 +30,8 @@ library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 source(here('pipeline', 'cellassign', 'scripts', 'run_cellassign.R'))
 source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix.R'))
-set.seed(6666)
+#set.seed(6666)
+set.seed(1234)
 
 ```
 

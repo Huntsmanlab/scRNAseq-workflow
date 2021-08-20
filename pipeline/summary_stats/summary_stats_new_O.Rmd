@@ -10,7 +10,7 @@ output:
     toc_float: true
 
 params:
-  pair_ids: 'DH33-DH34' # to run this, write TWO ids here, separated by -
+  pair_ids: 'DH32' # to run this, write TWO ids here, separated by -
   whichMethod: 'default' # to use different parameters here, just update them.
   min_features: 1000
   mito_thresh_max: 25
