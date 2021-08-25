@@ -637,14 +637,10 @@ reporters <- strsplit(as.character(params$reporter_genes), " ")[[1]]
 PlotReporter <- function(reporters, sce){
   p <- htmltools::tagList()
   for(i in 1:length(reporters)){
-  if(any(grepl(reporters[i], rownames(sce), ignore.case = TRUE) == TRUE)){
-    # if want exact match, use this:
-    #any(grepl(paste("^",reporters[i],"$", sep=""), rownames(sce), ignore.case = TRUE) == TRUE))
-    
+  if(any(grepl(paste("^",reporters[i],"$", sep=""), rownames(sce), ignore.case = TRUE) == TRUE)){
     # if our sample contains one of the reporter genes:
     count <- GetAssayData(sce) %>% as.matrix  
-    reporter_idx <- grep(reporters[i], rownames(sce), ignore.case = TRUE)
-    #reporter_idx <- grep(paste("^",reporters[i],"$", sep=""), rownames(sce), ignore.case = TRUE)
+    reporter_idx <- grep(paste("^",reporters[i],"$", sep=""), rownames(sce), ignore.case = TRUE)
     count_reporter <- count[reporter_idx,]
     
     df_umap <- cbind(sce[["umap"]]@cell.embeddings %>% as.data.frame(), sce[["tsne"]]@cell.embeddings %>% as.data.frame())

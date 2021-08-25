@@ -43,7 +43,7 @@ make_seurat_object(cell_type_csv = args$cell_type_csv,
                    sce_clus = args$sce_clus,
                    path_to_loom_file = args$path_to_loom_file) 
 
-
+#test:
 #cell_type_csv = '../../general/data/cellassign/DH2_control/cell_types.csv'
 #sce_clus = '../../general/data/clustered/sce/DH2_control/sce_clus.rds'
 #path_to_loom_file = '../../general/data/loom_cas/DH2_control/seurat_cas.loom'

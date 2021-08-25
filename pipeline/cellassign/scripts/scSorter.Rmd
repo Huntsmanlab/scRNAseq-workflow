@@ -164,18 +164,21 @@ for(i in 1:length(expr_obj)){
 
 ## Expression level
 
+we have expression level (logcounts) for `r id.list[[1]]` on the left and `r id.list[[2]]` on the right.
+
 ```{r echo=FALSE, message = FALSE,  warning = FALSE}
 
-PlotReporter <- function(reporters, seurat_obj, col, id){
+PlotReporter <- function(reporters, seurat_obj, col){
   # `reporters` is a vector of marker genes you are interested in seeing the expression level; `col` is the color of dots.
+  
   # initialize a list that can be printed out in an html report
-  p3 <- htmltools::tagList()
+  p <- replicate(length(reporters), vector("list", length(seurat_obj)), simplify = FALSE)
   # hide plot_ly grid
   ax <- list(zeroline = FALSE, showline = TRUE, showgrid = FALSE)
   
   for(i in 1:length(reporters)){
-    if(any(grepl(paste("^",reporters[i],"$", sep=""), rownames(seurat_obj), ignore.case = TRUE) == TRUE)){
       for(j in 1:length(seurat_obj)){
+        if(any(grepl(paste("^",reporters[i],"$", sep=""), rownames(seurat_obj[[j]]), ignore.case = TRUE) == TRUE)){
         # if our sample contains one of the reporter genes: get the logcounts of this gene
       count <- GetAssayData(seurat_obj[[j]]) %>% as.matrix  
       reporter_idx <- grep(paste("^",reporters[i],"$", sep=""), rownames(seurat_obj[[j]]), ignore.case = TRUE)
@@ -185,25 +188,73 @@ PlotReporter <- function(reporters, seurat_obj, col, id){
       df_umap <- cbind(seurat_obj[[j]][["TSNE"]]@cell.embeddings %>% as.data.frame(), seurat_obj[[j]][["UMAP"]]@cell.embeddings %>% as.data.frame())
       df_umap$logcounts <- count_reporter
   
-      p3[[i]][[j]] <- plot_ly(data = df_umap,
-        x = ~tSNE_1, y = ~tSNE_2,
+      p[[i]][[j]] <- plot_ly(data = df_umap,
+        x = ~TSNE_1, y = ~TSNE_2,
         opacity = 1,
         color = ~logcounts,
         type = "scatter",
         mode = "markers",
         marker = list(size = 4), 
         colors = brewer.pal(6, col)) %>% 
-          layout(title=paste0(id, ": ",reporters[[i]], "_logcount"),
-         legend= list(itemsizing='constant'), xaxis = ax, yaxis = ax, showlegend=F)
+          layout(title=paste0(reporters[[i]], "_logcount"),
+                 legend= list(itemsizing='constant'), xaxis = ax, yaxis = ax, showlegend=F)
       }
-    }
+    } 
+    do.call("subplot", c(p[[i]]))
   }
-  return(p3)
+  
 }
 
-
-PlotReporter(reporters=epithelial_ciliated, seurat_obj=expr_obj, col="Reds", id=id.list)
+#p3 <- htmltools::tagList()
+PlotReporter(reporters=epithelial_ciliated, seurat_obj=expr_obj, col="Reds")
 
 
 ```
+
+```{r}
+PlotReporter <- function(reporters, seurat_obj, col){
+  # `reporters` is a vector of marker genes you are interested in seeing the expression level; `col` is the color of dots.
+  
+  # initialize a list that can be printed out in an html report
+  p <- replicate(length(reporters), vector("list"), simplify = FALSE)
+  # hide plot_ly grid
+  ax <- list(zeroline = FALSE, showline = TRUE, showgrid = FALSE)
+  # get the count matrix - logcounts
+  count <- GetAssayData(seurat_obj) %>% as.matrix
+  
+  for(i in 1:length(reporters)){
+      if(any(grepl(paste("^",reporters[i],"$", sep=""), rownames(seurat_obj), ignore.case = TRUE) == TRUE)){
+      # if our sample contains one of the reporter genes: get the logcounts of this gene
+      reporter_idx <- grep(paste("^",reporters[i],"$", sep=""), rownames(seurat_obj), ignore.case = TRUE)
+      count_reporter <- count[reporter_idx,]
+    
+      # get umap and tsne coordinates for plotting; add logcounts 
+      df_umap <- cbind(seurat_obj[[j]][["TSNE"]]@cell.embeddings %>% as.data.frame(), seurat_obj[[j]][["UMAP"]]@cell.embeddings %>% as.data.frame())
+      df_umap$logcounts <- count_reporter
+  
+      p[[i]][[j]] <- plot_ly(data = df_umap,
+        x = ~TSNE_1, y = ~TSNE_2,
+        opacity = 1,
+        color = ~logcounts,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 4), 
+        colors = brewer.pal(6, col)) %>% 
+          layout(title=paste0(reporters[[i]], "_logcount"),
+                 legend= list(itemsizing='constant'), xaxis = ax, yaxis = ax, showlegend=F)
+      }
+    } 
+    do.call("subplot", c(p[[i]]))
+  }
+  
+}
+
+```
+
+
+
+
+
+
+
 

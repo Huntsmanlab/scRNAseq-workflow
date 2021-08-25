@@ -111,14 +111,21 @@ outputs <- plot_markers(paths, ntop = 50, negative_control = FALSE)
 
 colnames(outputs$markers_all)[5] <- "logFC"
 
-#saveRDS(outputs, file = params$output_path_paired)
 
 ```
 
 ```{r fig.height= 10, fig.width= 12}
-p <- plot_grid(outputs$plot, outputs$splot, labels = "AUTO")
-p
-# outputs$plot
+
+if (length(clusters) < 3) {
+  if(is.null(output$splot)){ # if no random sampling:
+    outputs$plot
+  } else { # if have random sampling:
+    plot_grid(outputs$plot, outputs$splot, labels = "AUTO")
+  }
+} else {
+  writeLines('Not yet implemented')
+}
+
 ```
 
 **positive logFC = upregulated in transduced sample, genes sorted by absolute logFC**

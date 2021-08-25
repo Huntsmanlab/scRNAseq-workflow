@@ -8,7 +8,7 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 params:
   # INSTRUCTIONS: Declare the location of the samples that you need for this analysis. Separate samples by a single '-'
 
-  ins: '/huntsman/harpcheng/data/cell_cycle/DH22_NEW/cell_cycle.rds-/huntsman/harpcheng/data/cell_cycle/DH22_control/cell_cycle.rds'
+  ins: '/huntsman/general/data/clustered/sce/DH21_NEW/sce_clus.rds-/huntsman/general/data/clustered/sce/DH21_control/sce_clus.rds'
   # INSTRUCTIONS: List the ids of the samples from above in the same order. Could also be a name of your choosing. 
   # Separate samples by a single '-'. Then add a pipe char '|', to demarcate a comparison if doing so between samples. ex. 'DH8-|-DH6-DH7'
   ids: 'DH21_NEW-DH21_control'
@@ -91,7 +91,10 @@ clusters <- 'temp'
 
 
 ```{r}
+### For debugging
 #inputs <- params$ins
+#ntop = 50
+#negative_control = FALSE
 
 plot_markers <- function(inputs, ids, ntop = 50, negative_control = FALSE, randomSubsets = 100){
   
@@ -219,9 +222,11 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control = FALSE, rando
   return(outputs)
 }
 
+```
+
+```{r include=FALSE, warning=FALSE, message=FALSE}
+
 outputs <- plot_markers(params$ins, ids, ntop = 50, negative_control = FALSE)
-#suppressWarnings(mkdirs(params$output_path))
-#saveRDS(outputs, paste(params$output_path, '/', params$output_file, sep = ""))
 
 ```
 
@@ -229,20 +234,21 @@ outputs <- plot_markers(params$ins, ids, ntop = 50, negative_control = FALSE)
 **positive logFC = upregulated in transduced sample**
 
 ```{r fig.height= 10, fig.width= 10, fig.align='center'}
+
 if (length(clusters) < 3) {
-  outputs$plot
+  if(is.null(output$splot)){ # if no random sampling:
+    outputs$plot
+  } else { # if have random sampling:
+    plot_grid(outputs$plot, outputs$splot, labels = "AUTO")
+  }
 } else {
   writeLines('Not yet implemented')
 }
-ggsave(filename=paste0("/huntsman/general/reports/paired_dge_basic/", params$ids, "/volcano.pdf"), outputs$plot)
+
+## If you want to save a nice volcano plot and sent to researchers:
+#ggsave(filename=paste0("/huntsman/general/reports/paired_dge_basic/", params$ids, "/volcano.pdf"), outputs$plot)
 
 
-# if (length(clusters) < 3) {
-#   p <- plot_grid(outputs$plot, outputs$splot, labels = "AUTO")
-#   p
-# } else {
-#   writeLines('Not yet implemented')
-# }
 ```
 
 ## Differentially Expressed Gene Tables {.tabset}

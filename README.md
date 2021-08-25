@@ -11,7 +11,7 @@
 6. integrate_cell_assign_results: Annotate cell types using cell assign and visulize cell clustering and cell type with dimension reduction plots. Although it is called integrate_cell_assign, it can handle both one-sample (with no integration) and two-sample (with integration) cases. Supply the argument `cell_type` with cell types you want to include for your sample. Choose "no" for `integration` if you don't want to perform the integration step (e.g., if running one sample). We run this rule to save a csv file on cell type information; and generate a rmd report. 
 7. run_cell_cycle_report: Assign cell cycle phases using cyclone and visualize cell cycle phases with dimension reduction plots and bar plots. We run this rule to save a csv file on cell cycle phase information; and generate a rmd report. 
 8. DGE_scran, DGE_edgeR_TWO_samples, DGE_edgeR_MULTIPLE_samples: Calculate the differentially expressed genes using scran (two paired samples) or edgeR (multiple samples), visualize the result with volcano plots, and perform enrichment analysis to find upregulated pathways.
-9. seurat_to_loom: convert sce with cell type information to seurat and then to a loom file in preparation for velocity analyses. We run thsi rule to get a loom object.
+9. seurat_to_loom: convert sce with cell type information to seurat and then to a loom file in preparation for velocity analyses. This loom file contains information on cell clustering and/or cell type information (if we have run cell assignment). We run thsi rule to get a loom object.
 
 For workflow management, we use Snakemake. For details on how to install and use it, refer <a href="https://snakemake.readthedocs.io/en/stable/" target="_blank">here</a>. More detailed instructions on how to run the pipeline through Snakemake are given in the Snakefile, and in the snakefile help document as well. 
 
@@ -104,7 +104,7 @@ This number is used to calculate the top percentage of genes that contribute mos
 **top_PCs:** pass "computed" or any number  
 User can pass "computed" (with quotation marks) to let the pipeline calculate the most optimal value for number of PCs to be used in PCA calculation later on. Optimal number of PCs are calculated based on the number of PCs in the denoised PCA. Note that this number will be between 5 and 50, but the user has the option to supply a specific number instead.  
 
-#### CLUSTERING INDIVIDUAL SCES (cluster_sce)  
+#### CLUSTERING INDIVIDUAL SCES
 Clusters a given sce object and projects results in various t-SNE plots.  
   
 **perplexity_list:** a list of any length, including numbers between 1 and 100  
@@ -127,7 +127,7 @@ After viewing the clustering plots with various k values, the user is expected t
 ### Analyses including multiple data sets  
 
  - **Summary statistics**  
-Show summary statistics for two datasets in a report. To run this, write the ids you wish to compare in the pair_ids list in the Snakefile. You can supply more than one pair of ids; summary stats will be computed for each pair separately.   
+Show summary statistics for two datasets in a report. To run this, write the ids you wish to compare in the pair_ids list in the Snakefile. Make sure ids correspond to pair_ids. For example, if you are running DH22_NEW and DH22_control, you need to specify `ids=['DH22_NEW','DH22_control']`, `pair_ids=['DH22_NEW-DH22_control']`. You can supply more than one pair of ids; summary stats will be computed for each pair separately.   
 
  - **Batch normalization**  
 Remove batch effects in two or more datasets, save the corrected samples and show findings in a report.  
@@ -148,7 +148,7 @@ For information about how to install cell assign, refer to <a href="https://shah
  - **Integrating and visualizing cell assign results**  
 At this step, a special rule other than Seurat integration has been designed. After computing cell types, write the samples you wish to integrate to the integration_ids list at the top of the Snakefile and separate distinct samples with "-", as shown:  
 `ids_integration = ['DH4-DH17-DH10']`  
-You can integrate as many samples as you wish. We previously integrated/combined samples with scran and seurat. Sce objects from both methods are loaded and visualized. Cell assign reports provide visualization on cell clustering and cell type clustering on individual samples and integrated samples with dimention reduction plots. Reports are automatically generated when you run cell assign. Reports for individual samples are in `/reports/cellassign` (this directory contains reports from old runs as we no longer have a separate rule for running individual sample), and integrated sample reports can be found in `/reports/cellassign_integrated` (when you run integrate_cell_assign_results, output reports are in this directory - for both individual sample and multiple samples).  
+You can integrate as many samples as you wish. We previously integrated/combined samples with scran and seurat in the batch correction step. Sce objects from both methods are loaded and visualized. Cell assign reports provide visualization on cell clustering and cell type clustering on individual samples and integrated samples with dimention reduction plots. Reports for individual samples are in `/reports/cellassign` (this directory contains reports from old runs as we no longer have a separate rule for running individual sample), and integrated sample reports can be found in `/reports/cellassign_integrated` (when you run integrate_cell_assign_results, output reports are in this directory - for both individual sample and multiple samples).  
 
 Moreover, each of these steps have two types of files: one off scripts and scripts that have been integrated to the pipeline. One off scripts end with '_O.Rmd'. If you need to repeat a specific step isolated from the Snakemake workflow, you can use the one off scripts where you can specify the ids you wish to analyze.  
 
