@@ -10,7 +10,7 @@ output:
     toc_float: true
 
 params:
-  pair_ids: 'DH32' # to run this, write TWO ids here, separated by -
+  pair_ids: 'pLenti_CR1_CS1-pLenti_CR1_CS2-pLenti_CR2_CS2' # to run this, write TWO ids here, separated by -
   whichMethod: 'default' # to use different parameters here, just update them.
   min_features: 1000
   mito_thresh_max: 25
@@ -876,8 +876,10 @@ for(i in 1:length(pro_sample)){
   ind <- min.clus:max.clus
   df <- matrix(NA, nrow=10, ncol=length(ind))
   for(j in 1:length(ind)){
-    temp <- top10 %>% filter(cluster==ind[j])
-    df[,j] <- temp$gene
+    temp <- top10 %>% filter(cluster==ind[j]) 
+    deg <- temp$gene
+    if(length(temp$gene) < 10) deg <- c(temp$gene, rep(NA, 10-length(temp$gene)))
+    df[,j] <- deg
 }
 
   df <- data.frame(df, stringsAsFactors = FALSE)

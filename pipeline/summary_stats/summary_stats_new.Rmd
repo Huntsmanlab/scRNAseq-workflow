@@ -912,8 +912,10 @@ for(i in 1:length(pro_sample)){
   ind <- min.clus:max.clus
   df <- matrix(NA, nrow=10, ncol=length(ind))
   for(j in 1:length(ind)){
-    temp <- top10 %>% filter(cluster==ind[j])
-    df[,j] <- temp$gene
+    temp <- top10 %>% filter(cluster==ind[j]) 
+    deg <- temp$gene
+    if(length(temp$gene) < 10) deg <- c(temp$gene, rep(NA, 10-length(temp$gene)))
+    df[,j] <- deg
 }
 
   df <- data.frame(df, stringsAsFactors = FALSE)

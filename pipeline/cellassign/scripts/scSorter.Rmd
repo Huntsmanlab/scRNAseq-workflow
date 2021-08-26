@@ -212,6 +212,8 @@ PlotReporter(reporters=epithelial_ciliated, seurat_obj=expr_obj, col="Reds")
 ```
 
 ```{r}
+## need more work
+
 PlotReporter <- function(reporters, seurat_obj, col){
   # `reporters` is a vector of marker genes you are interested in seeing the expression level; `col` is the color of dots.
   
