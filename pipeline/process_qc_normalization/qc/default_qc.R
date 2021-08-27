@@ -13,7 +13,9 @@ make_sce_qc <- function(whichMethod,
                         ribo_thresh_max, 
                         nmads, 
                         min_features, 
-                        remove_mito_and_ribo){
+                        remove_mito_and_ribo,
+                        save_qc,
+                        qc_path){
   
   print("Started QC.")
   
@@ -93,6 +95,9 @@ make_sce_qc <- function(whichMethod,
     sce_qc <- sce_qc[-ribo_idx, ]  } # end of if
   
   print("Finished QC.")
+  
+  ## if we want to save qc'ed object:
+  if(save_qc=="yes") saveRDS(sce_qc, file=qc_path)
   
   return(sce_qc)
   

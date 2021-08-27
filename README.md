@@ -3,7 +3,7 @@
 > This repository contains the code used by the Huntsman Lab at BCCRC for single cell RNA sequencing analysis from 10x experiments.
 
 **The steps of the pipeline are as follows:**  
-1. process_qc_normalization: Make a SingleCellExperiment object from filtered counts. Perform quality control to further filter cells with low reads and/or high mitochondrial content. FInally, we perform normalization. We run this rule to get the normalized sce object.
+1. process_qc_normalization: Make a SingleCellExperiment object from filtered counts. Perform quality control to further filter cells with low reads and/or high mitochondrial content. FInally, we perform normalization. We run this rule to get the normalized sce object. You can also set save_qc to "yes" if you want the qc'ed sce object.
 2. run_summary_stats: Use the Seurat workflow to visualize the results of data before and after quality control. Results include summary statistics, HVGs (volcano plots), clustering and dimension reduction plots, diffusion maps, and heatmaps showing signature genes for each cluster. We run this rule to generate a rmd report on summary statistics and dimension reduction plots.
 3. dimred_cluster: Do dimensionality reduction (PCA, tSNE and UMAP). Perform unsupervised clustering with scran/scater. We run this rule to get the sce object with clustering and dimension reduction information.
 4. compute_diff_map: Compute diffusion map coordinates. We no longer run this rule - instead, we compute diffusion map coordinates and do the visualization in run_summary_stats rule.
@@ -88,6 +88,9 @@ Seed is used for reproducibility.
   
 **remove_mito_and_ribo:** pass "yes" or "no", with quotation marks.  
 "yes" will remove all mitochondrial and ribosomal genes, "no" will retain them. Default is set to "yes".  
+
+**save_qc:** pass "yes" or "no", with quotation marks.
+Sometimes, we might want to obtain the qc'ed sce object. You can set this option to "yes", and the pipeline will save sce_qc.rds in `/data/qc`. You should keep this setting to "no" for the sake of saving space. 
 
 #### DIMENSIONALITY REDUCTION (dim_reduction)  
 Performs PCA, t-SNE and UMAP approximations on the SCE object.  

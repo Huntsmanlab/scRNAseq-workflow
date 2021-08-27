@@ -5,19 +5,18 @@ from snakemake_helper_functions import *
 ids = ['DH21_NEW', 'DH21_control']
 ids = ['DH22_NEW', 'DH22_control']
 ids = ['DH33', 'DH34']
-#ids = ['DH32']
-#ids = ['DH2_DBZ', 'DH2_control']
+ids = ['pLenti_CR1_CS1', 'pLenti_CR1_CS2', 'pLenti_CR2_CS2']
+#ids = ['DH1_DBZ', 'DH1_control']
 
 # separate samples by '-'
 pair_ids =  ['DH33-DH34']
 #pair_ids = ['DH21_NEW-DH21_control']
-#pair_ids = ['DH22_NEW-DH22_control']
-#pair_ids = ['DH32']
-#pair_ids = ['DH2_DBZ-DH2_control']
+pair_ids = ['pLenti_CR1_CS1-pLenti_CR1_CS2-pLenti_CR2_CS2']
+#pair_ids = ['DH1_DBZ-DH1_control']
 
 ids_integration = ['DH33-DH34']
 #ids_integration = ['DH22_NEW-DH22_control']
-#ids_integration = ['DH1_DBZ-DH1_control']
+ids_integration = ['DH1_DBZ-DH1_control']
 #ids_integration = ['DH2_DBZ-DH2_control']
 
 ids_dge = ['VOA10819UT_control_TOP=VOA10819UT_control_BOTTOM', 'VOA10286UT_control_TOP=VOA10286UT_control_BOTTOM'] # second id will be compared to first one
@@ -30,6 +29,7 @@ common_dge_wildcard = make_wildcard(pair_ids)
 
 # FILE NAMES FOR RULE ALL 
 path_to_10X = '../huntsmandata/raw/{id}' # where we keep the 10X outputs
+sce_qc = '../../general/data/qc/{id}/sce_qc.rds' # qc'ed sce
 sce_norm = '../../general/data/normalized/{id}/sce_norm.rds' # normalized sce
 dm_path = '../../general/data/dim_reduction/{id}/dm.rds'# diff map coordinates  
 sce_clus = '../../general/data/clustered/sce/{id}/sce_clus.rds' # clustered sce 
@@ -105,7 +105,7 @@ DGE_edgeR_TWO_samples = expand(edgeR_report_TWO_samples, ids_dge = ids_dge)
 DGE_edgeR_MULTIPLE_samples = expand(edgeR_report_MULTIPLE_samples, ids_dge = ids_dge)
 
 # summary statistics
-run_summary_stats = expand(summary_stats_report, pair_ids = pair_ids)
+run_summary_stats = [expand(summary_stats_report, pair_ids = pair_ids)]
 
 # batch correction 
 do_batch_correction = [expand(path_to_batch_report, ids_integration = ids_integration), expand(scran_corrected, ids_integration = ids_integration), expand(seurat_corrected, ids_integration = ids_integration)]
@@ -116,7 +116,8 @@ cluster_two_samples = [expand(combined_clustering_report, pair_ids = pair_ids), 
 # velocity
 seurat_to_loom = [expand(path_to_loom_file, id = ids)]
 
-process_qc_normalization = expand(sce_norm, id = ids)
+process_qc_normalization = [expand(sce_norm, id = ids), expand(sce_qc, id = ids)]
+
 dimred_cluster = expand(sce_clus, id = ids)
 compute_diff_map = expand(dm_path, id = ids)
 
@@ -124,13 +125,12 @@ compute_diff_map = expand(dm_path, id = ids)
 
 rule all:
   input:
-    #process_qc_normalization,
-    run_summary_stats,
+    process_qc_normalization,
+    #run_summary_stats,
     #dimred_cluster,
     #do_batch_correction,
     #integrate_cell_assign_results, # you can change selected markers in rule cellassign_report_multiple_samples
     #run_cell_cycle_report,
-    
     #seurat_to_loom,
     
     # DGE_scran,
@@ -139,7 +139,7 @@ rule all:
     
     ## compute_diff_map, # we now calculate and save dm coordinates in run_summary_stats
     ## perform_dim_reduction, # determine number of PCs to use
-    ## cluster_sce, #clustering on dividual sample
+    ## cluster_sce, #clustering on individual sample
     ## cluster_two_samples, #clustering on integrated sample
     ## find_common_dges, # common differentially expressed genes in a paired sample
 
@@ -148,9 +148,10 @@ rule all:
 # output normalized sce from 10X:
 rule process_qc_normalization: 
   input: 
-    path_to_10X
+    path_to_10X = path_to_10X
   output: 
-    sce_norm
+    sce_norm = sce_norm,
+    sce_qc = sce_qc
   params: 
     id = "{id}", # wildcard here 
     whichMethod = 'default', # to use different parameters here, just update them.
@@ -159,19 +160,22 @@ rule process_qc_normalization:
     mito_thresh_min = 1,
     ribo_thresh_max = 60, 
     nmads = 3,
-    remove_mito_and_ribo = "no" # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
+    remove_mito_and_ribo = "no", # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
+    save_qc = "yes" # set this to "yes" if you want to get sce_qc.rds
   shell:
       "Rscript pipeline/process_qc_normalization/process_qc_normalization.R \
-     --path_to_10X {input} \
+     --path_to_10X {input.path_to_10X} \
      --id {params.id} \
      --whichMethod {params.whichMethod} \
      --min_features {params.min_features} \
-     --output_file_name {output} \
+     --output_file_name {output.sce_norm} \
      --mito_thresh_max {params.mito_thresh_max} \
      --mito_thresh_min {params.mito_thresh_min} \
      --ribo_thresh_max {params.ribo_thresh_max} \
      --nmads {params.nmads} \
-     --remove_mito_and_ribo {params.remove_mito_and_ribo}"
+     --remove_mito_and_ribo {params.remove_mito_and_ribo} \
+     --save_qc {params.save_qc} \
+     --qc_path {output.sce_qc}"
 
 rule make_summary_stats:
   params:
@@ -185,7 +189,7 @@ rule make_summary_stats:
     nmads = 3,
     remove_mito_and_ribo = "no", # "yes" will remove all mito and ribo genes, "no" will retain them both in the sce
     dm_path = expand(dm_path, id = ids), # !! make sure ids correspond to pair_ids
-    reporter_genes = ["eGFP", "dsRED", "tdTomato"] # all possible reporters - case-insensitive
+    reporter_genes = ["eGFP-NRAS", "dsRED", "tdTomato"] # all possible reporters: case-insensitive; have to be exactly the same as the reporter gene names from the custom reference you built
   input:
     path_to_10X= expand(path_to_10X, id = ids)  # !! make sure ids correspond to pair_ids
   output:

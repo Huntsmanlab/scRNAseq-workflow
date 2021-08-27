@@ -23,6 +23,8 @@ parser$add_argument('--ribo_thresh_max', metavar='FILE', type='integer', help="M
 parser$add_argument('--nmads', metavar='FILE', type='integer', help="MAD threshold")
 parser$add_argument('--min_features', metavar='FILE', type='integer', help="Minimum number of detected genes")
 parser$add_argument('--remove_mito_and_ribo', metavar = 'FILE', type = 'character', help = 'Do you want to remove mito and ribo genes from the sces?')
+parser$add_argument('--save_qc', metavar = 'FILE', type = 'character', help = 'Do you want to save sce_qc.rds?')
+parser$add_argument('--qc_path', metavar = 'FILE', type='character', help="Path to qc'ed sce")
 
 # normalization 
 parser$add_argument('--output_file_name', metavar='FILE', type='character', help="Path to normalized sce")
@@ -41,7 +43,9 @@ sce <- make_sce_qc(whichMethod = args$whichMethod,
                    ribo_thresh_max = args$ribo_thresh_max, 
                    nmads = args$nmads, 
                    min_features = args$min_features, 
-                   remove_mito_and_ribo = args$remove_mito_and_ribo)
+                   remove_mito_and_ribo = args$remove_mito_and_ribo,
+                   save_qc = args$save_qc,
+                   qc_path = args$qc_path)
 
 # normalization
 sce <- normalize_sce(sce = sce, 
