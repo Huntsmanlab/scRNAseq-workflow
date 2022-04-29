@@ -6,10 +6,7 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: html_document
 
 params:
-  pair_ids: 'pair_ids'
-  sce_clus: 'sce_clus'
-  cell_types: 'cell_types'
-  marker: 'marker'
+  pair_ids: 'DH1_DBZ-DH1_control'
 ---
 
 ```{r include = FALSE}
@@ -24,8 +21,7 @@ set.seed(6666)
 
 # load clustered sce
 id.list <- strsplit(params$pair_ids, "-")[[1]] %>% as.list()
-sce <- as.list(unlist(strsplit(params$sce_clus[[1]], ' '))) 
-sce <- lapply(sce, function(path) readRDS(path)) 
+sce <- lapply(id.list, function(id) readRDS(here('..', '..', 'general', 'data', 'clustered', 'sce', id, 'sce_clus.rds')))
 
 # convert to seurat object
 expr_obj <- lapply(sce, function(sce) as.Seurat(sce))
@@ -82,7 +78,7 @@ marker_genes <- data.frame(Type=c(rep("epithelial_unciliated", length(epithelial
                            stringsAsFactors = F)
 
 # cell types we want to include - this is a subset of marker_genes list
-cell_types <- strsplit(as.character(params$cell_types), " ")[[1]]
+cell_types <- c("lymphocyte", "endothelial", "epithelial_ciliated", "epithelial_unciliated","macrophage_cells", "stromal_fibroblast", "vasular_smooth_muscle", "EndometrialStem", "Ovarian_cancer", "mesenchymal")
 
 marker_genes <- marker_genes %>% filter(Type %in% cell_types)
 detected <- marker_genes$Type %>% as.factor() %>% levels()
@@ -109,7 +105,7 @@ for(i in 1:length(expr_obj)){
 ```
 
 
-```{r include=FALSE, message = FALSE,  warning = FALSE}
+```{r include=FALSE}
 
 # cellassign
 cell_type_csv <- lapply(id.list, function(id) here('..', '..', 'general', 'data', 'cellassign', id, 'cell_types.csv'))
@@ -129,7 +125,7 @@ for(i in 1:length(id.list)){
 ```
 
 
-```{r eval=FALSE, include=FALSE}
+```{r eval=FALSE}
 
 # dim reduction and clustering
 expr_obj <- lapply(expr_obj, function(expr_obj) RunPCA(expr_obj, verbose = FALSE))
@@ -166,20 +162,71 @@ for(i in 1:length(expr_obj)){
 
 ## Expression level
 
-We have expression level (logcounts) for `r id.list[[1]]` on the left and `r id.list[[2]]` on the right. The cell type we want to take a closer look at is `r params$marker`.
+we have expression level (logcounts) for `r id.list[[1]]` on the left and `r id.list[[2]]` on the right.
 
-```{r include=FALSE, message = FALSE,  warning = FALSE}
+```{r echo=FALSE, message = FALSE,  warning = FALSE}
 
 PlotReporter <- function(reporters, seurat_obj, col){
   # `reporters` is a vector of marker genes you are interested in seeing the expression level; `col` is the color of dots.
   
+  # get genes in common
+  reporters <- intersect(rownames(seurat_obj[[1]]), reporters)
+  # initialize a list that can be printed out in an html report
+  p <- replicate(length(reporters), vector("list", length(seurat_obj)), simplify = FALSE)
+  
+  # hide plot_ly grid
+  ax <- list(zeroline = FALSE, showline = TRUE, showgrid = FALSE)
+  
+  for(i in 1:length(reporters)){
+      for(j in 1:length(seurat_obj)){
+        count <- GetAssayData(seurat_obj[[j]]) %>% as.matrix  
+        # get umap and tsne coordinates for plotting
+        df_umap <- cbind(seurat_obj[[j]][["TSNE"]]@cell.embeddings %>% as.data.frame(), 
+                         seurat_obj[[j]][["UMAP"]]@cell.embeddings %>% as.data.frame())
+        
+        if(any(grepl(paste("^",reporters[i],"$", sep=""), rownames(seurat_obj[[j]]), ignore.case = TRUE) == TRUE)){
+        # if our sample contains one of the reporter genes: get the logcounts of this gene
+        reporter_idx <- grep(paste("^",reporters[i],"$", sep=""), rownames(seurat_obj[[j]]), ignore.case = TRUE)
+        # add logcount 
+        count_reporter <- count[reporter_idx,]
+        df_umap$logcounts <- count_reporter
+  
+        # plot
+      p[[i]][[j]] <- plot_ly(data = df_umap,
+        x = ~TSNE_1, y = ~TSNE_2,
+        opacity = 1,
+        color = ~logcounts,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 4), 
+        colors = brewer.pal(6, col[j])) %>% 
+          layout(title=paste0(reporters[[i]], "_logcount"),
+                 legend= list(itemsizing='constant'), xaxis = ax, yaxis = ax, showlegend=F)
+      }
+    } 
+    print(do.call("subplot", c(p[[i]])))
+  }
+}
+
+
+PlotReporter(reporters=epithelial_unciliated, seurat_obj=expr_obj, col=c("Reds", "Blues"))
+
+
+```
+
+
+```{r echo=FALSE, message = FALSE,  warning = FALSE}
+
+PlotReporter <- function(reporters, seurat_obj, col){
+  # `reporters` is a vector of marker genes you are interested in seeing the expression level; `col` is the color of dots.
+
   # initialize a list that can be printed out in an html report
   p <- replicate(length(seurat_obj), vector("list"), simplify = FALSE)
   
   # hide plot_ly grid
   ax <- list(zeroline = FALSE, showline = TRUE, showgrid = FALSE)
-  
-  
+
+    
       for(j in 1:length(seurat_obj)){
         count <- GetAssayData(seurat_obj[[j]]) %>% as.matrix  
         # get umap and tsne coordinates for plotting
@@ -205,20 +252,14 @@ PlotReporter <- function(reporters, seurat_obj, col){
           layout(title=paste0(reporters, "_logcount"),
                  legend= list(itemsizing='constant'), xaxis = ax, yaxis = ax, showlegend=F)
         }
-        #do.call("subplot", c(p[[j]]))
+        #do.call("subplot", c(p[[j]])) this doesn't work for some reason
       } 
   subplot(p[[1]],p[[2]])
-}
-  
-```
+  }
 
-```{r echo=FALSE, message = FALSE,  warning = FALSE, fig.width = 15, fig.show = 'hold'}
-
-marker <- params$marker
-marker <- marker_genes %>% dplyr::filter(Type == marker) %>% dplyr::select(Marker) %>% unlist(use.names = F)
 
 # get genes in common
-reporters <- intersect(rownames(expr_obj[[1]]), marker)
+reporters <- intersect(rownames(expr_obj[[1]]), MesenchymalStem)
 
 hm <- htmltools::tagList()
 for(i in 1:length(reporters)){
@@ -226,19 +267,7 @@ for(i in 1:length(reporters)){
 }
 hm
 
-
-
-
-
-
-
-
-
-
 ```
-
-
-
 
 
 

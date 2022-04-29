@@ -4,14 +4,15 @@
 
 **The steps of the pipeline are as follows:**  
 1. process_qc_normalization: Make a SingleCellExperiment object from filtered counts. Perform quality control to further filter cells with low reads and/or high mitochondrial content. FInally, we perform normalization. We run this rule to get the normalized sce object. You can also set save_qc to "yes" if you want the qc'ed sce object.
-2. run_summary_stats: Use the Seurat workflow to visualize the results of data before and after quality control. Results include summary statistics, HVGs (volcano plots), clustering and dimension reduction plots, diffusion maps, and heatmaps showing signature genes for each cluster. We run this rule to generate a rmd report on summary statistics and dimension reduction plots.
+2. run_summary_stats: Use the Seurat workflow to visualize the results of data before and after quality control. Results include summary statistics, HVGs (volcano plots), clustering and dimension reduction plots, diffusion maps, and heatmaps showing signature genes for each cluster. We run this rule to generate an rmd report on summary statistics and dimension reduction plots.
 3. dimred_cluster: Do dimensionality reduction (PCA, tSNE and UMAP). Perform unsupervised clustering with scran/scater. We run this rule to get the sce object with clustering and dimension reduction information.
 4. compute_diff_map: Compute diffusion map coordinates. We no longer run this rule - instead, we compute diffusion map coordinates and do the visualization in run_summary_stats rule.
-5. do_batch_correction: Do batch correction and integration using seurat and scran if we have more than one sample. We run this rule to get scran corrected and seurat corrected objects for downstream analyses (i.e., integrated cell assign); and generate a rmd report visualizing dimension reduction and clustering plots before and after batch correction. 
-6. integrate_cell_assign_results: Annotate cell types using cell assign and visulize cell clustering and cell type with dimension reduction plots. Although it is called integrate_cell_assign, it can handle both one-sample (with no integration) and two-sample (with integration) cases. Supply the argument `cell_type` with cell types you want to include for your sample. Choose "no" for `integration` if you don't want to perform the integration step (e.g., if running one sample). We run this rule to save a csv file on cell type information; and generate a rmd report. 
-7. run_cell_cycle_report: Assign cell cycle phases using cyclone and visualize cell cycle phases with dimension reduction plots and bar plots. We run this rule to save a csv file on cell cycle phase information; and generate a rmd report. 
-8. DGE_scran, DGE_edgeR_TWO_samples, DGE_edgeR_MULTIPLE_samples: Calculate the differentially expressed genes using scran (two paired samples) or edgeR (multiple samples), visualize the result with volcano plots, and perform enrichment analysis to find upregulated pathways.
-9. seurat_to_loom: convert sce with cell type information to seurat and then to a loom file in preparation for velocity analyses. This loom file contains information on cell clustering and/or cell type information (if we have run cell assignment). We run thsi rule to get a loom object.
+5. do_batch_correction: Do batch correction and integration using seurat and scran if we have more than one sample. We run this rule to get scran corrected and seurat corrected objects for downstream analyses (i.e., integrated cell assign); and generate an rmd report visualizing dimension reduction and clustering plots before and after batch correction. 
+6. integrate_cell_assign_results: Annotate cell types using cell assign and visulize cell clustering and cell type with dimension reduction plots. Although it is called integrate_cell_assign, it can handle both one-sample (with no integration) and two-sample (with integration) cases. Supply the argument `cell_type` with cell types you want to include for your sample. Choose "no" for `integration` if you don't want to perform the integration step (e.g., if running one sample). We run this rule to save a csv file on cell type information; and generate an rmd report. 
+7. scSorter_cellassign: To supplement cell type assignment by the cellassign package, we recently discovered this new package `scSorter`. This report shows cell type assignment by these two packages. It also includes expression levels for marker genes of a cell type you specified. We run this rule to generate an rmd report.
+8. run_cell_cycle_report: Assign cell cycle phases using cyclone and visualize cell cycle phases with dimension reduction plots and bar plots. We run this rule to save a csv file on cell cycle phase information; and generate an rmd report. 
+9. DGE_scran, DGE_edgeR_TWO_samples, DGE_edgeR_MULTIPLE_samples: Calculate the differentially expressed genes using scran (two paired samples) or edgeR (multiple samples), visualize the result with volcano plots, and perform enrichment analysis to find upregulated pathways.
+10. seurat_to_loom: convert sce with cell type information to seurat and then to a loom file in preparation for velocity analyses. This loom file contains information on cell clustering and/or cell type information (if we have run cell assignment). We run thsi rule to get a loom object.
 
 For workflow management, we use Snakemake. For details on how to install and use it, refer <a href="https://snakemake.readthedocs.io/en/stable/" target="_blank">here</a>. More detailed instructions on how to run the pipeline through Snakemake are given in the Snakefile, and in the snakefile help document as well. 
 
@@ -25,6 +26,7 @@ rule all:
     # dimred_cluster,
     # do_batch_correction,
     # integrate_cell_assign_results,
+    # scSorter_cellassign,
     # run_cell_cycle_report,
     # seurat_to_loom,
     
@@ -122,9 +124,12 @@ This list will be used during clustering to vary number of nearest neighbors.  Y
 **chosen_k:** one single number, taken from the k_list given above  
 After viewing the clustering plots with various k values, the user is expected to choose a k value to continue downstream analysis. After inspecting the report once, you can pick a certain k value to store in the sce object for further downstream analysis. Default value is 15.  
 
+#### cell assignment with cellassign and scSorter
+
 **cell_types:** this is where we specify the type of cells you want to include for cellassign. The pipeline will assemble a marker gene matrix corresponding to cell types you specify. For a list of gene markers, refer to ./cellassign/scripts/create_marker_matrix.R. A spreadsheet with more details on these markers can be found here: https://docs.google.com/spreadsheets/d/1amSrlUxSD_N7XNDlqT3qvu3KLUyUYWTFux3lKH4Hnzw/edit#gid=0
 
-  
+**marker:** this is the cell type you want to examine expression profile with.
+
 > To run the pipeline using snakemake, change the name of the snakefile from 'sample_snakefile' to 'Snakefile' on your local machine after pulling from master.  
 
 ### Analyses including multiple data sets  

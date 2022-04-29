@@ -25,7 +25,7 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 source(here('pipeline', 'cellassign', 'scripts', 'run_cellassign.R'))
 source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix.R'))
 #set.seed(123)
-set.seed(666) # 6666 is the seed number used in integration_report_cellassign.Rmd
+set.seed(6666) # 6666 is the seed number used in integration_report_cellassign.Rmd
 
 ```
 

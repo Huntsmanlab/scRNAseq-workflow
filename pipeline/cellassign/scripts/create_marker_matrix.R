@@ -53,8 +53,8 @@ create_marker_mat <- function(cell_types){
 #     stromal_fibroblast = c("DCN","COL6A1","CRISPLD2","COL6A3","LUM","COL5A1"),
 #     vasular_smooth_muscle = c("MYLK","ACTA2","MYH11","PLN","SMTN","CNN1"),
 #     lymphocyte = c("MS4A1", 'CD79A', 'PTPRC', 'CD19', 'BANK1', 'CD24', 'IGKC', "CD4","CD2","CD3G","CD3D","CD28","CD3E", "CCL5", "STK17B", "PTPRC"),
-#     mesenchymal_stem = c("ENG","THY1","ALCAM","NT5E"),
 #     ovarian_cancer = c("PAX8", "WT1", "MUC16", "KL6", "KL7", "KL8"),
+#     mesenchymal_stem = c("ITGB1", "CD44", "NT5E", "THY1", "ENG", "ALCAM", "VCAM1"),
 # 
 #     # ARCHIVE
 #     OLDepithelial_unciliated = c("EPCAM", "KRT7","KRT8","KRT18","PAX8","OVGP1", "KRT19", "LCN2",'WFDC2', 'KLF5', 'SDC4', 'UCA1', 'TACSTD2', 'LINC01541', 'ELF3', 'C1orf186', 'DSP', 'CLDN4', 'PERP', 'KRT18', 'CD9', 'USP53',"CDH1","CLDN3","CLDN4","FUT4"),
