@@ -159,4 +159,3 @@ Packages you need to run the pipeline are listed in the sourceFiles/utilities.R 
 `snakemake -n` will execute a dry run.  
 `snakemake -j 5` will allocate 5 cores.  
 `snakemake -F` will force already computed objects to be computed again. 
-Test
