@@ -1,5 +1,6 @@
 library(here)
 library(loomR)
+library(SeuratDisk)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 parser <- ArgumentParser(description = "make a seurat object with cell type information")

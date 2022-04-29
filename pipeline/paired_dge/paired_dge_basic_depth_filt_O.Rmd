@@ -1,17 +1,17 @@
 ---
 title: "Differential Gene Expression Analysis (after cell cycle correction)"
 subtitle: '`r params$ids`'
-author: "Maxwell Douglas and Asli Munzur and Chris Horan"
+author: "Maxwell Douglas and Asli Munzur"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 
 
 params:
   # INSTRUCTIONS: Declare the location of the samples that you need for this analysis. Separate samples by a single '-'
 
-  ins: '/huntsman/general/data/clustered/sce/DH23/sce_clus.rds'
+  ins: '/huntsman/general/data/clustered/sce/DH35_eGFPMAYA/sce_clus.rds'
   # INSTRUCTIONS: List the ids of the samples from above in the same order. Could also be a name of your choosing. 
   # Separate samples by a single '-'. Then add a pipe char '|', to demarcate a comparison if doing so between samples. ex. 'DH8-|-DH6-DH7'
-  ids: 'DH23'
+  ids: 'DH35'
   # INSTRUCTIONS: We can do a differential gene expression calculation between samples or between groups/clusters within samples.
   #               Both flags must be FALSE for b/w sample comparison.
   #               Otherwise set these variables:
@@ -22,7 +22,7 @@ params:
   #                 Set only the reporter flag if you would like the cells containing a single given reporter not already added to the metadata
   #                 separated into their own 'group' and compared. Fields must match exactly.
   #                 Provide the name of the reporter in the sce object, otherwise set the parameter to FALSE.
-  reporter: 'eGFP'
+  reporter: 'eGFP-MAYA'
   
   # INSTRUCTIONS: Set this flag to run repeat sampling to determine DEGS. For when we have unequal sample sizes. 
   #               First grouping must be the small sample.
@@ -102,8 +102,9 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control = FALSE, rando
   # Read in sample(s) and if there is more than one combine, normalize, and re-filter
   if (length(strsplit(inputs, "-")[[1]]) == 1) {
     sce <- readRDS(inputs)
+    browser()
     if(is.null(rowData(sce)$qc_pass)) {
-      sce <- gene_filter(sce, gene_min_counts = 100, gene_min_detection_rate = 5, reporters = "eGFP") }
+      sce <- gene_filter(sce, gene_min_counts = 100, gene_min_detection_rate = 5, reporters = "eGFP-MAYA") }
   } else {
     inputs <- strsplit(inputs, "-")[[1]] # split by "-" SO ID itself must NOT CONTAIN "-"
     sce_list <- lapply(inputs, function(id) readRDS(id))
@@ -129,6 +130,9 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control = FALSE, rando
     sce <- gene_filter(sce, gene_min_counts = 100, gene_min_detection_rate = 5, reporters = NULL)
   }
   
+  depth_cutoff <- quantile(sce@colData@listData[["total"]], 0.5) 
+  sce <- sce[,which(sce@colData@listData[["total"]] > depth_cutoff)]
+  
   # Set appropriate parameters for DGE calculation
   if ((params$reporter == FALSE) && (params$clusters == FALSE)) {                                         # Sample 1 vs Sample 2...
     if (g_names == FALSE) { g_names <- sce$id}
@@ -147,7 +151,7 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control = FALSE, rando
   
   # Perform DGE
   if(params$remove_cell_cycle_genes != FALSE){  # If we want to remove cell cycle related genes
-    if(negative_control) {
+    if(negative_control){
       # Only pass in the genes that pass qc and are not cell cycle related genes
     suppressWarnings(markers <- findMarkers(sce[(rowData(sce)$qc_pass & !rowData(sce)$cell_cycle_gene), ], groups = sample(sce$comparator), log.p = TRUE)) 
       } else {
@@ -267,7 +271,7 @@ outputs$markers_sig %>%
 
 ### Random sampling DEGs
 ```{r, eval=FALSE}
-outputs$markers_sig %>%
+outputs$smarkers_sig %>%
   DT::datatable(
     extensions = 'Buttons', 
     options = list(dom = 'Bfrtip', 
@@ -374,7 +378,7 @@ outputs <- plot_markers(params$ins, ids, ntop = 50, negative_control = TRUE)
 ```
 
 ```{r}
-outputs$markers_sig %>%
+outputs$marker_sig %>%
   DT::datatable(
     extensions = 'Buttons', 
     options = list(dom = 'Bfrtip', 

@@ -11,7 +11,7 @@ output:
     toc_float: true
 
 params:
-  ids: 'DH21_NEW-DH21_control'
+  ids: 'DH32-DH33-DH34s'
 ---
 
 Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots (tSNE and UMAP) before and after batch normalization with **scran** and **seurat** in these samples:  

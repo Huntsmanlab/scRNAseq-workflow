@@ -46,7 +46,9 @@ id.list <- as.list(c(unlist(list(id.list))))
 sce_clus <- as.list(unlist(strsplit(params$sce_clus[[1]], ' '))) 
 cell_type_csv <-  as.list(unlist(strsplit(params$cell_type_csv[[1]], ' '))) 
 cell_types <- strsplit(as.character(params$cell_types), " ")[[1]]
+```
 
+```{r include = FALSE}
 # load cell_type_csv if object already exists; or run cellassign
 sce_cas <- list()
 cell_type <- list()
@@ -61,7 +63,9 @@ for(i in 1:length(id.list)){
     sce_cas[[i]] <- run_cellassign(sce_clus[[i]], cell_types, cell_type_csv[[i]])
   }
 }
+```
 
+```{r include = FALSE}
 # chunk option: if one sample, returns FALSE
 eval_text <- FALSE
 
@@ -75,7 +79,9 @@ if(length(id.list) > 1 & params$integrate =="yes"){
   # chunk option: if two samples, returns TRUE
   eval_text <- TRUE
 } 
+```
 
+```{r include = FALSE}
 # get marker matrix and sort 
 marker_mat <- create_marker_mat(cell_types)
 det_cell_type <- colnames(marker_mat)

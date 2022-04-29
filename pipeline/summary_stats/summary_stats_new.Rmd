@@ -77,7 +77,7 @@ for(i in 1:length(dh_organoid_ids)){
   sce_raws[[i]] <- convert_to_sces(path_to_10X = path_to_10X[[i]], id = dh_organoid_ids[[i]])
   sce_qcs[[i]] <- make_sce_qc(whichMethod=params$whichMethod, sce=sce_raws[[i]], mito_thresh_max=params$mito_thresh_max, 
                               mito_thresh_min=params$mito_thresh_min, ribo_thresh_max=params$ribo_thresh_max, 
-                              nmads=params$nmads, min_features=params$min_features, remove_mito_and_ribo=params$remove_mito_and_ribo)
+                              nmads=params$nmads, min_features=params$min_features, remove_mito_and_ribo=params$remove_mito_and_ribo, save_qc="", qc_path="")
 }
 
 # convert sce to seurat object
@@ -901,7 +901,7 @@ for(i in 1:length(pro_sample)){
   # get top 10 DEGs and plot heatmap
   top10 <- dat.markers %>%
     group_by(cluster) %>%
-    top_n(n = 10, wt = avg_logFC)
+    top_n(n = 10, wt = avg_log2FC)
   
   print(DoHeatmap(qc_sample[[i]], features = top10$gene) + NoLegend() + labs(title = dh_organoid_ids[[i]]))
   

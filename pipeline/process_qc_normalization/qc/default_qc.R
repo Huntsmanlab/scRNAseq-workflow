@@ -96,6 +96,9 @@ make_sce_qc <- function(whichMethod,
   
   print("Finished QC.")
   
+  ###NEW ADDED
+  if(missing(save_qc) || missing(qc_path)) return(sce_qc)
+  
   ## if we want to save qc'ed object:
   if(save_qc=="yes") saveRDS(sce_qc, file=qc_path)
   

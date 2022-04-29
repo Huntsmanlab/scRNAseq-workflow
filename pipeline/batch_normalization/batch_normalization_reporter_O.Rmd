@@ -1,0 +1,371 @@
+---
+title: 'Batch Effect Correction with Scran and cFIT with depth filtering and reporter presence suport'
+subtitle: '`r params$ids`'
+author: 'chris'
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 4
+    toc_float: true
+
+params:
+  ids: 'DH32-DH35'
+  #ids: 'DH2_DBZ'
+
+---
+
+Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots (tSNE and UMAP) before and after batch normalization with **scran** and **seurat** in these samples:  
+`r params$ids`. 
+
+Cells should not cluster by their source/origin (i.e., sampleID) if the batch effect is successfully removed. We can compare batch correction with scran and seurat to decide which is the better correction method we would like to go with.
+
+#### Imports
+```{r include = FALSE}
+library(here)
+library(Seurat)
+library(ggnewscale)
+library(ggpubr)
+library(viridis)
+library(plotly)
+source("../sourceFiles/utilities.R")
+source("../process_qc_normalization/data_preparation/convert_to_sces.R")
+source("../process_qc_normalization/qc/default_qc.R")
+source("cfitUtilities.r")
+source("cfitQuickFunctions.r")
+```
+
+## Scran batch correction
+We first correct for sequencing depth by calling `multiBatchNorm()` which downscales all batches to match the coverage of the least-sequenced batch. Then, we combine sces by directly merging them and use fast mutual nearest neighbours (fastMNN) to identify and remove batch effect. Dimension reduction plots (tSNE and UMAP) are shown to compare sample clustering before and after scran batch correction. 
+
+#### Load SCEs
+```{r include = FALSE}
+# Get experiment IDs
+ids <- strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+ids <- as.list(c(unlist(ids)))
+
+# Load SCEs
+sces <- lapply(ids, function(id) readRDS(paste('/huntsman/general/data/normalized', id, 'sce_norm.rds', sep = "/")))
+
+# Load cell types data
+celltype_csv <- lapply(ids, function(id) read_csv(paste("/huntsman/general/data/cellassign", id, "cell_types.csv", sep = "/")))
+
+# Create Seurat objects from SCEs
+seurats <- lapply(sces, function(sce) CreateSeuratObject(counts = counts(sce), project = sce$id))
+
+# add genes of interest here:
+reporters <- c("eGFP-MAYA", "eGFP")#, )"tdtomato", "eGFP_NRAS", "dsRED-eIF1a")
+```
+
+#### Count Genes
+```{r include = FALSE}
+
+marker_list = c("PAX8","OVGP1","KRT19")
+
+marker_count = list()
+sce = sces[[1]]
+for(marker in 1:length(marker_list)) {
+  marker_idx = grep(paste("^",marker_list[marker],"$", sep=""), rownames(sce), ignore.case = TRUE)
+  cell_markers = unname(sce@assays@data@listData[["counts"]][marker_idx,])
+  marker_count[[marker]] = length(cell_markers[cell_markers > 0])
+}
+names(marker_count) = marker_list
+
+marker_avg = list()
+
+for(marker in 1:length(marker_list)) {
+  marker_idx = grep(paste("^",marker_list[marker],"$", sep=""), rownames(sce), ignore.case = TRUE)
+  cell_markers = unname(sce@assays@data@listData[["counts"]][marker_idx,])
+  marker_avg[[marker]] = sum(cell_markers) / length(cell_markers)
+}
+names(marker_avg) = marker_list
+
+
+```
+
+
+#### Get reporter gene logcounts
+```{r include = FALSE}
+# Initialize reporter gene presence dataframe
+reporterPresence = data.frame("cell_id"=character(), "logcounts"=double(), "experiment"=character(), "depth"=double())
+
+# Get reporter logcounts for each experiment. Only accepts one reporter per experiment.
+for(sce in sces) {
+  reporterPresenceTmp = data.frame("cell_id"=colnames(sce), "logcounts"=0, "experiment"=sce@colData@listData[["id"]], depth = log(colSums(sce@assays@data@listData[["counts"]])))
+  for(j in 1:length(reporters)){
+    if(any(grepl(paste("^",reporters[j],"$", sep=""), rownames(sce), ignore.case = TRUE) == TRUE)){
+      # Get logcount matrix from experiment
+      count <- sce@assays@data@listData[["logcounts"]] %>% as.matrix
+      
+      # Get index of reporter
+      reporter_idx <- grep(paste("^",reporters[j],"$", sep=""), rownames(sce), ignore.case = TRUE)
+      
+      # Get logcounts for reporter
+      count_reporter <- count[reporter_idx,]
+    
+      # Add counts and identifiers to dataframe
+      reporterPresenceTmp$logcounts = count_reporter
+    }
+  }
+  reporterPresence = rbind(reporterPresence, reporterPresenceTmp)
+}
+rm(reporterPresenceTmp)
+
+# Add column for binary reporter presence
+reporterPresence$presence <- FALSE
+reporterPresence$presence[reporterPresence$logcounts > 0] = TRUE
+
+
+```
+
+#### Get CellAssign Data
+```{r include = FALSE}
+celltypes = data.frame("cell_id"=character(), "cellType"=character())
+for(i in 1:length(celltype_csv)) {
+  celltypes_tmp = data.frame("cell_id" = as.data.frame(celltype_csv[[i]])[2], as.data.frame(celltype_csv[[i]][1]))
+  celltypes = rbind(celltypes, celltypes_tmp)
+}
+colnames(celltypes) = c("cell_id", "cell_type")
+
+
+```
+
+#### Perform Scran Batch Correction
+```{r include = FALSE}
+# Subset to common genes 
+universe <- Reduce(intersect, lapply(sces, function(sce) rownames(sce)))
+combined <- lapply(sces, function(sce) sce[universe, ])
+
+# Find highly variable genes  
+vars <- lapply(combined, function(sce) modelGeneVar(sce))
+combined.var <- do.call(combineVar, vars)
+chosen.hvgs <- combined.var$bio > 0
+
+# Combine without any correction yet
+combined <- do.call(correctExperiments, c(PARAM=NoCorrectParam(), combined))
+
+# Dimensionality reduction pre-batch correction
+combined <- runPCA(combined, subset_row = chosen.hvgs)
+combined <- runUMAP(combined, dimred = "PCA", ncomponents = 3)
+
+# Extract pre-batch correction UMAP data
+preBCUmap = as.data.frame(cbind(combined@colData@rownames, combined@int_colData@listData[["reducedDims"]]@listData[["UMAP"]]))
+colnames(preBCUmap) = c("cell_id", "preBCUmap1", "preBCUmap2", "preBCUmap3")
+preBCUmap$preBCUmap1 = as.numeric(as.character(preBCUmap$preBCUmap1))
+preBCUmap$preBCUmap2 = as.numeric(as.character(preBCUmap$preBCUmap2))
+preBCUmap$preBCUmap3 = as.numeric(as.character(preBCUmap$preBCUmap3))
+
+# Perform batch correction 
+batch_removed <- fastMNN(combined, batch = combined$id, subset.row = chosen.hvgs)
+
+#batch_removed <- runTSNE(batch_removed, dimred="corrected")
+batch_removed <- runUMAP(batch_removed, dimred="corrected", ncomponents = 3)
+
+# Extract post-batch correction UMAP data
+scranUmap = as.data.frame(cbind(batch_removed@colData@rownames, batch_removed@int_colData@listData[["reducedDims"]]@listData[["UMAP"]]))
+colnames(scranUmap) = c("cell_id", "scranUmap1", "scranUmap2", "scranUmap3")
+scranUmap$scranUmap1 = as.numeric(as.character(scranUmap$scranUmap1))
+scranUmap$scranUmap2 = as.numeric(as.character(scranUmap$scranUmap2))
+scranUmap$scranUmap3 = as.numeric(as.character(scranUmap$scranUmap3))
+```
+
+#### Perform cFIT Batch Correction
+```{r include=FALSE, echo=FALSE, message=FALSE}
+# Combine Seurat objects
+all=merge(seurats[[1]], y=seurats[2:length(seurats)], add.cell.ids=ids)
+
+# Prepare combined seurat object for cFIT batch correction
+data.list = split_dataset_by_batch(X=t(as.matrix(all@assays$RNA@counts)), batch = all@meta.data$orig.ident)
+genes = select_genes(data.list$X.list, ngenes=3000, verbose=T)
+exprs.list = preprocess_for_integration(data.list$X.list, genes, scale.factor=10^4, scale=T, center=F)
+
+# cFIT Batch Correction
+int.out = CFITIntegrate_sketched(X.list=exprs.list, r=15, subsample.prop = 0.1,
+                                  max.niter=100, early.stopping=10, tol=1e-8, 
+                                  future.plan='sequential', seed=42, verbose=T)
+
+# ncell-by-ngene expression matrix
+exprs.int = do.call(rbind, int.out$H.list) %*% t(int.out$W)
+
+# ncell-by-r low dimensiional representation
+Hnorm = do.call(rbind, int.out$H.list) %*% diag(colSums(int.out$W))
+
+#Visualize the integrated data via UMAP plot,
+umap.out = plot_umap(X=Hnorm, labels=rownames(Hnorm), 
+                     pca = NULL, n_components = 3, n_neighbors = 50, min_dist = 0.1, # umap parameters
+                     point.size = 0.6, alpha=0.8, title=NULL, legend.name='cell type', # figure parameters
+                     seed=42)
+
+# Extract cell names
+umap.out[["p"]][["data"]][["labels"]] = rapply(str_split(umap.out[["p"]][["data"]][["labels"]], "_"), function(x) tail(x, 1))
+cFITUmap = as.data.frame(umap.out[["p"]][["data"]]$labels)
+cFITUmap = cbind(cFITUmap, as.data.frame(umap.out[["emb"]]))
+colnames(cFITUmap) = c("cell_id", "cFITUmap1", "cFITUmap2", "cFITUmap3")
+```
+
+#### Merge UMAP and reporter presence data
+```{r include = FALSE}
+# Merge reporter and various UMAP dataframes
+repDF <- merge.data.frame(reporterPresence, preBCUmap, by.x = 'cell_id', by.y = 'cell_id', all.x = FALSE)
+repDF <- merge.data.frame(repDF, scranUmap, by.x = 'cell_id', by.y = 'cell_id', all.x = FALSE)
+repDF <- merge.data.frame(repDF, cFITUmap, by.x = 'cell_id', by.y = 'cell_id', all.x = FALSE)
+repDF <- merge.data.frame(repDF, celltypes, by.x = 'cell_id', by.y = 'cell_id', all.x = FALSE)
+```
+
+#### Define plotting functions
+```{r include = FALSE, echo = FALSE, message = FALSE}
+# Set colour palette
+colPal = brewer.pal(9,"Set1")
+
+# Max of 9 experiments can be plotted on the same chart
+PlotReporterUMAP <- function(df_umap, separate_experiments = TRUE, binary_presence = FALSE, marker_size = 1, alpha = 1, x_data = "scranUmap1", y_data = "scranUmap2") {
+  exps = unique(df_umap$experiment)
+  #colPalsHigh = brewer.pal(length(exps),"Set1")
+  colLow = "#DDDDDD"
+  plot <- ggplot(data = df_umap, aes_string(x = x_data, y = y_data))
+    if(separate_experiments) {
+      for(i in 1:length(exps)) {
+        if(binary_presence) {
+          plot <- plot + geom_point(data = df_umap[df_umap$experiment == exps[i],], aes(col = presence), size = marker_size, alpha = alpha) +
+            scale_colour_manual(labels = c(""), breaks = TRUE, values = c(colLow, colPal[i]), guide = guide_legend(keywidth = 5, title.hjust = 0.5 , order = i, override.aes = list(size = 5))) +
+            labs(colour = paste(exps[i], "reporter\npresence", sep = "\n")) +
+            new_scale_colour()
+        } else {
+          plot <- plot + geom_point(data = df_umap[df_umap$experiment == exps[i],], aes(col = logcounts), size = marker_size, alpha = alpha) +
+            scale_colour_continuous(low = colLow, high = colPal[i]) +
+            labs(colour = paste(exps[i], " logcount", sep = "\n")) +
+            new_scale_colour()
+        }
+      }
+    } else {
+      if(binary_presence) {
+        plot <- plot + geom_point(data = df_umap, aes(col = presence),size = marker_size, alpha = alpha) +
+          scale_colour_manual(values = c(colLow, colPal[1]))
+      } else {
+        plot <- plot + geom_point(data = df_umap, aes(col = logcounts), size = marker_size, alpha = alpha) +
+          scale_colour_continuous(low = colLow, high = colPal[1])
+      }
+    }
+    plot <- plot + xlab("UMAP 1") +
+      ylab("UMAP 2") +
+      theme_bw()
+  
+  return(plot)
+}
+
+# Max of 9 experiments can be plotted on the same chart
+PlotExpsUMAP <- function(df_umap, marker_size = 1, alpha = 1, x_data = "scranUmap1", y_data = "scranUmap2") {
+  p <- ggplot(data = df_umap, aes_string(x = x_data, y = y_data)) +
+    geom_point(data = df_umap, aes(col = experiment), size = marker_size, alpha = alpha) +
+    scale_colour_manual(values = colPal, guide = guide_legend(keywidth = 5, label.position = "top", title.hjust = 0.5 , override.aes = list(size = 5))) +
+    xlab("UMAP 1") +
+    ylab("UMAP 2") +
+    theme_bw()
+  return(p)
+}
+
+PlotCellTypeUMAP <- function(df_umap, marker_size = 1, alpha = 1, x_data = "scranUmap1", y_data = "scranUmap2") {
+  p <- ggplot(data = df_umap, aes_string(x = x_data, y = y_data)) +
+    geom_point(data = df_umap, aes(col = cell_type), size = marker_size, alpha = alpha) +
+    scale_colour_manual(values = colPal, guide = guide_legend(keywidth = 5, label.position = "top", title.hjust = 0.5 , override.aes = list(size = 5))) +
+    xlab("UMAP 1") +
+    ylab("UMAP 2") +
+    theme_bw()
+  return(p)
+}
+
+PlotDepthUMAP <- function(df_umap, marker_size = 1, x_data = "scranUmap1", y_data = "scranUmap2") {
+  p <- ggplot(data = df_umap, aes_string(x = x_data, y = y_data)) +
+    geom_point(data = df_umap, aes(col = depth), size = marker_size) +
+    scale_colour_viridis() +
+    xlab("UMAP 1") +
+    ylab("UMAP 2") +
+    theme_bw()
+  return(p)
+}
+
+```
+
+```{r echo=FALSE, fig.width=8, fig.height=8, message=FALSE}
+
+test = PlotDepthUMAP(repDF)
+test = PlotReporterUMAP(repDF, x_data = "scranUmap1", y_data = "scranUmap2", binary_presence = TRUE, alpha = 0.25)
+test = PlotReporterUMAP(repDF, x_data = "cFITUmap1", y_data = "cFITUmap2", binary_presence = TRUE)
+test = PlotExpsUMAP(repDF, x_data = "cFITUmap1", y_data = "cFITUmap2")
+test = PlotExpsUMAP(repDF, x_data = "scranUmap1", y_data = "scranUmap2", alpha = 0.25)
+test = PlotExpsUMAP(repDF, x_data = "preBCUmap1", y_data = "preBCUmap2", alpha = 0.25, marker_size = 0.5)
+test = PlotCellTypeUMAP(repDF, x_data = "cFITUmap1", y_data = "cFITUmap2")
+test = plot_ly(repDF, x = ~scranUmap1, y = ~scranUmap2, z = ~scranUmap3, color = ~experiment, colors = c('#BF382A', '#0C4B8E'))
+
+test = PlotExpsUMAP(repSubset, x_data = "scranUmap1", y_data = "scranUmap2")
+test = PlotReporterUMAP(repSubset, x_data = "scranUmap1", y_data = "scranUmap2", binary_presence = TRUE, alpha = 0.25)
+
+test = PlotExpsUMAP(repSubset, x_data = "cFITUmap1", y_data = "cFITUmap2")
+test = PlotReporterUMAP(repSubset, x_data = "cFITUmap1", y_data = "cFITUmap2", binary_presence = TRUE, alpha = 0.25)
+
+test = PlotCellTypeUMAP(repSubset, x_data = "cFITUmap1", y_data = "cFITUmap2")
+
+test = PlotCellTypeUMAP(repDF[repDF$experiment == "DH2_control",], x_data = "cFITUmap1", y_data = "cFITUmap2")
+
+test = plot_ly(repDF[repDF$experiment == "DH2_control",], mode = 'markers')
+test = add_trace(test, x = ~cFITUmap1, y = ~cFITUmap2, z = ~cFITUmap3, color = ~experiment, colors = colPal, marker = list(size = 5), text = ~cell_id)
+
+test
+```
+
+#### Display pre-batch correction UMAP
+```{r echo=FALSE, fig.width=4, fig.height=4, message=FALSE}
+plotPreBC <- PlotReporterUMAP(repDF, separate_experiments = TRUE, binary_presence = TRUE, marker_size = 0.5, x_data = "preBCUmap1", y_data = "preBCUmap2")
+plotPreBC
+```
+
+#### Display scran batch correction UMAP
+```{r echo=FALSE, fig.width=4, fig.height=4, message=FALSE}
+plotScran <- PlotReporterUMAP(repDF, separate_experiments = TRUE, binary_presence = TRUE, marker_size = 0.5, x_data = "scranUmap1", y_data = "scranUmap2")
+plotScran
+```
+
+#### Display cFIT batch correction UMAP
+```{r echo=FALSE, fig.width=4, fig.height=4, message=FALSE}
+plotCFIT <- PlotReporterUMAP(repDF, separate_experiments = TRUE, binary_presence = TRUE, marker_size = 0.5, x_data = "cFITUmap1", y_data = "cFITUmap2")
+plotCFIT
+```
+
+# OLD - may delete later
+```{r include = FALSE}
+p <- list()
+
+p <- PlotReporter(repDF, separate_experiments = TRUE, binary_presence = TRUE)
+
+plots <- ggarrange(p[[1]], p[[2]], ncol=2, common.legend = TRUE, legend = "right")
+
+gridExtra::grid.arrange(plots, top = textGrob(paste("Reporter Gene Presence:", paste(unique(repDF$experiment), sep = "", collapse = ", "), sep = " "), gp=gpar(fontsize=20,font=3)))
+
+hists <- list()
+dep_filt_sample <- list()
+
+for(i in 1:length(qc_sample)){
+  bot_quarter <- quantile(qc_sample[[i]]@meta.data[["nCount_RNA"]], 0.25)  
+  half <- quantile(qc_sample[[i]]@meta.data[["nCount_RNA"]], 0.5)
+  top_quarter <- quantile(qc_sample[[i]]@meta.data[["nCount_RNA"]], 0.75)
+  hists[[i]] = ggplot(qc_sample[[i]]@meta.data, aes(x=nCount_RNA)) + geom_histogram() +
+    ggtitle(qc_sample[[i]]@meta.data[["orig.ident"]][1]) +
+    geom_vline(data = qc_sample[[i]]@meta.data, aes(xintercept = bot_quarter)) +
+    geom_vline(data = qc_sample[[i]]@meta.data, aes(xintercept = half)) +
+    geom_vline(data = qc_sample[[i]]@meta.data, aes(xintercept = top_quarter)) +
+    scale_y_continuous(labels = percent)
+  dep_filt_sample[[i]] <- qc_sample[[i]][,which(qc_sample[[i]]@meta.data[["nCount_RNA"]] > half)]
+}
+
+depDF = BuildReporterDF(reporters, dep_filt_sample, batch_removed)
+
+dep_plots <- PlotReporterSepExps(depDF)
+dep_plots
+
+gridExtra::grid.arrange(dep_plots[[1]], dep_plots[[2]], nrow = 2, top = textGrob(paste("Reporter Gene Presence:", paste(unique(repDF$experiment), sep = "", collapse = ", "), sep = " "), gp=gpar(fontsize=20,font=3)))
+
+n <- length(hists)
+nCol <- floor(sqrt(n))
+do.call("grid.arrange", c(hists, ncol=nCol))
+```

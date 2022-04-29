@@ -8,8 +8,8 @@ output:
 
 params:
   id: 'id'
-  output_path: 'output_path' # where we save the sce with clustering data 
-  path_to_sce_norm: 'sce_red'
+  #output_path: 'output_path' # where we save the sce with clustering data 
+  path_to_sce_red: 'sce_red'
   chosen_perp: 'chosen_perp'
   perplexity_list: 'perplexity_list'
   k_list: 'k_list'
@@ -32,38 +32,29 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 ```
 
 ```{r echo = FALSE, message = FALSE}
-
 # load the data - it has to be normalized sce with reduced dimensions 
-sce <- readRDS(params$path_to_sce_norm)
-
+sce <- readRDS(params$path_to_sce_red)
 perplexity_list <- params$perplexity_list
 perplexity_list <- strsplit(perplexity_list, " ") # perplexity_list is passed a string with space, get rid of spaces
 perplexity_list <- as.list(c(unlist(list(perplexity_list)))) # save each element separately 
 perplexity_list <- lapply(perplexity_list, function(element) as.numeric(element)) # make them numeric 
-
 k_list <- params$k_list
 k_list <- strsplit(k_list, " ") # perplexity_list is passed a string with space, get rid of spaces
 k_list <- as.list(c(unlist(list(k_list)))) # save each element separately 
 k_list <- lapply(k_list, function(element) as.numeric(element)) # make them numeric 
-
 chosen_perp <- params$chosen_perp
 chosen_perp <- as.numeric(chosen_perp)
-
 chosen_k <- params$chosen_k
 chosen_k <- as.numeric(chosen_k)
-
 ```
 
 ```{r include = FALSE}
-
 g <- buildSNNGraph(sce, use.dimred = "PCA", k = 15) # shared neighbor weighting
 cluster <- igraph::cluster_walktrap(g)$membership # extract clustering info from the graph that we just made 
 sce$cluster <- factor(cluster) # add that info to the sce 
 cluster_table <- table(sce$cluster) # this table shows how many cells in each cluster 
-
 # we can redo the reduced dim plots with the clustering info in mind 
 plotTSNE <- plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste('TSNE', params$id, sep = '_'))
-
 ```
 
 ### t-SNE plots with various perplexities  
@@ -72,15 +63,12 @@ Perplexity is an important parameter that determines the granularity of the visu
 Note that in the plots below, shared neighbor algorithm was used with 15 neighbors. 
 
 ```{r, message = FALSE, echo = FALSE}
-
 # perplexity_list <- list(5, 10, 15, 25, 30, 40, 50, 60, 70, 80, 90, 100)
 # we will use this to dynamically change the figure height in the next chunk
 dim <- length(perplexity_list) / 3 * 4
-
 ```
 
 ```{r fig.width = 12, fig.height = dim, message = FALSE}
-
 # define a function to make tsne plots 
 make_tsne_plot <- function(sce, perplexity_value) {
   
@@ -89,7 +77,6 @@ make_tsne_plot <- function(sce, perplexity_value) {
   
   return(p)
 }
-
 # make copies of the sce object, as many times as the number of different perplexities supplied 
 sce_list <- list()
 i = 1 
@@ -100,34 +87,26 @@ while (i <= length(perplexity_list)) {
   
   i = i + 1 
 }
-
 # list of tsne plots with various perplexity values 
 plotlist <- mapply(make_tsne_plot, sce = sce_list, perplexity_value = perplexity_list)
-
 # based on the user passed chosen_perp parameter, pick an sce computed with a certain perplexity value 
 index <- match(chosen_perp, perplexity_list) # find the index of the chosen perp in the perp list 
 sce <- sce_list[[index]]
-
 # visualize all the plots in 3 columns
 do.call(gridExtra::grid.arrange, c(plotlist, ncol = 3))
-
 ```
 
 ### t-SNE plots with various numbers of clusters 
 After picking a t-SNE plot with a certain perplexity (`r params$chosen_perp`), next we try various numbers for nearest neighbor to see how this changes the number of clusters we have. 
 
 ```{r, include = FALSE}
-
 # k_list = list(5, 9, 10, 12, 15, 25)
-
 # we will use this to dynamically change the figure height in the next chunk
 dim <- length(k_list) / 3 * 4
-
 ```
 
 
 ```{r fig.width = 12, fig.height = dim}
-
 # make copies of the sce object, as many times as the number of different perplexities supplied 
 sce_list <- list()
 i = 1 
@@ -138,43 +117,33 @@ while (i <= length(k_list)) {
   
   i = i + 1 
 }
-
 # function to cluster sce with various k values
 cluster_sce <- function(sce, k_value) {
   
   g <- buildSNNGraph(sce, use.dimred = "PCA", k = k_value, type = "number") # shared neighbor weighting
   cluster <- igraph::cluster_louvain(g)$membership # extract clustering info from the graph that we just made 
   sce$cluster <- factor(cluster) # add that info to the sce 
-
   return(sce)
   
 }
-
 # function to make tsne plots for various sces 
 make_tsne_plots <- function(sce, k_value) {
   
   p <- list(plotTSNE(sce, colour_by="cluster", text_by="cluster") + ggtitle(paste("k = ", k_value, sep = "")))
-
   return(p)
 }
-
 sce_list_cluster <- mapply(cluster_sce, sce = sce_list, k_value = k_list) # generate list of sces with various numbers of clusters 
 tsne_plots <- mapply(make_tsne_plots, sce = sce_list_cluster, k_value = k_list) # generate tsne plots using the sce_list and various k values
-
 # based on the user passed chosen_k parameter, pick an sce computed with a certain k value 
 index <- match(chosen_k, k_list) # find the index of the chosen k in the k list 
 sce <- sce_list_cluster[[index]]
-
 do.call(gridExtra::grid.arrange, c(tsne_plots, ncol = 3))
-
 ```
 
 ### PCA plots  
 
 ```{r fig.width = 12, fig.height = 4}
-
 # By inspecting the contribution of each PC to overall variance, we can get a better sense of the heterogeneity of the data.  
-
 # visualize first 100 PCs
 if (is.null(attr(reducedDim(sce), "percentVar"))){
   
@@ -184,17 +153,13 @@ if (is.null(attr(reducedDim(sce), "percentVar"))){
   
   percent.var <- attr(reducedDim(sce), "percentVar")
   plot(percent.var[1:100], xlab = "PC", ylab = "Variance explained (%)", type = "p", pch = 16, main = "contribution of top 100 PCs to variance") 
-
 }
-
 ```
 
 Here we show the top 4 PCs together below to visualize multiple PCs at the same time. Cells grouped according to the cluster they belong to. The diagonal boxes in the scatter plot matrix below show the cell density for each component.  
 
 ```{r fig.width = 12, fig.height = 8}
-
 plotReducedDim(sce, dimred="PCA", ncomponents = 4, colour_by="cluster") + ggtitle("4 top PCs")
-
 ```
 
 #### Final clustering plots  
@@ -204,35 +169,28 @@ One of the useful tools is to select the area you wish to zoom in, then the plot
 
 
 ```{r include = FALSE}
-
 # get tsne coordinates
 tsne_1 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$TSNE[, 1])
 tsne_2 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$TSNE[, 2])
 tsne_3 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$TSNE[, 3])
-
 df_tsne <- data.frame(tsne_1, tsne_2, tsne_3)
 df_tsne$cluster <- as.factor(sce$cluster)
-
 # get umap coordinates 
 umap_1 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$UMAP[, 1])
 umap_2 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$UMAP[, 2])
 umap_3 <- as.numeric(sce@int_colData@listData[["reducedDims"]]$UMAP[, 3])
-
 df_umap <- data.frame(umap_1, umap_2, umap_3)
 df_umap$cluster <- as.factor(sce$cluster)
-
 ```
 
 
 ```{r echo= FALSE, message = FALSE}
 # now we make the table look nice for the report 
-
 cluster_table <- as.data.frame(cluster_table) %>% 
   rename(cluster = Var1, number_of_cells = Freq)
 ```
 
 ```{r include = FALSE}
-
 # make 2d plots according to dims we calculate before 
 tsne <- plot_ly(data = df_tsne,
         x = ~tsne_1, y = ~tsne_2,
@@ -243,7 +201,6 @@ tsne <- plot_ly(data = df_tsne,
         marker = list(size = 5)) %>% 
   layout(title = 'clusters shown in t-SNE plot', 
          legend= list(itemsizing='constant'))
-
 umap <- plot_ly(data = df_umap,
         x = ~umap_1, y = ~umap_2,
         opacity = 1,
@@ -253,11 +210,9 @@ umap <- plot_ly(data = df_umap,
         marker = list(size = 5)) %>% 
   layout(title = 'clusters shown in UMAP plot', 
          legend= list(itemsizing='constant'))
-
 ```
 
 ```{r}
-
 # make 3d plots below 
 tsne_3d <- plot_ly(data = df_tsne,
         x = ~tsne_1, y = ~tsne_2, z = ~tsne_3,
@@ -268,7 +223,6 @@ tsne_3d <- plot_ly(data = df_tsne,
         marker = list(size = 4)) %>% 
   layout(title = 'clusters shown in t-SNE plot - 3D', 
          legend= list(itemsizing='constant'))
-
 umap_3d <- plot_ly(data = df_umap,
         x = ~umap_1, y = ~umap_2, z = ~umap_3,
         opacity = 1,
@@ -278,15 +232,12 @@ umap_3d <- plot_ly(data = df_umap,
         marker = list(size = 4)) %>% 
   layout(title = 'clusters shown in UMAP plot - 3D', 
          legend= list(itemsizing='constant'))
-
 ```
 
 
 ```{r}
-
 tsne
 umap
-
 ```
 
 ### Ways to interact with the 3d plots below  
@@ -298,26 +249,21 @@ Same information in the plots above is also presented in interactive 3d plots be
  - If you bring your mouse pointer over the 3d plots, you'll notice that a faint panel on the right upper corner of the plot appears. That panel gives more options to interact with the plot. To reset everything in the plot, click "reset camera to last save".  
 
 ```{r}
-
 tsne_3d
 umap_3d
-
 ```
 
 ### Diffusion maps  
 Diffusion maps are a non-linear dimensionality technique. It achieves dimensionality reduction by re-organising data according to parameters of its underlying geometry. This method can help us  when dealing with data that includes some sort of differentiation or transformation process because diffusion maps are good at picking up brancing in the data. This is a computationally expensive calculation, so to speed things up, it's best to limit the computation to most significant PCs. In this report, top `r params$n_PCs` were used. Results of diffusion map calculation are given in both 2 and 3 dimensional plots below.  
 
 ```{r fig.width = 12, fig.height = 8, message = FALSE}
-
 # load the dm from params 
 dm <- readRDS(params$dm_path)
-
 # make df with the diffusion map coodinates, we will use this later to make the dm plot 
 tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
                   DC2 = eigenvectors(dm)[, 2],
                   DC3 = eigenvectors(dm)[, 3],
                   Timepoint = sce$cluster) # this will help color based on cluster 
-
 # make the 2D plot 
 dm_2d <- plot_ly(data = tmp,
         x = ~DC1, y = ~DC2,
@@ -328,7 +274,6 @@ dm_2d <- plot_ly(data = tmp,
         marker = list(size = 5)) %>% 
   layout(title = '2D diffusion map showing clusters', 
          legend= list(itemsizing='constant'))
-
 # make the 3d plot 
 dm_3d <- plot_ly(data = tmp,
         x = ~DC1, y = ~DC2, z = ~DC3,
@@ -339,42 +284,14 @@ dm_3d <- plot_ly(data = tmp,
         marker = list(size = 3))  %>% 
   layout(title = '3D diffusion map showing clusters', 
          legend= list(itemsizing='constant'))
-
-
 ```
 
 ```{r echo = FALSE, warning = FALSE, message = FALSE}
-
 dm_2d
 dm_3d
-
 ```
 
 ```{r eval = FALSE, include = FALSE}
-
 # here we save the sce object with the clustering data - we only save the shared neighbor clusters 
-saveRDS(sce, file = params$output_path)
-
+#saveRDS(sce, file = params$output_path)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

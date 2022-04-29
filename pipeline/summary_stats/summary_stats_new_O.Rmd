@@ -10,7 +10,7 @@ output:
     toc_float: true
 
 params:
-  pair_ids: 'pLenti_CR1_CS1-pLenti_CR1_CS2-pLenti_CR2_CS2' # to run this, write TWO ids here, separated by -
+  pair_ids: 'DH35' # to run this, write TWO ids here, separated by -
   whichMethod: 'default' # to use different parameters here, just update them.
   min_features: 1000
   mito_thresh_max: 25
@@ -547,10 +547,12 @@ PlotDiffMap <- function(dat, dm_path, dim){
     dm <- readRDS(dm_path)
   }
   
+  ev = eigenvectors(dm)
+  browser()
   # make df with the diffusion map coodinates, we will use this later to make the dm plot 
-  tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
-                  DC2 = eigenvectors(dm)[, 2],
-                  DC3 = eigenvectors(dm)[, 3],
+  tmp <- data.frame(DC1 = ev[, 1],
+                  DC2 = ev[, 2],
+                  DC3 = ev[, 3],
                   Timepoint = as.factor(dat$seurat_clusters), 
                   ids = dat$orig.ident) # this will help color based on cluster 
 
@@ -593,10 +595,9 @@ l3
 
 ```{r }
 # add genes of interest here:
-reporters <- c("eGFP", "dsRED", "tdTomato")
+reporters <- c("eGFP-MAYA")
 # remove grid from plot_ly
 ax <- list(zeroline = FALSE, showline = TRUE, showgrid = FALSE)
-
 PlotReporter <- function(reporters, sce){
   p <- htmltools::tagList()
   for(i in 1:length(reporters)){
@@ -861,7 +862,7 @@ hm <- d <- htmltools::tagList()
 for(i in 1:length(pro_sample)){
   # find markers for every cluster compared to all remaining cells, report only the positive ones
   dat.markers <- FindAllMarkers(qc_sample[[i]], only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
-  
+  browser()
   # get top 10 DEGs and plot heatmap
   top10 <- dat.markers %>%
     group_by(cluster) %>%
@@ -892,6 +893,8 @@ d
 
 
 ```
+
+
 
 
 

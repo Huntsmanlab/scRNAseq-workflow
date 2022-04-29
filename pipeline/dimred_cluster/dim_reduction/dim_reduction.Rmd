@@ -151,14 +151,18 @@ DimHeatmap(sobject, dims = 1:15, cells = 500, balanced = TRUE)
 ```
 
 ### Finding significant PCs
-‘Significant’ PCs will show a strong enrichment of genes with low p-values. To generate the plot below, a resampling test was implemented by the JackStraw procedure (Macosko et al). A subset of the data (1% by default) ws randomly permuted and PCA was computed again. This constructs a 'null distribution' of feature scores where the procedure was repeated numerous times. 'Significant' PCs were identified as those who have a strong enrichment of low p-value features.
+##OLD DESC
+#‘Significant’ PCs will show a strong enrichment of genes with low p-values. To generate the plot below, a resampling test was implemented by the JackStraw procedure (Macosko et al). A subset of the data (1% by default) ws randomly permuted and PCA was computed again. This constructs a 'null distribution' of feature scores where the procedure was repeated numerous times. 'Significant' PCs were identified as those who have a strong enrichment of low p-value features.
+
+Significant PCs will show a curve that is strongly skewed to the left compared to the null distribution (dashed line). A subset of the data (1% by default) was randomly permuted and PCA was computed again. This constructs a 'null distribution' of feature scores where the procedure was repeated numerous times.
 
 ```{r fig.width = 10, fig.height = 7, warning = FALSE, message=FALSE}
 
 sobject <- JackStraw(object = sobject, reduction = "pca", dims = 20, num.replicate = 100,  prop.freq = 0.1, verbose = FALSE)
 
 sobject <- ScoreJackStraw(object = sobject, dims = 1:20, reduction = "pca")
-JackStrawPlot(object = sobject, dims = 1:20, reduction = "pca")
+JackStrawPlot(object = sobject, dims = 1:20, reduction = "pca") + labs(x="Empirical Quantile", y="Theoretical Quantile")
+
 
 
 ```

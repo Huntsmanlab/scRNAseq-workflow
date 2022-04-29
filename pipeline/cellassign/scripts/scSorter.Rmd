@@ -6,7 +6,7 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: html_document
 
 params:
-  pair_ids: 'DH1_DBZ-DH1_control'
+  pair_ids: 'pair_ids'
 ---
 
 ```{r include = FALSE}

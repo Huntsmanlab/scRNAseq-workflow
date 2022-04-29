@@ -1,0 +1,162 @@
+---
+title: Cell assign results 
+subtitle: '`r params$pair_ids` - `r params$id_type`'
+author: "aslı"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 4
+
+params:
+  pair_ids: 'DH22_control' # write here the ids you want to integrate, separate by '-'
+  id_type: 'id_type' # here you can write a quick summary of what these ids are, like tissue types etc. 
+  
+---
+
+In this report we show the results of cell assign runs on individual samples as well as on integrated and batch corrected samples. We include some dim reduction plots with cell types and clustering information. We first show results of cell assign run on individual samples, then we give the plots for integrated samples.   
+
+
+```{r include = FALSE}
+
+library(here)
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
+#source(here('pipeline', 'cellassign', 'scripts', 'run_cellassign.R'))
+source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix.R'))
+set.seed(434)
+
+title = "test"
+desc = "Test run."
+
+runs = 2
+
+```
+
+```{r include = FALSE}
+
+# get separate ids from the params$pair_ids
+id.list <- strsplit(params$pair_ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+id.list <- as.list(c(unlist(list(id.list))))
+
+# run cell assign and get sce with cell type information
+sce_clus <- lapply(id.list, function(id) paste("/huntsman/general/data/clustered/sce", id, "sce_clus.rds", sep = "/"))
+# cell_types <- c("epithelial_secretory", "epithelial_ciliated", "endothelial", "stromal_fibroblast", "vasular_smooth_muscle", "lymphocyte", "mesenchymal_stem", "endometrial_stem")
+# cell_types <- c("lymphocyte", "epithelial_secretory", "epithelial_ciliated","endothelial", "macrophage_cells", "stromal_fibroblast", "MesenchymalStem", "vasular_smooth_muscle", "EndometrialStem", "Ovarian_cancer", "Mesenchymal_cells")
+
+cell_types <- c("NEWepithelial_unciliated", "NEWepithelial_ciliated")
+#cell_types <- c("lymphocyte", "NEWepithelial_unciliated", "NEWepithelial_ciliated", "endothelial", "stromal_fibroblast")
+
+#cell_types <- c("ORIGB_cells","ORIGCytotoxic_T_cells","ORIGMonocyte/Macrophage","ORIGEpithelial_cells","ORIGMyofibroblast","ORIGVascular_smooth_muscle_cells","ORIGEndothelial_cells","ORIGPlasma_cells","ORIGEpithelial_ciliated_cells","ORIGEndometrial_stem_cells","ORIGMesenchymal_cells","ORIGProliferative_cells","ORIGCluster2_like")
+
+# load cell_type_csv if object already exists; or run cellassign
+cell_type <- data.frame(matrix(ncol = length(cell_types) + 2, nrow = 0))
+
+check_required <- function(cell_check = cell_types[1]) {
+  marker_mat <- create_marker_mat(cell_types)
+  set.seed(sample(1:1000, 1))
+  
+  test_genes = names(which(marker_mat[,cell_check] == 1))
+  gene_check_list = vector("list", length = length(test_genes) + 1)
+  names(gene_check_list) = c("All", test_genes)
+
+  # size factors already computed in qc step
+  sce <- readRDS(sce_clus[[1]])
+  old_rownames <- rownames(sce)
+  rownames(sce) <- rowData(sce)$ID
+  
+  # Get initial cell_type numbers
+  # construct the marker gene matrix
+  sce_marker <- sce[intersect(rownames(marker_mat), rownames(sce)), ]
+  marker_mat <- marker_mat[intersect(rownames(marker_mat), rownames(sce)),] 
+
+  # assign cell type
+  cas <- cellassign(exprs_obj = sce_marker,
+                  marker_gene_info = marker_mat,
+                  s = sizeFactors(sce_marker))
+  
+  cell_type_col <- as.vector(cas$cell_type) 
+  cells_found = sum(cell_type_col == cell_check)
+  
+  gene_check_list[["All"]] = cells_found
+  
+  for(gene in test_genes) {
+    tmp_marker_mat = marker_mat
+    tmp_marker_mat[gene,cell_check] = 0
+    print(gene)
+    
+    sce_marker <- sce[intersect(rownames(tmp_marker_mat), rownames(sce)), ]
+    tmp_marker_mat <- tmp_marker_mat[intersect(rownames(tmp_marker_mat), rownames(sce)),] 
+  
+    # assign cell type
+    cas <- cellassign(exprs_obj = sce_marker,
+                    marker_gene_info = tmp_marker_mat,
+                    s = sizeFactors(sce_marker))
+    
+    cell_type_col <- as.vector(cas$cell_type) 
+    cells_found = sum(cell_type_col == cell_check)
+  
+    gene_check_list[[gene]] = cells_found
+  }
+  return(gene_check_list)
+}
+
+#final_gene_check4 = check_required()
+
+
+for(i in 1:length(id.list)){
+  for(j in 1:runs){
+    marker_mat <- create_marker_mat(cell_types)
+    #marker_mat <- marker.mat
+    #cell_types = colnames(marker.mat)
+    set.seed(sample(1:1000, 1))
+  
+    # size factors already computed in qc step
+    sce <- readRDS(sce_clus[[i]])
+    #sce <- sce_norm_cas
+    old_rownames <- rownames(sce)
+    rownames(sce) <- rowData(sce)$ID
+  
+    # construct the marker gene matrix
+    sce_marker <- sce[intersect(rownames(marker_mat), rownames(sce)), ]
+    marker_mat <- marker_mat[intersect(rownames(marker_mat), rownames(sce)),] 
+  
+    # assign cell type
+    cas <- cellassign(exprs_obj = sce_marker,
+                    marker_gene_info = marker_mat,
+                    s = sizeFactors(sce_marker))
+    
+    cell_type_col <- as.vector(cas$cell_type) 
+    barcodes <- as.vector(colnames(cas)) 
+    cell_type_tmp <- as.data.frame(cbind(cell_type_col, barcodes))
+    if(!("other" %in% cell_types)) {
+      cell_types_all = c(cell_types, "other")
+    }
+    cell_types_all = sort(cell_types_all)
+    not_present = setdiff(c(cell_types_all), unique(cell_type_tmp$cell_type))
+    
+    rowSums = c(t(as.data.frame(table(cell_type_tmp$cell_type))[2]))
+    rowSums = c(rowSums, id.list[i])
+    for(extra in not_present) {
+      index = which(cell_types_all == extra)
+      rowSums = c(rowSums[1:index-1], 0, rowSums[index:length(rowSums)])
+    }
+    cell_type = rbind(cell_type, rowSums)
+    column_names = sort(rownames(table(cell_types_all)))
+    colnames(cell_type) = c(column_names, "experiment")
+  }
+}
+
+# Used to save cellassign results to table
+#dir.create(here('pipeline', 'batch_normalization', 'cellassignTEST', title))
+#cat(desc, file=here('pipeline', 'batch_normalization', 'cellassignTEST', title, 'README'))
+#marker_csv = as.data.frame(read.csv(here('pipeline', 'cellassign', 'cellassign_markers', "140322_DBZTest.csv"), header = FALSE))
+#marker_csv = marker_csv[marker_csv$V1 %in% cell_types,]
+#emptycols <- sapply(marker_csv, function (k) all(is.na(k))|all(k==""))
+#marker_csv <- marker_csv[!emptycols]
+#write.table(marker_csv,here('pipeline', 'batch_normalization', 'cellassignTEST', title, 'marker_list.csv'), sep=",", row.names = FALSE, col.names = FALSE)
+#write.table(cell_type,here('pipeline', 'batch_normalization', 'cellassignTEST', title, 'results.csv'), sep=",", row.names = FALSE)
+
+
+
+```

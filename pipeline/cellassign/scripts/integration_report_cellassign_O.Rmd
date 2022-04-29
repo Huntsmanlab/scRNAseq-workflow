@@ -10,7 +10,7 @@ output:
     toc_depth: 4
 
 params:
-  pair_ids: 'DH1_DBZ' # write here the ids you want to integrate, separate by '-'
+  pair_ids: 'DH35' # write here the ids you want to integrate, separate by '-'
   id_type: 'id_type' # here you can write a quick summary of what these ids are, like tissue types etc. 
   
 ---
@@ -38,8 +38,8 @@ id.list <- as.list(c(unlist(list(id.list))))
 # run cell assign and get sce with cell type information
 sce_clus <- lapply(id.list, function(id) here('..', '..', 'general', 'data', 'clustered', 'sce', id, 'sce_clus.rds'))
 cell_type_csv <- lapply(id.list, function(id) here('..', '..', 'general', 'data', 'cellassign', id, 'cell_types.csv'))
-#cell_types <- c("epithelial_secretory", "epithelial_ciliated", "endothelial", "stromal_fibroblast", "vasular_smooth_muscle", "lymphocyte", "mesenchymal_stem", "endometrial_stem")
-cell_types <- c("lymphocyte", "epithelial_secretory", "epithelial_ciliated","endothelial", "macrophage_cells", "stromal_fibroblast", "MesenchymalStem", "vasular_smooth_muscle", "EndometrialStem", "Ovarian_cancer", "Mesenchymal_cells")
+cell_types <- c("epithelial_secretory", "epithelial_ciliated", "endothelial", "stromal_fibroblast", "vasular_smooth_muscle", "lymphocyte", "mesenchymal_stem", "endometrial_stem")
+#cell_types <- c("lymphocyte", "epithelial_unciliated", "epithelial_ciliated","endothelial", "stromal_fibroblast")
 
 # load cell_type_csv if object already exists; or run cellassign
 sce_cas <- list()

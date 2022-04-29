@@ -236,7 +236,8 @@ visualize_cellassign <- function(seurat_object, reduction_type, group_by, master
   idx <- match(common, master_cell_types)
   
   # pick colors that correspond to the indices
-  colors_chosen <- master_color_palette[idx]
+  #colors_chosen <- master_color_palette[idx]
+  colors_chosen <- master_color_palette
   
   # make cell assign plot
   plot <- DimPlot(object = seurat_object,
