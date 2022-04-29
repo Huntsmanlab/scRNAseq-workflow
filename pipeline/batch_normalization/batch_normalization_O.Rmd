@@ -1,5 +1,5 @@
 ---
-title: 'Correcting for batch effects'
+title: 'Batch Effect Correction with Scran and Seurat'
 subtitle: '`r params$ids`'
 author: 'asli'
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
@@ -11,17 +11,19 @@ output:
     toc_float: true
 
 params:
-  ids: 'DH21_NEW-DH21_control'
+  ids: 'DH32-DH33-DH34s'
 ---
 
-Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots before and after batch normalization with **scran** and **seurat** in these samples:  
-`r params$ids`. Cells should not cluster by their source/orgin (i.e., sampleID) if the batch effect is sucessfully removed.
+Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots (tSNE and UMAP) before and after batch normalization with **scran** and **seurat** in these samples:  
+`r params$ids`. 
+
+Cells should not cluster by their source/orgin (i.e., sampleID) if the batch effect is sucessfully removed. We can compare batch correction with scran and seurat to decide which is the better correction method we would like to go with.
 
 
 ```{r include = FALSE}
 
 library(here)
-source(here('..', 'sourceFiles', 'utilities.R'))
+source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ```
 
@@ -69,6 +71,12 @@ p2 <- plotUMAP(combined, colour_by = "id")
 # batch correction! 
 batch_removed <- fastMNN(combined, batch = combined$id, subset.row = chosen.hvgs)
 
+print("Started clustering the sce.")  
+snn.gr <- buildSNNGraph(batch_removed, use.dimred="corrected")
+clusters <- igraph::cluster_walktrap(snn.gr)$membership
+batch_removed$cluster <- factor(clusters)
+print("Finished clustering sce.")
+
 batch_removed <- runTSNE(batch_removed, dimred="corrected")
 batch_removed <- runUMAP(batch_removed, dimred="corrected")
 
@@ -91,24 +99,25 @@ gridExtra::grid.arrange(p3, p4, nrow = 1)
 
 ```
 
-```{r include = FALSE}
-# save the uncorrected object
-saveRDS(combined, file = here('..', 'data', 'batch_corrected', params$ids, 'uncorrected.rds'))
-
-# save the corrected object 
-saveRDS(batch_removed, file = here('..', 'data', 'batch_corrected', params$ids, 'corrected.rds'))
-
-```
-
 
 ## Seurat integration and batch correction
 
 We can integrate samples using Seurat integration. Seurat first finds integration anchors which are cells that have similar biological state across samples. Then, individual samples are integrated into one integrated sample on which dimension reduction and clustering are ran. Best number of clusters is decided by seurat.
 
 ```{r include = FALSE}
-# we start with the plots for uncorrected samples  
 
-uncorrected <- readRDS(here('..', 'data', 'integrated', params$ids, 'uncorrected.rds'))
+# perform seurat integration: 
+# combined sample without batch correction is stored in the 'uncorrected' slot;
+# batch corrected sample is stored in the 'corrected' slot.
+path_to_sce_clus <- lapply(dh_organoid_ids, function(id) here('..', 'data', 'clustered', 'sce', id, 'sce_clus.rds'))
+
+# perform seurat integration and batch correction
+out <- seurat_integrate(path_to_sce_clus = path_to_sce_clus, 
+                        ids_integration = params$ids)
+  
+
+# we start with the plots for uncorrected samples  
+uncorrected <- out$uncorrected
 
 # some dim red plots 
 p1 <- plotReducedDim(uncorrected, "TSNE", colour_by = "id") 
@@ -116,7 +125,7 @@ p2 <- plotReducedDim(uncorrected, "UMAP", colour_by = "id")
 
 
 # now plots for batch corrected (integrated) samples 
-integrated <- readRDS(here('..', 'data', 'integrated', params$ids, 'integrated.rds'))
+integrated <- out$corrected
 
 # some dim red plots 
 p3 <- DimPlot(integrated, reduction = 'tsne', group.by = 'id', combine = FALSE)
@@ -141,6 +150,15 @@ gridExtra::grid.arrange(p3, p4, nrow = 1)
 
 ```
 
+
+```{r}
+# save the integrated objects:
+# scran batch corrected
+saveRDS(batch_removed, file = here('..', 'data', 'batch_corrected', ids, 'scran_corrected.rds'))
+
+# seurat batch corrected
+saveRDS(integrated, file = here('..', 'data', 'batch_corrected', ids, 'seurat_corrected.rds'))
+```
 
 
 

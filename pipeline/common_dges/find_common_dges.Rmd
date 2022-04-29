@@ -11,7 +11,6 @@ params:
   ntop: 'ntop'
   paired_dge_output: 'paired_dge_output'
   common_dge_outfile_name: 'common_dge_outfile_name'
-  common_dge_plot_file_name: 'common_dge_plot_file_name'
   
 ---
 
@@ -56,16 +55,22 @@ paired_dge_output <- as.list(unlist(strsplit(params$paired_dge_output, ' ')))
 degs_list <- lapply(paired_dge_output, function(some_file) readRDS(some_file))
 
 # Intersect names to find common top genes
-top_names <- lapply(degs_list, function(o) head(o$markers_sig, ntop)$gene_symbol)
+top_names <- lapply(degs_list, function(o) head(o, ntop)$gene_symbol)
 top_names <- data.frame(common_genes = Reduce(intersect, top_names))
 
-tables <- lapply(degs_list, function(o) head(o$markers_sig, ntop))
+tables <- lapply(degs_list, function(o) head(o, ntop))
 names(tables) <- params$pair_ids
+```
 
+
+```{r, message = FALSE}
 # Format
 format_topgenes <- function(o, u) {
-  nms <- colnames(o)[2:dim(o)[2]]
+  nms <- colnames(o)
   nms <- nms[ nms != 'Top']
+  nms <- nms[ nms != 'gene_symbol']
+  sink()
+  print(nms)
   o$Top <- rownames(o)
   rownames(o) <- o$gene_symbol
   o$gene_symbol <- NULL
@@ -83,15 +88,5 @@ output <- data.frame(row.names = top_names$common_genes)
 for (i in 1:length(tables)) { output <- cbind(output, tables[[i]]) }
 
 write.csv(output, file = params$common_dge_outfile_name, quote = FALSE, row.names = TRUE)
-
-# 2. EXTRACT THE PLOTS 
-plots <- lapply(degs_list, function(o) o$plot)
-p <- plot_grid(plotlist = plots, ncol = 2)
-ggsave(filename = params$common_dge_plot_file_name, p , width = 20, height = 30)
-
-DT::datatable(output,
-  extensions = 'Buttons',
-  options = list(dom = 'Bfrtip',
-                 buttons = list("copy", "excel", "csv", "pdf")))
 
 ```

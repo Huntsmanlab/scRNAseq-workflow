@@ -247,7 +247,7 @@ def common_dges_input_files(pair_ids):
   
   while i < len(pair_ids): 
     
-    path = '../data/dge/paired_dge_basic/' + pair_ids[i] + '/outputsTEST.rds'
+    path = '../../general/data/dge/paired_dge_basic/' + pair_ids[i] + '/outputs.rds'
     input_path_list.append(path)
     i += 1
     

@@ -6,14 +6,12 @@ convert_to_sces <- function(path_to_10X, id) {
   # here we account for that: 
   # first check if this directory exists: 
   if(dir.exists(paste(path_to_10X, 'filtered_feature_bc_matrix', sep = '/')) == TRUE) {
-    
     path_to_10X <- paste(path_to_10X, 'filtered_feature_bc_matrix', sep = '/')
-    
   }
   
   sce <- read10xCounts(samples = path_to_10X) 
   
-  # rename reporter genes
+  # rename reporter genes: this step is usually done when running cellranger - you should already have renamed reporter genes in your custom reference
   rowData(sce)$Symbol[rowData(sce)$ID == 'ENSG00099999996'] <- 'tdTomato' # DH21, 22, 21_control, 22_control
   rowData(sce)$Symbol[rowData(sce)$ID == 'ENSG00099999997'] <- 'eGFP' # DH21, 22, 21_control, 22_control
   rowData(sce)$Symbol[rowData(sce)$ID == 'ENSG00099999998'] <- 'eGFP' # DH23

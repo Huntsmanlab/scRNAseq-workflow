@@ -1,5 +1,5 @@
 ---
-title: 'Correcting for batch effects'
+title: 'Batch Effect Correction with Scran and Seurat'
 subtitle: '`r params$ids` - `r params$id_type` '
 author: 'asli'
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
@@ -13,13 +13,16 @@ output:
 params:
   ids: 'ids'
   path_to_sce_clus: 'path_to_sce_clus'
-  output_uncorrected: 'output_uncorrected'
   output_corrected: 'output_corrected'
+  output_integrated: 'output_integrated'
   id_type: 'id_type'
   
 ---
 
-#### Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots before and after batch normalization in `r params$ids`. Analysis was done using scran and batchelor packages. 
+Batch effects can introduce unwanted variation to samples. It's important to normalize the batch effect before attempting to analyze samples together. Here we show some dimensionality reduction plots (tSNE and UMAP) before and after batch normalization with **scran** and **seurat** in these samples:  
+`r params$ids`. 
+
+Cells should not cluster by their source/orgin (i.e., sampleID) if the batch effect is sucessfully removed. We can compare batch correction with scran and seurat to decide which is the better correction method we would like to go with.
 
 
 ```{r include = FALSE}
@@ -29,9 +32,13 @@ source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ```
 
+
+## Scran batch correction
+
+We first correct for sequencing depth by calling `multiBatchNorm()` which downscales all batches to match the coverage of the least-sequenced batch. Then, we combine sces by directly merging them and use fast mutual nearest neighbours (fastMNN) to identify and remove batch effect. Dimension reduction plots (tSNE and UMAP) are shown to compare sample clustering before and after scran batch correction. 
+
+
 ```{r include = FALSE, message = FALSE}
-# For testing purposes:
-# paths <- list('/huntsman/harpcheng/data/clustered/sce/DH21/sce_clus.rds', '/huntsman/harpcheng/data/clustered/sce/DH21_control/sce_clus.rds')
 
 # snakemake passes the input files as one string separated by a space. we need to divide them into separate lists: 
 paths <- as.list(unlist(strsplit(params$path_to_sce_clus[[1]], ' '))) 
@@ -70,6 +77,12 @@ p2 <- plotUMAP(combined, colour_by = "id")
 # batch correction! 
 batch_removed <- fastMNN(combined, batch = combined$id, subset.row = chosen.hvgs)
 
+print("Started clustering the sce.")  
+snn.gr <- buildSNNGraph(batch_removed, use.dimred="corrected")
+clusters <- igraph::cluster_walktrap(snn.gr)$membership
+batch_removed$cluster <- factor(clusters)
+print("Finished clustering sce.")
+
 batch_removed <- runTSNE(batch_removed, dimred = "corrected")
 batch_removed <- runUMAP(batch_removed, dimred = "corrected")
 
@@ -78,25 +91,78 @@ p4 <- plotUMAP(batch_removed, colour_by = "batch")
 
 ```
 
-**Before** batch correction  
+#### **Before** batch correction  
 ```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 8}
 
 gridExtra::grid.arrange(p1, p2, nrow = 1)
 
 ```
 
-**After** batch correction  
+#### **After** batch correction  
 ```{r echo = FALSE, message = FALSE, fig.height = 4, fig.width = 8}
 
 gridExtra::grid.arrange(p3, p4, nrow = 1)
 
 ```
 
-```{r include = FALSE}
-# save the uncorrected object
-saveRDS(combined, file = params$output_uncorrected)
 
-# save the corrected object 
-saveRDS(batch_removed, file = params$output_corrected)
+
+## Seurat integration and batch correction
+
+We can integrate samples using Seurat integration. Seurat first finds integration anchors which are cells that have similar biological state across samples. Then, individual samples are integrated into one integrated sample on which dimension reduction and clustering are ran. Best number of clusters is decided by seurat.
+
+
+```{r include = FALSE}
+
+# snakemake passes the input files as one string separated by a space. we need to divide them into separate lists: 
+path_to_sce_clus <- as.list(unlist(strsplit(params$path_to_sce_clus[[1]], ' '))) 
+
+# perform seurat integration and batch correction
+out <- seurat_integrate(path_to_sce_clus = path_to_sce_clus, 
+                        ids_integration = params$ids)
+
+# we start with the plots for uncorrected samples  
+uncorrected <- out$uncorrected
+
+# some dim red plots 
+p1 <- plotReducedDim(uncorrected, "TSNE", colour_by = "id") 
+p2 <- plotReducedDim(uncorrected, "UMAP", colour_by = "id") 
+
+
+# now plots for batch corrected (integrated) samples 
+integrated <- out$corrected
+
+# some dim red plots 
+p3 <- DimPlot(integrated, reduction = 'tsne', group.by = 'id', combine = FALSE)
+p4 <- DimPlot(integrated, reduction = 'umap', group.by = 'id', combine = FALSE)
+
+p3 <- ggplotify::as.grob(p3[[1]])
+p4 <- ggplotify::as.grob(p4[[1]])
 
 ```
+
+#### **Before** seurat batch correction
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 10}
+
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+
+```
+
+#### **After** seurat batch correction  
+```{r echo = FALSE, message = FALSE, fig.height = 5, fig.width = 10}
+
+gridExtra::grid.arrange(p3, p4, nrow = 1)
+
+```
+
+
+```{r}
+# save the integrated objects:
+# scran batch corrected
+saveRDS(batch_removed, file = params$output_corrected)
+
+# seurat batch corrected
+saveRDS(integrated, file = params$output_integrated)
+
+```
+

@@ -7,9 +7,9 @@ output:
     code_folding: hide
 
 params:
-  ids: 'ids_dge' # write the control first to compare experimental to control 
+  ids: 'ids_dge' # write the control first
   sce_clus: 'sce_clus'
-  
+
   seed: 123
 ---
 
@@ -17,6 +17,7 @@ params:
 
 # source some files
 library(here)
+library(EnhancedVolcano)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 
 ```
@@ -65,7 +66,7 @@ group <- c(rep(1, ncol(sample1_df)), rep(2, ncol(sample2_df)))
 dgeObject <- DGEList(counts = combined, genes = rownames(combined), group = group)
 
 # filter the lowly expressed genes - have at least in 0.5 cpm in at least 2 samples 
-keep <- rowSums(cpm(dgeObject) > 0.5) >= 2 
+keep <- rowSums(edgeR::cpm(dgeObject) > 0.5) >= 2 
 dgeObject <- dgeObject[keep, ]
 
 # normalize using edgeR's method 
@@ -206,11 +207,13 @@ data <- data %>%
 
 cool_genes <- c(upregulated_genes_table[1][1: 15, ], downregulated_genes_table[1][1: 15, ])
 
+pFiltered = data
+pFiltered$pvalue[pFiltered$pvalue == 0] = 9.9e-324
 x_limits = max(max(upregulated_genes_table[, 2]), abs(min(downregulated_genes_table[, 2])))
+y_limit = max(-log10(pFiltered), na.rm=TRUE)
 
-library(EnhancedVolcano)
 
-EnhancedVolcano(data,
+EnhancedVolcano(pFiltered,
   lab = rownames(data),
   x = 'log2FoldChange',
   y = 'pvalue',
@@ -219,18 +222,20 @@ EnhancedVolcano(data,
   selectLab = cool_genes, 
   labCol = 'black',
   labFace = 'bold',
-  drawConnectors = TRUE,
+  #drawConnectors = TRUE, # Breaks plotting
   widthConnectors = 0.4,
   colConnectors = 'black',
   pointSize = 0.7, 
-  xlim = c(-x_limits, x_limits), 
+  xlim = c(-x_limits, x_limits),
+  #ylim = c(0, 1),
   FCcutoff = 1, 
   pCutoff = 10e-5, 
-  legend=c('not significant','Log (base 2) fold-change','P value',
+  legendLabels = c('not significant','Log (base 2) fold-change','P value',
       'P value & Log (base 2) fold-change'), 
   legendPosition = 'right',
   legendLabSize = 8,
-  legendIconSize = 5.0)
+  legendIconSize = 5.0
+)
 
 
 ```

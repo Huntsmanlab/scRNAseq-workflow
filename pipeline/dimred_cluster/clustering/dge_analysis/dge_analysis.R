@@ -1,13 +1,13 @@
 
 # source a function from scran 
-source('/huntsman/amunzur/DH_organoid/pipeline/sourceFiles/getMarkerEffects_scran.R')
+source('/huntsman/general/scRNAseq-workflow/pipeline/sourceFiles/getMarkerEffects_scran.R')
 
 # load the data 
 readRDS()
 
 # here we do pairwise comparisons between clusters for each gene, and return a list of dfs containing ranked candidate markers for each cluster.
 # for example, 8th element in this list would give you the candidate genes for cluster 8. 
-markers.sce <- findMarkers(sce, sce$cluster)
+markers.sce <- findMarkers(sce_clus, sce_clus$cluster)
 
 # pick a cluster to further investigate 
 chosen <- "1"

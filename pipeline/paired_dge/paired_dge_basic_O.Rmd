@@ -1,17 +1,17 @@
 ---
 title: "Differential Gene Expression Analysis (after cell cycle correction)"
 subtitle: '`r params$ids`'
-author: "Maxwell Douglas and Asli Munzur"
+author: "Maxwell Douglas and Asli Munzur and Chris Horan"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 
 
 params:
   # INSTRUCTIONS: Declare the location of the samples that you need for this analysis. Separate samples by a single '-'
 
-  ins: '/huntsman/harpcheng/data/cell_cycle/DH22_NEW/cell_cycle.rds-/huntsman/harpcheng/data/cell_cycle/DH22_control/cell_cycle.rds'
+  ins: '/huntsman/general/data/clustered/sce/DH23/sce_clus.rds'
   # INSTRUCTIONS: List the ids of the samples from above in the same order. Could also be a name of your choosing. 
   # Separate samples by a single '-'. Then add a pipe char '|', to demarcate a comparison if doing so between samples. ex. 'DH8-|-DH6-DH7'
-  ids: 'DH21_NEW-DH21_control'
+  ids: 'DH23'
   # INSTRUCTIONS: We can do a differential gene expression calculation between samples or between groups/clusters within samples.
   #               Both flags must be FALSE for b/w sample comparison.
   #               Otherwise set these variables:
@@ -22,7 +22,7 @@ params:
   #                 Set only the reporter flag if you would like the cells containing a single given reporter not already added to the metadata
   #                 separated into their own 'group' and compared. Fields must match exactly.
   #                 Provide the name of the reporter in the sce object, otherwise set the parameter to FALSE.
-  reporter: FALSE
+  reporter: 'eGFP'
   
   # INSTRUCTIONS: Set this flag to run repeat sampling to determine DEGS. For when we have unequal sample sizes. 
   #               First grouping must be the small sample.
@@ -34,7 +34,7 @@ params:
   remove_cell_cycle_genes: FALSE
 
   # INSTRUCTIONS: Location where you would like the output data stored
-  output_path: '/huntsman/harpcheng'
+  output_path: '/huntsman/choran'
   # INSTRUCTIONS: Name of the output data file
   output_file: 'outputs.rds'
   
@@ -59,9 +59,10 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
 ```
 
-```{r, message=FALSE, warning=FALSE, include=FALSE}
+```{r message=FALSE, warning=FALSE, include=FALSE}
 # Packages, Libraries, and Functions to import
 suppressPackageStartupMessages({
   library(tidyverse)
@@ -91,7 +92,10 @@ clusters <- 'temp'
 
 
 ```{r}
+### For debugging
 #inputs <- params$ins
+#ntop = 50
+#negative_control = FALSE
 
 plot_markers <- function(inputs, ids, ntop = 50, negative_control = FALSE, randomSubsets = 100){
   
@@ -99,7 +103,7 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control = FALSE, rando
   if (length(strsplit(inputs, "-")[[1]]) == 1) {
     sce <- readRDS(inputs)
     if(is.null(rowData(sce)$qc_pass)) {
-      sce <- gene_filter(sce, gene_min_counts = 100, gene_min_detection_rate = 5, reporters = NULL) }
+      sce <- gene_filter(sce, gene_min_counts = 100, gene_min_detection_rate = 5, reporters = "eGFP") }
   } else {
     inputs <- strsplit(inputs, "-")[[1]] # split by "-" SO ID itself must NOT CONTAIN "-"
     sce_list <- lapply(inputs, function(id) readRDS(id))
@@ -143,7 +147,7 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control = FALSE, rando
   
   # Perform DGE
   if(params$remove_cell_cycle_genes != FALSE){  # If we want to remove cell cycle related genes
-    if(negative_control){
+    if(negative_control) {
       # Only pass in the genes that pass qc and are not cell cycle related genes
     suppressWarnings(markers <- findMarkers(sce[(rowData(sce)$qc_pass & !rowData(sce)$cell_cycle_gene), ], groups = sample(sce$comparator), log.p = TRUE)) 
       } else {
@@ -219,9 +223,11 @@ plot_markers <- function(inputs, ids, ntop = 50, negative_control = FALSE, rando
   return(outputs)
 }
 
+```
+
+```{r include=FALSE, warning=FALSE, message=FALSE}
+
 outputs <- plot_markers(params$ins, ids, ntop = 50, negative_control = FALSE)
-#suppressWarnings(mkdirs(params$output_path))
-#saveRDS(outputs, paste(params$output_path, '/', params$output_file, sep = ""))
 
 ```
 
@@ -229,20 +235,21 @@ outputs <- plot_markers(params$ins, ids, ntop = 50, negative_control = FALSE)
 **positive logFC = upregulated in transduced sample**
 
 ```{r fig.height= 10, fig.width= 10, fig.align='center'}
+
 if (length(clusters) < 3) {
-  outputs$plot
+  if(is.null(outputs$splot)){ # if no random sampling:
+    outputs$plot
+  } else { # if have random sampling:
+    plot_grid(output$splot, outputs$plot, labels = "AUTO")
+  }
 } else {
   writeLines('Not yet implemented')
 }
-ggsave(filename=paste0("/huntsman/general/reports/paired_dge_basic/", params$ids, "/volcano.pdf"), outputs$plot)
+
+## If you want to save a nice volcano plot and sent to researchers:
+#ggsave(filename=paste0("/huntsman/general/reports/paired_dge_basic/", params$ids, "/volcano.pdf"), outputs$plot)
 
 
-# if (length(clusters) < 3) {
-#   p <- plot_grid(outputs$plot, outputs$splot, labels = "AUTO")
-#   p
-# } else {
-#   writeLines('Not yet implemented')
-# }
 ```
 
 ## Differentially Expressed Gene Tables {.tabset}
@@ -260,7 +267,7 @@ outputs$markers_sig %>%
 
 ### Random sampling DEGs
 ```{r, eval=FALSE}
-outputs$smarkers_sig %>%
+outputs$markers_sig %>%
   DT::datatable(
     extensions = 'Buttons', 
     options = list(dom = 'Bfrtip', 
@@ -367,7 +374,7 @@ outputs <- plot_markers(params$ins, ids, ntop = 50, negative_control = TRUE)
 ```
 
 ```{r}
-outputs$marker_sig %>%
+outputs$markers_sig %>%
   DT::datatable(
     extensions = 'Buttons', 
     options = list(dom = 'Bfrtip', 

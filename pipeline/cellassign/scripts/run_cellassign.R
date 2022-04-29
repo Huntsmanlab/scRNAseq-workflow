@@ -1,45 +1,61 @@
 library(here)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
-source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix_GC.R'))
-source(here('pipeline', 'cellassign', 'scripts', 'assign_cell_type.R'))
+source(here('pipeline', 'cellassign', 'scripts', 'create_marker_matrix.R'))
 
-parser <- ArgumentParser(description = "run cell assign on a sample")
+suppressPackageStartupMessages({
+  library(SingleCellExperiment)
+  library(scater)
+  library(scran)
+  library(tidyverse)
+  library(aargh)
+  library(cellassign)
+})
 
-parser$add_argument('--sce_clus', metavar='DIRECTORY', type='character', help="path to sce clus")
+# RUN cell type assignment: save sce with cell type information, save csv with cell type information;
+# function returns sce which is used in cell assign report.
 
-parser$add_argument('--cell_type_csv', metavar='DIRECTORY', type='character', help="where we save the cell type information as a csv file")
+run_cellassign <- function(sce_clus, sample_type, cell_type_csv){
 
-parser$add_argument('--marker_mat_path', metavar='DIRECTORY', type='character', help="where we save the sce with cell type info matrix")
-
-parser$add_argument('--sce_cas_path', metavar='DIRECTORY', type='character', help='where we save the sce_cas object')
-
-parser$add_argument('--cellassignment_path', metavar='DIRECTORY', type='character', help="where we run cell assignment")
-
-args <- parser$parse_args()
-
-cellAssign <- function(sce_clus, 
-                       marker_mat_path,
-                       sce_cas_path,
-                       cell_type_csv,
-                       cellassignment_path){
+  # load marker gene matrix; specify the type of your sample: if granulosa cells, supply "GC"; if..., ...
+  marker_mat <- create_marker_mat(sample_type) 
   
-  marker_mat <- create_marker_mat(marker_mat_path) 
-                                 
+  # size factors already computed in qc step
+  sce <- readRDS(sce_clus)
+  old_rownames <- rownames(sce)
+  rownames(sce) <- rowData(sce)$ID
   
-  #### Run cell assign
-  find_cell_type(path_to_sce = sce_clus, 
-                 path_to_marker_mat = marker_mat_path,  
-                 output_file_name3 = cell_type_csv, 
-                 output_file_name2 = cellassignment_path,
-                 output_file_name1 = sce_cas_path)
+  # construct the maker gene matrix
+  sce_marker <- sce[intersect(rownames(marker_mat), rownames(sce)), ]
+  marker_mat <- marker_mat[intersect(rownames(marker_mat), rownames(sce)), ] 
+  
+  # assign cell type
+  cas <- cellassign(exprs_obj = sce_marker,
+                    marker_gene_info = marker_mat,
+                    s = sizeFactors(sce_marker))
+  
+  # make a df with the celltype information 
+  cell_type <- as.vector(cas$cell_type) 
+  barcodes <- as.vector(colnames(sce)) 
+  df <- as.data.frame(cbind(cell_type, barcodes))
+  names(df) <- c("cell_type", "barcodes")
+  
+  # add celltype information to sce
+  sce$cell_type <- cas$cell_type
+  rownames(sce) <- old_rownames
+  
+  # save sce with cell type information
+  # saveRDS(sce, file = sce_cas_path) 
+  
+  # save celltype information in a csv file
+  dir.create(dirname(cell_type_csv))
+  write_csv(df, cell_type_csv) 
+  
+  # retuen sce with cell type information 
+  return(sce)
 }
 
+  
 
-cellAssign(sce_clus = args$sce_clus, 
-           marker_mat_path = args$marker_mat_path,
-           cell_type_csv = args$cell_type_csv,
-           cellassignment_path = args$cellassignment_path,
-           sce_cas_path = args$sce_cas_path)
 
 
 

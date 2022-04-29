@@ -1,45 +1,50 @@
 ---
 title: "Dimensionality reduction plots "
+subtitle: 'DH31'
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 
 params:
   sce_clus: 'sce_clus'
-  dm_path: 'dm_path'
+  dm: 'dm_path'
 
 output: 
   html_document:
     code_folding: hide
+    toc: true
+    toc_depth: 4
 ---
 
 ```{r include = FALSE}
 
 # source some files 
-source("/huntsman/amunzur/scRNAseq-workflow/pipeline/sourceFiles/utilities.R")
+library(here)
+source(here("pipeline", "sourceFiles", "utilities.R"))
 
 ```
 
 ```{r}
+# change this to your sample
+sample_id <- "DH31"
 
-sce <- readRDS(params$sce_clus)
+# load sce_clus
+sce <- readRDS(here("..", "data", "clustered", "sce", sample_id, "sce_clus.rds"))
 
+# load the dm from params 
+dm <- readRDS(here("..", "data", "dim_reduction", sample_id, "dm.rds"))
+
+# set some colors for heatmap
 colors_list <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494", "#B3B3B3", '#E2201C', '#1D91C0', '#6B3E9A', '#32A028', "deepskyblue", "black")
 
 min_cluster <- as.numeric(min(as.vector(sce$cluster)))
 max_cluster <- max(as.numeric(as.character(sce$cluster)))
 
 cluster_name <- min_cluster:max_cluster
-
 colors_list <- colors_list[1:max_cluster]
 
 ```
 
-`r unique(sce$id)`
 
-
-```{r fig.width = 12, fig.height = 8, message = FALSE}
-
-# load the dm from params 
-dm <- readRDS(params$dm_path)
+```{r}
 
 # make df with the diffusion map coodinates, we will use this later to make the dm plot 
 tmp <- data.frame(DC1 = eigenvectors(dm)[, 1],
@@ -69,11 +74,6 @@ dm_3d <- plot_ly(data = tmp,
         marker = list(size = 3), 
         colors = colors_list)  %>% 
   layout(legend= list(itemsizing='constant'))
-
-
-```
-
-```{r}
 
 # get tsne coordinates
 tsne_1 <- as.numeric(sce@int_colData@listData[["reducedDims"]]@listData[["TSNE"]][, 1])
@@ -107,6 +107,9 @@ df_umap$cluster <- as.factor(sce$cluster)
 
 ```{r include = FALSE}
 
+# remove grid from plot_ly
+ax <- list(zeroline = FALSE, showline = TRUE, showgrid = FALSE)
+
 # TSNE
 tsne_3d <- plot_ly(data = df_tsne,
         x = ~tsne_1, y = ~tsne_2, z = ~tsne_3,
@@ -114,7 +117,7 @@ tsne_3d <- plot_ly(data = df_tsne,
         color = ~cluster,
         type = "scatter3d",
         mode = "markers",
-        marker = list(size = 3), 
+        marker = list(size = 4), 
         colors = colors_list) %>% 
   layout(legend= list(itemsizing='constant'))
 
@@ -124,9 +127,10 @@ tsne_2d <- plot_ly(data = df_tsne,
         color = ~cluster,
         type = "scatter",
         mode = "markers",
-        marker = list(size = 3), 
+        marker = list(size = 4), 
         colors = colors_list) %>% 
-  layout(legend= list(itemsizing='constant'))
+  layout(legend= list(itemsizing='constant'),
+         xaxis = ax, yaxis = ax)
 
 
 # PCA
@@ -136,7 +140,7 @@ pca_3d <- plot_ly(data = df_pca,
         color = ~cluster,
         type = "scatter3d",
         mode = "markers",
-        marker = list(size = 3), 
+        marker = list(size = 4), 
         colors = colors_list) %>% 
   layout(legend= list(itemsizing='constant'))
 
@@ -146,9 +150,10 @@ pca_2d <- plot_ly(data = df_pca,
         color = ~cluster,
         type = "scatter",
         mode = "markers",
-        marker = list(size = 3), 
+        marker = list(size = 4), 
         colors = colors_list) %>% 
-  layout(legend= list(itemsizing='constant'))
+  layout(legend= list(itemsizing='constant'),
+         xaxis = ax, yaxis = ax)
 
 # UMAP
 umap_3d <- plot_ly(data = df_umap,
@@ -157,7 +162,7 @@ umap_3d <- plot_ly(data = df_umap,
         color = ~cluster,
         type = "scatter3d",
         mode = "markers",
-        marker = list(size = 3), 
+        marker = list(size = 4), 
         colors = colors_list) %>% 
   layout(legend= list(itemsizing='constant'))
 
@@ -167,13 +172,16 @@ umap_2d <- plot_ly(data = df_umap,
         color = ~cluster,
         type = "scatter",
         mode = "markers",
-        marker = list(size = 3), 
+        marker = list(size = 4), 
         colors = colors_list) %>% 
-  layout(legend= list(itemsizing='constant'))
+  layout(legend= list(itemsizing='constant'),
+         xaxis = ax, yaxis = ax)
 
 ```
 
-# PCA
+# Dimension Reduction Plots 
+
+### PCA
 ```{r}
 
 pca_2d
@@ -181,7 +189,7 @@ pca_3d
 
 ```
 
-# t-SNE
+### t-SNE
 ```{r}
 
 tsne_2d
@@ -189,7 +197,7 @@ tsne_3d
 
 ```
 
-# UMAP
+### UMAP
 ```{r}
 
 umap_2d
@@ -197,13 +205,215 @@ umap_3d
 
 ```
 
-# Diffusion Maps
-```{r}
+### Diffusion map
 
+```{r}
 dm_2d
 dm_3d
+```
+
+
+### UMAP showing logcounts of reporter genes
+
+```{r}
+# add genes of interest here:
+reporters <- c("eGFP", "dsRED", "tdTomato")
+
+p2 <- p3 <-  htmltools::tagList()
+
+for(i in 1:length(reporters)){
+  if(any(grepl(reporters[[i]], rownames(sce), ignore.case = TRUE) == TRUE)){
+    
+    # if our sample contains one of the reporter genes:
+    count <- logcounts(sce)
+    reporter_idx <- grep(reporters[[i]], rownames(sce), ignore.case = TRUE)
+    count_reporter <- count[reporter_idx,]
+    df_umap$logcounts <- count_reporter
+    
+  p2[[i]] <- plot_ly(data = df_umap,
+        x = ~umap_1, y = ~umap_2,
+        opacity = 1,
+        color = ~logcounts,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 4), 
+        colors = brewer.pal(6, "Reds")) %>% 
+          layout(title=paste0(reporters[[i]], "_logcount"),
+         xaxis = ax, yaxis = ax)
+  
+    p3[[i]] <- plot_ly(data = df_umap,
+        x = ~umap_1, y = ~umap_2, z = ~umap_3,
+        opacity = 1,
+        color = ~logcounts,
+        type = "scatter3d",
+        mode = "markers",
+        marker = list(size = 4), 
+        colors = brewer.pal(6, "Reds")) %>% 
+          layout(title=paste0(reporters[[i]], "_logcount"),
+         xaxis = ax, yaxis = ax)
+  }
+}
+
+p2
+p3
 
 ```
+
+
+# Top 20 differentially expressed genes 
+
+```{r}
+
+# get up and down regulated genes for each cluster
+markers.sce.up <- findMarkers(sce, sce$cluster, direction="up")
+
+# a function that returns a table of top sig.genes
+sig_gene_table <- function(gene_list, top=20){
+  
+  df <- list()
+  clus_names <- numeric()
+
+  for(i in 1:length(gene_list)){
+    temp <- list(head(rownames(gene_list[[i]]), top))
+    df <- append(df, temp)
+    clus_names[i] <- paste("cluster", i, sep=" ")
+  }
+
+  df <- as.data.frame(df, stringsAsFactors=FALSE)
+  colnames(df) <- clus_names
+  return(df)
+}
+
+sig_gene_table(markers.sce.up)  %>%
+  DT::datatable(
+    extensions = 'Buttons', 
+    options = list(dom = 'Bfrtip', 
+                   buttons = list("copy", "excel", "csv", "pdf")),
+    caption = "Top 20 up-regulated genes in each cluster")
+
+```
+
+```{r, eval=FALSE}
+
+# a spread sheet of the significant gene table for each cluster
+df <- data.frame(matrix(NA, nrow=20000, ncol=length(markers.sce.up)))
+clus_names <- numeric()
+
+for(i in 1:length(markers.sce.up)){
+  sig.subset <- markers.sce.up[[i]][markers.sce.up[[i]]$p.value < 0.05,]
+  temp <- rownames(sig.subset)
+  diff <- 20000 - length(temp)
+  df[,i] <- c(temp, rep(NA, diff))
+  clus_names[i] <- paste("cluster", i, sep=" ")
+}
+
+colnames(df) <- clus_names
+write.csv(df, quote=FALSE, file=paste0("/huntsman/harpcheng/", sample_id, "_sig_genes.csv"), na="")
+
+```
+
+
+# Heatmap with signature genes
+
+A heatmap showing top 10 upregulated genes.
+
+```{r fig.height = 15, fig.width = 16}
+
+make_heatmap <- function(sce, all_markers){
+
+###################### Subset count matrix ########################
+# subset the sce to the markers 
+idx <- na.omit(match(unlist(all_markers), rownames(sce)))
+sce_subsetted <- sce[idx, ]
+
+# accoding to type of object we are dealing with, extract the counts matrix in a different way 
+if (is.null(sce$orig.ident)) {
+  # if sample is an sce object
+  df_main <- as.data.frame(logcounts(sce_subsetted))
+} else {
+  # if sample is a seurat object
+  df_main <- as.data.frame(GetAssayData(object = sce[["integrated"]], slot = "data")) }
+
+# reorder CELLS according to the clustering order in col annot
+idx_main <- match(rownames(col_annot), colnames(df_main))
+df_main <- df_main[, idx_main]
+
+
+###################### Annotation colors ########################
+# recompute min and max values
+min_cluster <- as.numeric(min(as.vector(sce$cluster)))
+max_cluster <- max(as.numeric(as.character(sce$cluster)))
+
+# set column/cluster colors
+cluster_name <- min_cluster:max_cluster
+cluster_color_list <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F", "#E5C494", "#B3B3B3", '#E2201C', '#1D91C0', "#E7298A", '#32A028')
+cluster_colors <- cluster_color_list[1:max_cluster]
+names(cluster_colors) <- cluster_name
+
+# set row/marker colors
+marker_name <- paste0(names(all_markers), " markers")
+marker_color_list <- c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", '#32A028', "#A0881D", "#705F48", "#595959")
+marker_colors <- marker_color_list[1:length(all_markers)]
+names(marker_colors) <- marker_name
+
+# set sample colors
+sample_id <- as.vector(as.character(unique(sce$id)))
+sample_colors <- colorRampPalette(brewer.pal(8, "RdYlBu"))(length(sample_id))
+names(sample_colors) <- sample_id
+
+# put the above color information into a list
+my_colours <- list(cluster_colors, marker_colors, sample_colors)
+names(my_colours) <- c(colnames(col_annot), "marker_type", " ")
+
+
+###################### make COL annotations  ###################### 
+# make a data frame with colnames of the sce object as rownames here 
+col_annot <- data.frame(colnames(sce), sce$cluster, sce$id, row.names = colnames(sce))
+names(col_annot) <- c("column_names", "cluster", "sample_id")
+
+# this will help order cells according to the cluster they belong to
+col_annot <- col_annot[order(col_annot$cluster), ] 
+col_annot$column_names <- NULL
+col_annot$cluster <- as.vector(as.character(col_annot$cluster))
+col_annot$sample_id <- as.vector(as.character(col_annot$sample_id))
+
+###################### make ROW annotations ###################### 
+all_names_rep <- rep(marker_name, each=10)
+row_annot <- data.frame(unlist(genes), all_names_rep, stringsAsFactors = FALSE) %>% na.omit()
+names(row_annot) <- c("marker_genes", "marker_type")
+rownames(row_annot) <- rownames(df_main)
+row_annot$marker_genes <- NULL
+
+
+###################### Plot heatmap ###################### 
+pheatmap(df_main,
+      color = inferno(10),
+      show_colnames = FALSE,
+      show_rownames = TRUE,
+      cluster_cols = FALSE,
+      cluster_rows = FALSE, 
+      annotation_col = col_annot,
+      annotation_row = row_annot,
+      annotation_colors = my_colours)
+}
+
+
+# get top 10 DEGs for clusters: modify marker list if needed
+genes <- cbind.data.frame(sig_gene_table(markers.sce.up, top=10), 
+                          #c(),
+                          stringsAsFactors = FALSE)
+
+print(make_heatmap(sce, genes))
+```
+
+
+
+
+
+
+
+
+
 
 
 

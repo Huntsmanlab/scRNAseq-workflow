@@ -36,6 +36,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Packages, Libraries, and Functions to import
 library(here)
+library(scran)
 source(here('pipeline', 'sourceFiles', 'utilities.R'))
 source('/huntsman/mdouglas/dh_organoid/source_scripts/utils_dge.R') # maxwell's dge functions 
 
@@ -46,17 +47,18 @@ source('/huntsman/mdouglas/dh_organoid/source_scripts/utils_dge.R') # maxwell's 
 ```{r, message = FALSE, warning = FALSE}
 
 
-plot_markers <- function(ids, ntop = 100, negative_control, randomSubsets = 100){
-  
+plot_markers <- function(paths, ids, ntop = 100, negative_control = FALSE, randomSubsets = 100){
+
   sce_list <- lapply(paths, function(some_path) readRDS(some_path))
-  
-  ids <- lapply(sce_list, function(sce) unique(sce$id)) # extract ids 
-  sce_list <- intersect_all(sce_list) # subset to common genes 
+
+  ids <- lapply(sce_list, function(sce) unique(sce$id)) # extract ids
+  sce_list <- intersect_all(sce_list) # subset to common genes
   sce_list <- scran_batch_norm(sce_list) # batch norm with scran
-  sce <- combine_sces(sce_list = sce_list, prefix_col_name = 'id', prefix_cell_name = TRUE) # combine sces 
-  
-  # gene filtering 
+  sce <- combine_sces(sce_list = sce_list, prefix_col_name = 'id', prefix_cell_name = TRUE) # combine sces
+
+  # gene filtering
   sce <- gene_filter(sce, gene_min_counts = 100, gene_min_detection_rate = 5, reporters = NULL)
+  sce$comparator = sce$id
   
   if(negative_control){
     markers <- findMarkers(sce[rowData(sce)$qc_pass, ], groups = sample(sce$id), log.p = TRUE)
@@ -64,10 +66,10 @@ plot_markers <- function(ids, ntop = 100, negative_control, randomSubsets = 100)
   else{
     markers <- findMarkers(sce[rowData(sce)$qc_pass, ], groups = sce$id, log.p = TRUE)
   }
-  
+
   markers <- markers[[ids[[1]]]] # pos logFC = up-regulated in tranduced cells
   markers_all <- as.data.frame(markers) %>% rownames_to_column('gene_symbol')
-  
+
   if ("FDR" %in% colnames(markers_all)) {                                             # Case when p = p.value
     markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(FDR <= 0.05)
     tooLow <- function(x) (ifelse(x < 1e-315, 1e-315, x))
@@ -77,7 +79,7 @@ plot_markers <- function(ids, ntop = 100, negative_control, randomSubsets = 100)
     t_mark <- markers_sig                                                             # make copy
     t_mark$FDR <- -log10(t_mark[,4])                                                  # log transform
     tt_top <- head(t_mark, ntop)                                                      # Identify top 'n' genes
-    
+
   } else {                                                                            # Case when p = log.p.value
     markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(log.FDR < -1.6)
     # Order the genes for plotting
@@ -86,7 +88,7 @@ plot_markers <- function(ids, ntop = 100, negative_control, randomSubsets = 100)
     t_mark$log.FDR <- -(t_mark[,4])
     tt_top <- head(t_mark, ntop)                                                      # Identify top 'n' genes
   }
-  
+
   p <- ggplot(t_mark, aes_string(x = names(t_mark)[5], y = names(t_mark)[4])) +
     geom_point(colour = 'gray') +
     geom_text_repel(data = tt_top, aes(label = gene_symbol), colour = 'red', size = 5) +
@@ -97,28 +99,41 @@ plot_markers <- function(ids, ntop = 100, negative_control, randomSubsets = 100)
                       control = ids[[2]], ntop = ntop),
          subtitle = 'positive logFC means up-regulated in experimental sample') + theme(plot.subtitle = element_text(hjust = 0.5))
 
-  # Cluster/Subset DGE Analysis by repeated sampling 
-  degs <- fMarkersSampling(sce, ids[1], ids[2], randomSubsets)
+  # 
+  if(length(sce[sce$id == ids[1],]) > length(sce[sce$id == ids[2],])) {
+    larger = ids[[1]]
+    smaller = ids[[2]]
+  } else {
+    larger = ids[[2]]
+    smaller = ids[[1]]
+  }
+  
+  # Cluster/Subset DGE Analysis by repeated sampling
+  degs <- fMarkersSampling(sce, smaller, larger, randomSubsets)
   commonDEGs <- assembleMarkersByP(degs)
   samplingPlot <- plotDEGs(commonDEGs, ids, ntop, params$reporter)
-  
+
   outputs <- list(markers_all = markers_all, markers_sig = markers_sig, tt_top = tt_top, plot = p, smarkers_sig = commonDEGs, splot = samplingPlot)
-  # outputs <- list(markers_all = markers_all, markers_sig = markers_sig, tt_top = tt_top, plot = p)
 }
 
-paths <- as.list(unlist(strsplit(params$sce_norm[[1]], ' '))) 
-outputs <- plot_markers(paths, ntop = 50, negative_control = FALSE)
-
+paths <- as.list(unlist(strsplit(params$sce_norm, ' '))) 
+outputs <- plot_markers(paths, ids = ids, ntop = 50)
 colnames(outputs$markers_all)[5] <- "logFC"
 
-#saveRDS(outputs, file = params$output_path_paired)
+# Save DGE data
+outDF = outputs$markers_all
+saveRDS(outDF, file = params$output_path_paired)
 
 ```
 
 ```{r fig.height= 10, fig.width= 12}
-p <- plot_grid(outputs$plot, outputs$splot, labels = "AUTO")
-p
-# outputs$plot
+
+if(is.null(outputs$splot)){ # if no random sampling:
+  outputs$plot
+} else { # if have random sampling:
+  plot_grid(outputs$plot, outputs$splot, labels = "AUTO")
+}
+
 ```
 
 **positive logFC = upregulated in transduced sample, genes sorted by absolute logFC**

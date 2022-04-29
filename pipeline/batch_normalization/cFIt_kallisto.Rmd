@@ -1,0 +1,371 @@
+---
+title: "cFIT"
+output: html_document
+
+params:
+  ids: 'DH21_control-DH22_control-DH35'
+---
+
+run cfit on kallisto output for DH33, DH34 and DH32
+
+```{r}
+source("/huntsman/choran/utilities.r")
+source('QuickFunctions.r')
+library(Seurat)
+```
+
+```{r}
+
+get=function(id){
+  object<-readRDS(paste0("/huntsman/general/data/clustered/sce/",id,"/sce_clus.rds"))
+  return(object)
+}
+ids=strsplit(params$ids, "-")[[1]] # split by "-" SO ID must NOT CONTAIN "-"
+sces=lapply(ids, get)
+#for(sce in sces) {
+  seurs = lapply(sces, as.Seurat)
+#}
+    
+repeated <- lapply(seurs, function(seur) dim(seur)[[2]]) # extract cell numbers from each sce
+id.list <- mapply(rep, ids, repeated)
+
+for (i in 1:length(seurs)) {
+  seurs[[i]]$orig.ident <- id.list[[i]]
+  Idents(seurs[[i]]) = seurs[[i]]@meta.data[["Barcode"]]
+}
+```
+
+```{r echo = FALSE, message = FALSE, fig.height = 8, fig.width = 8}
+
+#all=merge(seurs[[1]], y=c(seurs[[2]], seurs[[3]]), add.cell.ids=c("DH21_control", "DH22_control", "DH35"), project="inHouse")
+all=merge(x=seurs[[1]], y=c(seurs[[2]], seurs[[3]]), add.cell.ids=c("DH21_control", "DH22_control", "DH35"))
+data.list = split_dataset_by_batch(X=t(as.matrix(all@assays$RNA@counts)), 
+                                   batch = all@meta.data$orig.ident)
+
+genes = select_genes(data.list$X.list, ngenes=3000, verbose=T)
+
+exprs.list = preprocess_for_integration(data.list$X.list, genes, scale.factor=10^4, scale=T, center=F)
+
+# integration
+
+#int.out = CFITIntegrate(X.list=exprs.list, r=15, max.niter=100, future.plan='sequential', seed=0, verbose=F)
+ #this was taking way too long i will try the sketeched version:
+# For large datasets we recommende using the sketched version for fast convergence.
+int.out = CFITIntegrate_sketched(X.list=exprs.list, r=15, subsample.prop = 0.1,
+                                  max.niter=100, early.stopping=10, tol=1e-8, 
+                                  future.plan='sequential', seed=42, verbose=T)
+
+# ncell-by-ngene expression matrix
+exprs.int = do.call(rbind, int.out$H.list) %*% t(int.out$W)
+
+# ncell-by-r low dimensiional representation
+Hnorm = do.call(rbind, int.out$H.list) %*% diag(colSums(int.out$W))
+
+#Visualize the integrated data via UMAP plot,
+
+tech = do.call(c, lapply(data.list$metadata.list, function(x) x$orig.ident))
+celltype = do.call(c, data.list$labels.list)
+umap.out = plot_umap(X=Hnorm, labels=celltype, 
+                     pca = NULL, n_components = 2, n_neighbors = 50, min_dist = 0.1, # umap parameters
+                     point.size = 0.6, alpha=0.8, title=NULL, legend.name='cell type', # figure parameters
+                     seed=42)
+
+
+p1 = umap.out$p # colored by technologies
+p2 = plot_umap(labels=tech, point.size = 1, alpha=0.5, legend.name='technology', emb=umap.out$emb)$p # colored by cell types
+
+p2
+
+
+barcode = do.call(c, lapply(data.list$metadata.list, function(x) x$orig.ident))
+
+celltype = do.call(c, data.list$labels.list)
+umap.out = plot_umap(X=Hnorm, labels=celltype, 
+                     pca = NULL, n_components = 2, n_neighbors = 50, min_dist = 0.1, # umap parameters
+                     point.size = 0.6, alpha=0.8, title=NULL, legend.name='cell type', # figure parameters
+                     seed=42)
+
+p1 = umap.out$p # colored by technologies
+p2 = plot_umap(labels=barcode, point.size = 1, alpha=0.5, legend.name='technology', emb=umap.out$emb)$p # colored by cell types
+
+p2
+```
+
+# ```{r}
+# all[["cFIT"]]=CreateAssayObject(counts=t(exprs.int))
+# # add dimensionality reduction, Hnorm is the embeddings matrix
+# colnames(Hnorm)=paste0("F_", 1:15)
+# all[["cfit"]]=CreateDimReducObject(embeddings = Hnorm, key="F_", assay = "cFIT")
+# DimPlot(all, reduction = "cfit", pt.size = 0.5)
+# 
+# DefaultAssay(all)="cFIT"
+# integrated=RunUMAP(all, reduction = "cfit",reduction.name = "cfitUMAP", dims=1:15)
+# 
+# DimPlot(integrated, reduction = "cfitUMAP", group.by = "orig.ident")
+# ```
+# 
+# 
+# ## cluster on cFIT
+# ```{r}
+# 
+# integrated <- FindNeighbors(integrated, reduction = "cfit", dims = 1:15)
+# integrated <- FindClusters(integrated, resolution = 0.5)
+# 
+# DimPlot(integrated, label = T,  reduction = "cfitUMAP")
+# 
+# integrated$cFIT_clusters=integrated$seurat_clusters
+# 
+# ```
+# 
+# ```{r, fig.width=12, fig.height=15}
+# # scaling is a must for DoHeatmap
+# integrated=ScaleData(integrated, assay = "cFIT",features = genes)
+# markers_cFIT <- FindAllMarkers(integrated, only.pos = TRUE, min.pct = 0.15, logfc.threshold = 0.25, test.use ="wilcox", verbose = F)
+# 
+# top10<-markers_cFIT%>%group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+# DoHeatmap(integrated, features = top10$gene, size=4, angle=90) + NoLegend()
+# 
+# ```
+# 
+# 
+# 
+# ```{r}
+# plot_grid(plotCombo(integrated@meta.data,cFIT_clusters, orig.ident),
+# plotCombo(integrated@meta.data,cFIT_clusters, mutation_status))
+# 
+# ```
+# 
+# 
+# ```{r}
+# 
+# marker_list<-list()
+# clusters <- sort(unique(markers_cFIT[, 'cluster']))
+# for (i in clusters){
+#   clust<-markers_cFIT%>%dplyr::filter(cluster==i)
+#   marker_list[[i]]<-clust
+# }
+# 
+# set.seed(123434)
+# Gos<-run_gene_enrichment(marker_list=marker_list, pathways_input =here('allGosets.gmt.txt'))
+# plots <- make_ge_plots(Gos$fgseaRes_list, pathway_name = "Go", pthresh = 0.05, ntop = 10)
+# plots
+# 
+# ```
+# 
+# ```{r}
+# htmltools::tagList(
+#   lapply(Gos$fgseaRes_list, function(x)(DT::datatable(x, extensions = 'Buttons', 
+#     options = list(dom = 'Bfrtip', 
+#                    buttons = list("copy", "excel", "csv", "pdf")))))
+# )
+# 
+# markers_cFIT%>%DT::datatable()
+# 
+# ```
+# 
+# ```{r, fig.width=10}
+# 
+# FeaturePlot(integrated, features = c( "SOX9", "LGR5", "PAEP", "LCN2"))
+# ```
+# 
+# 
+# DH32 vs DH21 control
+# get DE genes
+# DH33 Vs DH21 control
+# get DE gene 
+# 
+# ```{r}
+# boxplotting<-function(seur,genes, id){
+#   DefaultAssay(seur)="RNA"
+#   sub=seur[genes,]
+#   submeta=sub@meta.data%>%dplyr::select({{id}})
+#   exp=t(sub@assays$RNA@data)
+#   exp=data.frame(exp)
+#   melti=cbind(submeta,exp)
+#   melted=melt(melti)
+#   print(ggplot(melted, aes(x={{id}}, y=value, fill={{id}})) + geom_boxplot()+ theme_classic()+facet_wrap(~variable))
+# }
+# boxplotting(seurs[[1]], "RBP1", mutation_status)
+# 
+# ```
+# 
+# 
+# ```{r}
+# source("/huntsman/nadam/scRNAseq-workflow/pipeline/sourceFiles/utilities.R")
+# 
+# plot_markers <- function(ids, ntop = 50, negative_control){
+#   
+#   sce_list <- lapply(ids, function(id) readRDS( paste0("/huntsman/general/data/normalized/",id,"/sce_norm.rds")))
+#   names(sce_list) <- ids
+# 
+#   universe=intersect(rownames(sce_list[[1]]), rownames(sce_list[[2]]))
+# 
+#   sce_list=lapply(sce_list,function(x)(x[universe,]))
+#   reducedDims(sce_list[[1]])=NULL
+#   reducedDims(sce_list[[2]])=NULL
+#   #sce_list <- do.call(batchelor::multiBatchNorm, c(sce_list, assay.type="counts", min.mean = 0.1))
+#   sce <- combine_sces(sce_list = sce_list, prefix_col_name = 'id', prefix_cell_name = TRUE)
+#   # remove genes whose total counts < 100 and detected in < 5% of cells, remove mito, ribo genes
+#   sce <- gene_filter(sce, gene_min_counts = 100, gene_min_detection_rate = 5, reporters = NULL)
+#   
+#   if(negative_control){
+#     markers <- findMarkers(sce[rowData(sce)$qc_pass, ], clusters = sample(sce$id))
+#   }
+#   else{
+#     markers <- findMarkers(sce[rowData(sce)$qc_pass, ], clusters = sce$id)
+#   }
+#   
+#   markers <- markers[[ids[1]]] # pos logFC = up-regulated in tranduced cells
+#   markers_sig <- as.data.frame(markers) %>% rownames_to_column('gene_symbol') %>% dplyr::filter(FDR <= 0.05)
+#   colnames(markers_sig) <- c('gene_symbol', 'Top', 'p.value ', 'FDR', 'logFC')
+#   markers_sig <- markers_sig %>% dplyr::arrange(desc(abs(logFC)))
+#   #tt_top <- top_n(markers_sig, n = ntop, wt = abs(logFC))
+#   tt_top <- head(markers_sig, ntop)
+#   
+#   p <- ggplot(markers_sig, aes(x = logFC, y = -log10(FDR))) +
+#     geom_point(colour = 'gray') +
+#     geom_text_repel(data = tt_top, aes(label = gene_symbol), colour = 'red', size = 5) + 
+#     geom_point(data = tt_top, aes(x = logFC, y = -log10(FDR)), colour = "blue") +
+#     labs(title = glue('{infected}  vs. {control} top {ntop} DEGs', infected = ids[[1]], control = ids[[2]], ntop = ntop), 
+#          subtitle = 'positive logFC means up-regulated in transduced sample') + theme(plot.subtitle = element_text(hjust = 0.5))
+#   
+#   outputs <- list(markers_sig = markers_sig, tt_top = tt_top, plot = p)
+#   
+# }
+# 
+# outputs1 <- plot_markers(c('DH32', 'DH22_control'), ntop = 50, negative_control = FALSE)
+# ```
+# 
+# 
+# ```{r}
+# outputs1$markers_sig
+# 
+# ```
+# 
+# 
+# 
+# ```{r}
+# outputs2 <- plot_markers(c('DH33', 'DH22_control'), ntop = 50, negative_control = FALSE)
+# outputs2$markers_sig
+# ```
+# 
+# 
+# 
+# ```{r}
+# 
+# outputs1$markers_sig[which((!outputs1$markers_sig$gene_symbol%in%outputs2$markers_sig$gene_symbol)),]
+# ```
+# 
+# # compare with seurat integration
+# 
+# ```{r}
+# integ<-function(seurs){
+# features<- SelectIntegrationFeatures(object.list = seurs, nfeatures=3000)
+# anchors <- FindIntegrationAnchors(object.list = seurs, anchor.features = features, k.filter = 10)
+# integrated <- IntegrateData(anchorset = anchors, dims = 1:35)
+# 
+# DefaultAssay(integrated) <- "integrated"
+# 
+# integrated <- ScaleData(integrated, verbose = FALSE)
+# set.seed(1998)
+# integrated <- Seurat::RunPCA(integrated, verbose = FALSE)
+# integrated <- Seurat::RunUMAP(integrated, dims = 1:30)
+# integrated <- FindNeighbors(integrated, reduction = "pca", dims = 1:35)
+# integrated <- FindClusters(integrated, resolution = 0.5)
+# return(integrated)
+# }
+# 
+# seurat.integrated=integ(seurs)
+# ```
+# 
+# 
+# ```{r}
+# plotCombo(seurat.integrated@meta.data,seurat_clusters, orig.ident)
+# DimPlot(seurat.integrated, group.by = "orig.ident")
+# ```
+# 
+# 
+# ```{r, fig.width=15, fig.height=18}
+# quickDE=function(integrated){
+#   markers <- FindAllMarkers(integrated, only.pos = TRUE, min.pct = 0.15, logfc.threshold = 0.25, test.use ="MAST", verbose = F)
+#   top10<-markers%>%group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+#   print(DoHeatmap(integrated, features = top10$gene, size=4, angle=90) + NoLegend())
+#   return(markers)
+# }
+# 
+# markersSeurat=quickDE(seurat.integrated)
+# 
+# ```
+# 
+# 
+# ```{r}
+# 
+# marker_list<-list()
+# clusters <- sort(unique(markersSeurat[, 'cluster']))
+# for (i in clusters){
+#   clust<-markersSeurat%>%dplyr::filter(cluster==i)
+#   marker_list[[i]]<-clust
+# }
+# 
+# set.seed(123434)
+# Gos<-run_gene_enrichment(marker_list=marker_list, pathways_input =here('allGosets.gmt.txt'))
+# plots <- make_ge_plots(Gos$fgseaRes_list, pathway_name = "Go", pthresh = 0.05, ntop = 10)
+# plots
+# 
+# ```
+# 
+# 
+# ```{r}
+# new=RenameCells(seurat.integrated, new.names = colnames(integrated))
+# head(colnames(seurat.integrated))
+# head(colnames(integrated))
+# 
+# ```
+# 
+# 
+# 
+# 
+# ```{r}
+# 
+# tab <- table( cr=new$seurat_clusters, kb=integrated$seurat_clusters)
+# tab <- tab/rowSums(tab)
+# pheatmap(tab, color=viridis::viridis(100), cluster_cols=FALSE, cluster_rows=FALSE, display_numbers=T,
+#          number_color="white", main = "x=kb clustering, y=Cellranger clustering")
+# 
+# ```
+# 
+# # Enrich on seurat integration
+# 
+# understand the pathways, do we get the same results? the immune markers are not on the top of the list here
+# 
+# ```{r}
+# 
+# DT::datatable(markersSeurat)
+# ```
+# 
+# ```{r}
+# FeaturePlot(seurat.integrated,features=c('EPCAM','KRT7','KRT8','KRT18'))
+# # do a histogram of the levels of epcam in this data set
+# 
+# sub=new[c('EPCAM','KRT7','KRT8','KRT18'),]
+# 
+# df=data.frame(t((sub@assays$RNA@data)))
+# m=melt(df)
+# head(m)
+# ggplot(m, aes(x=value, color=variable))+ geom_histogram(fill="white")+geom_vline(aes(xintercept=0.1), color="red", linetype="dashed")
+# ```
+# 
+# far more cells don't express EPCAM! isolate those cells and check their clustering annotation
+# 
+# ```{r}
+# table(integrated$cFIT_snn_res.0.5)
+# df
+# negEpcam=rownames(data.frame(df)%>%dplyr::filter(EPCAM<0.1))
+# negKRT7=rownames(df%>%dplyr::filter(KRT7<0.1))
+# 
+# negEpcamCells=integrated[, colnames(integrated)%in%negEpcam]
+# negKRT7Cells=integrated[, colnames(integrated)%in%negKRT7]
+# 
+# table(negEpcamCells$cFIT_clusters)
+# table(negKRT7Cells$cFIT_clusters)
+# ```
